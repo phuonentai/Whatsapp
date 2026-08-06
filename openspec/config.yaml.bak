@@ -1,0 +1,17 @@
+schema: spec-driven
+
+context: |
+  Dual Single Point of Truth (SSOT) Architecture Framework:
+
+  +-------------------------------------------------------+
+  |           OpenSpec System Governance                  |
+  +-------------------------------------------------------+
+                    |                       |
+     (Static SSOT: Declarative State)   (Runtime SSOT: Ephemeral Identity)
+                    |                       |
+                    v                       v
+  +-----------------------+       +-----------------------+
+  | go-b2b-starter (Git)  |       |  Stytch B2B (Cloud)   |
+  +-----------------------+       +-----------------------+
+  | - Domain Models (Go)  |       | - Org & Tenant State  |
+  | - SQLC DB Schemas     | <---> | -

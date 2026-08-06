@@ -1,0 +1,126 @@
+schema: spec-driven
+
+context: |
+  # Dual Single Point of Truth (SSOT) Architecture Constitution
+
+  ## 1. State Analysis
+
+  Establishing go-b2b-starter/ (GitHub repository) and Stytch B2B as synchronized Dual
+  Single Points of Truth (SSOT) creates two distinct boundary domains.
+
+  +-------------------------------------------------------+
+  |           OpenSpec System Governance                  |
+  +-------------------------------------------------------+
+                    |                       |
+     (Static SSOT: Declarative State)   (Runtime SSOT: Ephemeral Identity)
+                    |                       |
+                    v                       v
+  +-----------------------+       +-----------------------+
+  | go-b2b-starter (Git)  |       |  Stytch B2B (Cloud)   |
+  +-----------------------+       +-----------------------+
+  | - Domain Models (Go)  |       | - Org & Tenant State  |
+  | - SQLC DB Schemas     | <---> | - Session Management  |
+  | - API Specs & System  |       | - Cryptographic RBAC  |
+  |   Invariants          |       | - Webhook Signatures  |
+  +-----------------------+       +-----------------------+
+
+  Failure Modes & Attack Vectors:
+
+  1. Schema-Identity Drift: Database schema or domain models drifting out of phase
+     with Stytch Organization / RBAC policy definitions.
+  2. Session Impersonation & Spoofing: Inadequate validation of JWT signatures,
+     session tokens, or webhook signatures originating from Stytch.
+  3. Split-Brain State Transitions: State changes committed in local PostgreSQL
+     without atomic verification against Stytch's global identity state.
+  4. Third-Party Outage Cascades: Stytch API latency spikes or downtimes blocking
+     all backend request execution paths due to synchronous verification loops.
+
+  ## 2. Constitutional Alignment
+
+  Static Governance Anchor (GitHub Repository):
+    Every artifact, schema, and API interface within go-b2b-starter/ is the authoritative
+    source for system structure, domain logic, and validation rules. Code implementation
+    cannot alter these contracts without an archived OpenSpec change proposal.
+
+  Runtime Identity Anchor (Stytch B2B API):
+    Stytch is the sole authority for member identity, multi-tenant hierarchy, session
+    validity, and cryptographic RBAC. No local database table within go-b2b-starter/ may
+    replicate or override Stytch password hashes, active session states, or MFA states.
+
+  ## 3. Specification Synthesis
+
+  Primary Static SSOT: go-b2b-starter/ (GitHub Repository)
+    - Authoritative repository for code, DB migrations, SQLC query models, OpenAPI
+      schemas, and OpenSpec delta specifications.
+    - Clean Architecture enforcement: domain -> application -> infrastructure.
+    - Zero hardcoded runtime credentials; all configuration derived via validated
+      environment invariants.
+
+  Primary Runtime SSOT: Stytch B2B Authorization Service
+    - External Reference API: https://stytch.com/docs/api-reference/b2b/api/overview
+    - Single authority for: Member Identity, Organization Multi-Tenancy, OAuth/SSO
+      Sessions, and Member RBAC Roles.
+    - Database Guardrail: Local PostgreSQL tables MUST NOT store passwords, MFA tokens,
+      or session tokens. All local user references store solely stytch_member_id and
+      stytch_organization_id foreign keys.
+
+  Invariants & Boundary Interoperability:
+    - Cryptographic Verification: All inbound requests verified via Stytch B2B JWKS
+      RS250/EdDSA public keys cached locally with TTL <= 300s.
+    - Webhook Authentication: Webhooks processed via stytch-signature verification
+      using SVIX/HMAC-SHA250 headers before dispatching database mutative events.
+    - Resilience Protocol: Outbound Stytch API calls wrapped in a two-tier Circuit
+      Breaker (Threshold: 5 failures, Timeout: 10s, Half-Open Probe: 2 requests).
+
+  ## 4. Storage Invariant & Mapping Strategy
+
+  Entity                    | Primary Authority | Persistence Mechanism
+  User Identity/Credentials | Stytch B2B        | Stytch Directory (stytch_member_id)
+  Org & Hierarchy           | Stytch B2B        | Stytch Directory (stytch_organization_id)
+  RBAC Policies             | Stytch B2B        | Stytch RBAC Engine
+  Active Auth Sessions      | Stytch B2B        | Stytch Session Store (JWT validation)
+  Application Business Data | go-b2b-starter/   | PostgreSQL (referencing stytch_member_id)
+  Domain Logic & Workflows  | go-b2b-starter/   | Go Domain Packages (domain/)
+
+  ## 5. Circuit Breaker & Fallback Protocol
+
+  Inbound Request
+    |
+    v
+  Circuit Breaker Active?
+    / \
+  Yes   No
+   |     |
+   v     v
+  Check Local JWKS JWT Cache   Call Stytch B2B API
+   |     |                      |           |
+  Valid Invalid               Success     Failure
+   |     |                      |           |
+   v     v                      v           v
+  Allow Cached (Read-Only)  Deny 503    Update Cache  Increment Error Count
+                                         & Proceed
+
+  When Stytch experiences service degradation, backend adapters fallback to local
+  JWT validation using pre-fetched JWKS public keys, restricting context scope
+  strictly to read-only actions until connection health is restored.
+
+rules:
+  proposal:
+    - "Every proposal modifying authentication flow or data persistence MUST explicitly reference Stytch B2B API contracts."
+    - "Proposals MUST define explicit rollback strategies for both the Git state and the Stytch tenant policy state."
+    - "Include a 'Non-Goals' section explicitly rejecting local credential storage."
+
+  spec:
+    - "Formally define State Transition Invariants across the network boundary between Go domain logic and Stytch API response codes."
+    - "Specify explicit Fallback/Circuit-Breaker states for every outbound Stytch SDK invocation."
+    - "Map Stytch B2B RBAC roles directly to local application authorization contexts using strict type definitions."
+
+  design:
+    - "Go Domain models MUST NOT import Stytch SDKs or external transport packages."
+    - "Infrastructure adapters (infrastructure/auth/stytch) MUST implement domain interface abstractions for all authentication routines."
+    - "Database operations triggered by Stytch webhooks MUST be idempotent using transaction-isolated state checks."
+
+  tasks:
+    - "Cap execution tasks at a maximum duration of 2 hours per task unit."
+    - "Tag tasks with explicit domain prefixes: [BE-DOMAIN], [BE-INFRA], [DB-SQLC], or [FE-NEXT]."
+    - "Require verification criteria involving signature validation tests and mock fallback execution for all integration tasks."

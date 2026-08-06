@@ -1,0 +1,289 @@
+package mercadopago
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/logger"
+	loggerdomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
+	mp "github.com/moasq/go-b2b-starter/internal/platform/mercadopago"
+)
+
+var _ domain.BillingProvider = (*mpAdapter)(nil)
+
+type mpAdapter struct {
+	client *mp.Client
+	logger logger.Logger
+}
+
+func NewMPAdapter(client *mp.Client, log logger.Logger) domain.BillingProvider {
+	return &mpAdapter{
+		client: client,
+		logger: log,
+	}
+}
+
+func (a *mpAdapter) GetSubscription(ctx context.Context, externalCustomerID string) (*domain.Subscription, error) {
+	endpoint := fmt.Sprintf("/preapproval/search?external_reference=%s", externalCustomerID)
+
+	resp, err := a.client.Get(ctx, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call MercadoPago API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("MercadoPago API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Results []struct {
+			ID             string `json:"id"`
+			Reason         string `json:"reason"`
+			ExternalRef    string `json:"external_reference"`
+			Status         string `json:"status"`
+			NextPayment    string `json:"next_payment_date"`
+			DateCreated    string `json:"date_created"`
+			LastModified   string `json:"last_modified"`
+			AutoRecurring  *struct {
+				Frequency       int    `json:"frequency"`
+				FrequencyType   string `json:"frequency_type"`
+				StartDate       string `json:"start_date"`
+				EndDate         string `json:"end_date"`
+				TransactionAmt  string `json:"transaction_amount"`
+				CurrencyID      string `json:"currency_id"`
+			} `json:"auto_recurring"`
+			PayerID    int    `json:"payer_id"`
+			PaymentID  string `json:"payment_method_id"`
+		} `json:"results"`
+		Paging struct {
+			Total int `json:"total"`
+		} `json:"paging"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode MercadoPago preapproval search response: %w", err)
+	}
+
+	if len(result.Results) == 0 {
+		return nil, domain.ErrSubscriptionNotFound
+	}
+
+	mpSub := result.Results[0]
+
+	var periodStart, periodEnd time.Time
+	if mpSub.AutoRecurring != nil {
+		periodStart, _ = time.Parse(time.RFC3339, mpSub.AutoRecurring.StartDate)
+		periodEnd, _ = time.Parse(time.RFC3339, mpSub.AutoRecurring.EndDate)
+	}
+	if periodStart.IsZero() {
+		periodStart, _ = time.Parse(time.RFC3339, mpSub.DateCreated)
+	}
+	if periodEnd.IsZero() && mpSub.NextPayment != "" {
+		periodEnd, _ = time.Parse(time.RFC3339, mpSub.NextPayment)
+	}
+
+	a.logger.Info("MercadoPago preapproval sync completed", loggerdomain.Fields{
+		"external_ref":    externalCustomerID,
+		"preapproval_id":  mpSub.ID,
+		"status":          mpSub.Status,
+		"reason":          mpSub.Reason,
+	})
+
+	subscription := &domain.Subscription{
+		ExternalCustomerID: externalCustomerID,
+		SubscriptionID:     mpSub.ID,
+		SubscriptionStatus: mpSub.Status,
+		ProductID:          "",
+		ProductName:        mpSub.Reason,
+		CurrentPeriodStart: periodStart,
+		CurrentPeriodEnd:   periodEnd,
+		Metadata: map[string]any{
+			"provider":          "mercadopago",
+			"payer_id":          mpSub.PayerID,
+			"payment_method_id": mpSub.PaymentID,
+		},
+	}
+
+	return subscription, nil
+}
+
+func (a *mpAdapter) GetCheckoutSession(ctx context.Context, sessionID string) (*domain.CheckoutSessionResponse, error) {
+	endpoint := fmt.Sprintf("/v1/payments/%s", sessionID)
+
+	resp, err := a.client.Get(ctx, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call MercadoPago payments API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, fmt.Errorf("%w: %s", domain.ErrCheckoutSessionNotFound, sessionID)
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("MercadoPago payments API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		ID              int64  `json:"id"`
+		Status          string `json:"status"`
+		StatusDetail    string `json:"status_detail"`
+		ExternalRef     string `json:"external_reference"`
+		TransactionAmt  float64 `json:"transaction_amount"`
+		DateCreated     string `json:"date_created"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode MercadoPago payment response: %w", err)
+	}
+
+	a.logger.Info("MercadoPago payment retrieved", loggerdomain.Fields{
+		"payment_id":   result.ID,
+		"status":       result.Status,
+		"external_ref": result.ExternalRef,
+	})
+
+	checkoutStatus := result.Status
+	switch result.Status {
+	case "approved":
+		checkoutStatus = "succeeded"
+	case "rejected", "cancelled", "refunded", "charged_back":
+		checkoutStatus = "failed"
+	default:
+		checkoutStatus = "pending"
+	}
+
+	createdAt, _ := time.Parse(time.RFC3339, result.DateCreated)
+
+	checkoutSession := &domain.CheckoutSessionResponse{
+		ID:         strconv.FormatInt(result.ID, 10),
+		Status:     checkoutStatus,
+		CustomerID: result.ExternalRef,
+		Amount:     int64(result.TransactionAmt),
+		CreatedAt:  createdAt,
+	}
+
+	return checkoutSession, nil
+}
+
+func (a *mpAdapter) GetCheckoutSessionWithPolling(ctx context.Context, sessionID string) (*domain.CheckoutSessionResponse, error) {
+	const (
+		pollInterval = 2 * time.Second
+		maxDuration  = 10 * time.Second
+	)
+
+	deadline := time.Now().Add(maxDuration)
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	session, err := a.GetCheckoutSession(ctx, sessionID)
+	if err == nil && session.Status == "succeeded" {
+		return session, nil
+	}
+
+	if err == nil {
+		a.logger.Debug("MercadoPago payment polling started", loggerdomain.Fields{
+			"payment_id":   sessionID,
+			"status":       session.Status,
+			"max_duration": maxDuration.String(),
+		})
+	} else if !isRetryableError(err) {
+		return nil, err
+	} else {
+		a.logger.Debug("MercadoPago payment initial attempt failed, will retry", loggerdomain.Fields{
+			"payment_id": sessionID,
+			"error":      err.Error(),
+		})
+	}
+
+	attemptCount := 1
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			attemptCount++
+			session, err := a.GetCheckoutSession(ctx, sessionID)
+
+			if err == nil {
+				a.logger.Debug("MercadoPago payment polling attempt", loggerdomain.Fields{
+					"payment_id": sessionID,
+					"attempt":    attemptCount,
+					"status":     session.Status,
+				})
+				if session.Status == "succeeded" {
+					a.logger.Info("MercadoPago payment polling succeeded", loggerdomain.Fields{
+						"payment_id": sessionID,
+						"attempts":   attemptCount,
+					})
+					return session, nil
+				}
+				continue
+			}
+
+			if !isRetryableError(err) {
+				a.logger.Warn("MercadoPago payment polling non-retryable error", loggerdomain.Fields{
+					"payment_id": sessionID,
+					"attempt":    attemptCount,
+					"error":      err.Error(),
+				})
+				return nil, err
+			}
+
+			a.logger.Debug("MercadoPago payment polling attempt failed, retrying", loggerdomain.Fields{
+				"payment_id": sessionID,
+				"attempt":    attemptCount,
+				"error":      err.Error(),
+			})
+		}
+	}
+
+	lastStatus := "unknown"
+	if session != nil {
+		lastStatus = session.Status
+	}
+	a.logger.Warn("MercadoPago payment polling timeout", loggerdomain.Fields{
+		"payment_id":  sessionID,
+		"attempts":    attemptCount,
+		"last_status": lastStatus,
+	})
+	return nil, fmt.Errorf("payment verification timed out after 10 seconds (last status: %s)", lastStatus)
+}
+
+func (a *mpAdapter) IngestMeterEvent(ctx context.Context, externalCustomerID string, meterSlug string, amount int32) error {
+	a.logger.Debug("MercadoPago IngestMeterEvent no-op (meter events not supported)", loggerdomain.Fields{
+		"external_customer_id": externalCustomerID,
+		"meter_slug":           meterSlug,
+		"amount":               amount,
+	})
+	return nil
+}
+
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	if strings.Contains(errStr, "checkout session not found") || strings.Contains(errStr, "404") {
+		return false
+	}
+
+	if strings.Contains(errStr, "returned status 400") ||
+		strings.Contains(errStr, "returned status 401") ||
+		strings.Contains(errStr, "returned status 403") {
+		return false
+	}
+
+	return true
+}

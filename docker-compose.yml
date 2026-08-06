@@ -1,0 +1,115 @@
+services:
+  # =============================================================================
+  # Database - PostgreSQL with pgvector
+  # =============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: saas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-saas_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-saas_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Cache - Redis
+  # =============================================================================
+  redis:
+    image: redis:alpine
+    container_name: saas_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =============================================================================
+  # Database Migration - one-shot job
+  # =============================================================================
+  migrate:
+    image: migrate/migrate:v4.18.2
+    container_name: saas_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./go-b2b-starter/internal/db/postgres/sqlc/migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-saas_db}?sslmode=disable"
+      - "up"
+    restart: "no"
+
+  # =============================================================================
+  # Backend - Go API server
+  # =============================================================================
+  backend:
+    build:
+      context: ./go-b2b-starter
+      dockerfile: Dockerfile
+    container_name: saas_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./go-b2b-starter/app.env:/app/app.env:ro
+    environment:
+      ENV: DEV
+      SERVER_ADDRESS: :8080
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-saas_db}
+      DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ALLOWED_ORIGINS: http://localhost:3000
+      STYTCH_PROJECT_ID: ${STYTCH_PROJECT_ID}
+      STYTCH_SECRET: ${STYTCH_SECRET}
+      STYTCH_ENV: ${STYTCH_PROJECT_ENV:-test}
+      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # =============================================================================
+  # Frontend - Next.js application
+  # =============================================================================
+  frontend:
+    build:
+      context: ./next_b2b_starter
+      dockerfile: Dockerfile.docker-compose
+    container_name: saas_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      API_BASE_URL_INTERNAL: http://backend:8080/api
+      STYTCH_PROJECT_ID: ${STYTCH_PROJECT_ID}
+      STYTCH_SECRET: ${STYTCH_SECRET}
+      STYTCH_PROJECT_ENV: ${STYTCH_PROJECT_ENV:-test}
+      NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN: ${NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN}
+      NEXT_PUBLIC_STYTCH_PROJECT_ID: ${NEXT_PUBLIC_STYTCH_PROJECT_ID}
+      NEXT_PUBLIC_STYTCH_PROJECT_ENV: ${NEXT_PUBLIC_STYTCH_PROJECT_ENV:-test}
+      NEXT_PUBLIC_APP_BASE_URL: ${NEXT_PUBLIC_APP_BASE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

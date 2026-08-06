@@ -1,0 +1,105 @@
+# --- Global OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Global Editor Files ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Secrets (Safety Net) ---
+# We ignore these here just in case someone accidentally
+# creates an .env file in the root.
+.env
+.env.*
+# But allow .env.example and example.env files (templates for users)
+!.env.example
+!**/.env.example
+!**/example.env
+*.pem
+*.key
+
+# --- Claude Code ---
+# Ignore .claude/ contents but allow CLAUDE.md files
+.claude/*
+!.claude/CLAUDE.md
+**/.claude/*
+!**/.claude/CLAUDE.md
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Docker ---
+# If you mount volumes locally
+.docker/
+postgres_data/
+redis_data/
+
+# --- Additional Safety Nets ---
+# These provide defense-in-depth, even though subdirectory
+# .gitignore files may already cover these patterns
+tmp/
+temp/
+
+# Additional IDE files
+*.sublime-*
+.vscode-test/
+
+# ==============================================================================
+# PROJECT-SPECIFIC IGNORES
+# ==============================================================================
+
+# --- Go Backend (go-b2b-starter/) ---
+# Go Environment Files
+go-b2b-starter/.env
+go-b2b-starter/.env.*
+go-b2b-starter/app.env
+
+# Binaries and Build Artifacts
+go-b2b-starter/bin/
+go-b2b-starter/dist/
+go-b2b-starter/*.exe
+go-b2b-starter/*.exe~
+go-b2b-starter/*.dll
+go-b2b-starter/*.so
+go-b2b-starter/*.dylib
+go-b2b-starter/*.test
+go-b2b-starter/main
+go-b2b-starter/src/main/main
+go-b2b-starter/src/bin/main
+
+# Go Temporary Files
+go-b2b-starter/tmp/
+go-b2b-starter/temp/
+
+# Go Test Coverage
+go-b2b-starter/coverage.out
+go-b2b-starter/coverage.html
+go-b2b-starter/coverage.txt
+go-b2b-starter/coverage/
+
+# Go Vendor
+go-b2b-starter/vendor/
+
+# --- Next.js Frontend (next_b2b_starter/) ---
+# Next.js Environment Files
+next_b2b_starter/.env.local
+next_b2b_starter/.env.production
+next_b2b_starter/.env.development
+next_b2b_starter/.env
+
+# Dependencies
+next_b2b_starter/node_modules/
+
+# Next.js Build Output
+next_b2b_starter/.next/
+next_b2b_starter/out/
+next_b2b_starter/build/
+
+# TypeScript Build Info
+next_b2b_starter/*.tsbuildinfo
+next_b2b_starter/.turbo/
