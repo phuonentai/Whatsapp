@@ -137,16 +137,7 @@ INSERT INTO organizations.organizations (
     $1,
     $2,
     $3
-) RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
+) RETURNING id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider
 `
 
 type CreateOrganizationParams struct {
@@ -168,6 +159,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
@@ -291,17 +283,7 @@ func (q *Queries) GetAccountByID(ctx context.Context, arg GetAccountByIDParams) 
 }
 
 const getAccountOrganization = `-- name: GetAccountOrganization :one
-SELECT
-    o.id,
-    o.slug,
-    o.name,
-    o.status,
-    o.stytch_org_id,
-    o.stytch_connection_id,
-    o.stytch_connection_name,
-    o.created_at,
-    o.updated_at
-FROM organizations.organizations o
+SELECT o.id, o.slug, o.name, o.status, o.stytch_org_id, o.stytch_connection_id, o.stytch_connection_name, o.created_at, o.updated_at, o.billing_provider FROM organizations.organizations o
 INNER JOIN organizations.accounts a ON o.id = a.organization_id
 WHERE a.id = $1
 `
@@ -319,6 +301,7 @@ func (q *Queries) GetAccountOrganization(ctx context.Context, id int32) (Organiz
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
@@ -387,17 +370,7 @@ func (q *Queries) GetAccountStats(ctx context.Context, id int32) (GetAccountStat
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider FROM organizations.organizations
 WHERE id = $1
 `
 
@@ -414,22 +387,13 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id int32) (Organizati
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
 
 const getOrganizationBySlug = `-- name: GetOrganizationBySlug :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider FROM organizations.organizations
 WHERE slug = $1
 `
 
@@ -446,22 +410,13 @@ func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organ
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
 
 const getOrganizationByStytchID = `-- name: GetOrganizationByStytchID :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider FROM organizations.organizations
 WHERE stytch_org_id = $1
 `
 
@@ -478,23 +433,14 @@ func (q *Queries) GetOrganizationByStytchID(ctx context.Context, stytchOrgID pgt
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
 
 const getOrganizationByUserEmail = `-- name: GetOrganizationByUserEmail :one
 
-SELECT
-    o.id,
-    o.slug,
-    o.name,
-    o.status,
-    o.stytch_org_id,
-    o.stytch_connection_id,
-    o.stytch_connection_name,
-    o.created_at,
-    o.updated_at
-FROM organizations.organizations o
+SELECT o.id, o.slug, o.name, o.status, o.stytch_org_id, o.stytch_connection_id, o.stytch_connection_name, o.created_at, o.updated_at, o.billing_provider FROM organizations.organizations o
 INNER JOIN organizations.accounts a ON o.id = a.organization_id
 WHERE a.email = $1
   AND a.status = 'active'
@@ -516,6 +462,7 @@ func (q *Queries) GetOrganizationByUserEmail(ctx context.Context, email string) 
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
@@ -629,17 +576,7 @@ func (q *Queries) ListAccountsByOrganization(ctx context.Context, organizationID
 }
 
 const listOrganizations = `-- name: ListOrganizations :many
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider FROM organizations.organizations
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -668,6 +605,7 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 			&i.StytchConnectionName,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BillingProvider,
 		); err != nil {
 			return nil, err
 		}
@@ -867,16 +805,7 @@ SET
     stytch_connection_name = $6,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
+RETURNING id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider
 `
 
 type UpdateOrganizationParams struct {
@@ -908,6 +837,7 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }
@@ -920,16 +850,7 @@ SET
     stytch_connection_name = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
+RETURNING id, slug, name, status, stytch_org_id, stytch_connection_id, stytch_connection_name, created_at, updated_at, billing_provider
 `
 
 type UpdateOrganizationStytchInfoParams struct {
@@ -957,6 +878,7 @@ func (q *Queries) UpdateOrganizationStytchInfo(ctx context.Context, arg UpdateOr
 		&i.StytchConnectionName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BillingProvider,
 	)
 	return i, err
 }

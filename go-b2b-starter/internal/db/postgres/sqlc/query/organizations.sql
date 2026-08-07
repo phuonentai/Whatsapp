@@ -7,57 +7,18 @@ INSERT INTO organizations.organizations (
     $1,
     $2,
     $3
-) RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at;
+) RETURNING *;
 
 -- name: GetOrganizationByID :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT * FROM organizations.organizations
 WHERE id = $1;
 
 -- name: GetOrganizationBySlug :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT * FROM organizations.organizations
 WHERE slug = $1;
 
 -- name: GetOrganizationByStytchID :one
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT * FROM organizations.organizations
 WHERE stytch_org_id = $1;
 
 -- name: UpdateOrganization :one
@@ -70,16 +31,7 @@ SET
     stytch_connection_name = $6,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at;
+RETURNING *;
 
 -- name: UpdateOrganizationStytchInfo :one
 UPDATE organizations.organizations
@@ -89,29 +41,10 @@ SET
     stytch_connection_name = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at;
+RETURNING *;
 
 -- name: ListOrganizations :many
-SELECT
-    id,
-    slug,
-    name,
-    status,
-    stytch_org_id,
-    stytch_connection_id,
-    stytch_connection_name,
-    created_at,
-    updated_at
-FROM organizations.organizations
+SELECT * FROM organizations.organizations
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -293,17 +226,7 @@ WHERE id = $1 AND organization_id = $2;
 -- Organization membership queries
 
 -- name: GetOrganizationByUserEmail :one
-SELECT
-    o.id,
-    o.slug,
-    o.name,
-    o.status,
-    o.stytch_org_id,
-    o.stytch_connection_id,
-    o.stytch_connection_name,
-    o.created_at,
-    o.updated_at
-FROM organizations.organizations o
+SELECT o.* FROM organizations.organizations o
 INNER JOIN organizations.accounts a ON o.id = a.organization_id
 WHERE a.email = $1
   AND a.status = 'active'
@@ -311,17 +234,7 @@ WHERE a.email = $1
 LIMIT 1;
 
 -- name: GetAccountOrganization :one
-SELECT
-    o.id,
-    o.slug,
-    o.name,
-    o.status,
-    o.stytch_org_id,
-    o.stytch_connection_id,
-    o.stytch_connection_name,
-    o.created_at,
-    o.updated_at
-FROM organizations.organizations o
+SELECT o.* FROM organizations.organizations o
 INNER JOIN organizations.accounts a ON o.id = a.organization_id
 WHERE a.id = $1;
 

@@ -115,6 +115,7 @@ type CircuitBreaker struct {
 	threshold      int
 	cooldown       time.Duration
 	halfOpenProbes int
+	halfOpenMax    int
 }
 
 type CircuitState int
@@ -130,6 +131,7 @@ func NewCircuitBreaker(threshold int, cooldown time.Duration, halfOpenProbes int
 		threshold:      threshold,
 		cooldown:       cooldown,
 		halfOpenProbes: halfOpenProbes,
+		halfOpenMax:    halfOpenProbes,
 	}
 }
 
@@ -143,11 +145,23 @@ func (cb *CircuitBreaker) Allow() bool {
 	case CircuitOpen:
 		if time.Since(cb.lastFailureAt) > cb.cooldown {
 			cb.state = CircuitHalfOpen
-			return true
+			cb.halfOpenProbes = cb.halfOpenMax
+		} else {
+			return false
 		}
-		return false
+		fallthrough
 	case CircuitHalfOpen:
-		return cb.halfOpenProbes > 0
+		if cb.halfOpenProbes <= 0 {
+			cb.state = CircuitOpen
+			cb.lastFailureAt = time.Now()
+			return false
+		}
+		cb.halfOpenProbes--
+		if cb.halfOpenProbes <= 0 {
+			cb.state = CircuitOpen
+			cb.lastFailureAt = time.Now()
+		}
+		return true
 	default:
 		return true
 	}

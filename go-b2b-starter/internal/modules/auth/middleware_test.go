@@ -19,7 +19,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "valid edge auth headers pass through",
 			headers: map[string]string{
-				"X-Forwarded-Auth":        "true",
+				"X-Forwarded-Auth":         "true",
 				"X-Stytch-Organization-Id": "550e8400-e29b-41d4-a716-446655440000",
 				"X-Stytch-Member-Id":       "660e8400-e29b-41d4-a716-446655440001",
 			},
@@ -36,7 +36,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "missing org id returns 401",
 			headers: map[string]string{
-				"X-Forwarded-Auth":  "true",
+				"X-Forwarded-Auth":   "true",
 				"X-Stytch-Member-Id": "660e8400-e29b-41d4-a716-446655440001",
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -44,7 +44,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "missing member id returns 401",
 			headers: map[string]string{
-				"X-Forwarded-Auth":        "true",
+				"X-Forwarded-Auth":         "true",
 				"X-Stytch-Organization-Id": "550e8400-e29b-41d4-a716-446655440000",
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -52,7 +52,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "malformed org id UUID returns 401",
 			headers: map[string]string{
-				"X-Forwarded-Auth":        "true",
+				"X-Forwarded-Auth":         "true",
 				"X-Stytch-Organization-Id": "not-a-uuid",
 				"X-Stytch-Member-Id":       "660e8400-e29b-41d4-a716-446655440001",
 			},
@@ -61,7 +61,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "malformed member id UUID returns 401",
 			headers: map[string]string{
-				"X-Forwarded-Auth":        "true",
+				"X-Forwarded-Auth":         "true",
 				"X-Stytch-Organization-Id": "550e8400-e29b-41d4-a716-446655440000",
 				"X-Stytch-Member-Id":       "bad-uuid",
 			},
@@ -70,7 +70,7 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 		{
 			name: "X-Forwarded-Auth false is ignored",
 			headers: map[string]string{
-				"X-Forwarded-Auth":        "false",
+				"X-Forwarded-Auth":         "false",
 				"X-Stytch-Organization-Id": "550e8400-e29b-41d4-a716-446655440000",
 				"X-Stytch-Member-Id":       "660e8400-e29b-41d4-a716-446655440001",
 			},
@@ -81,7 +81,10 @@ func TestRequireAuth_EdgeForwardedAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Middleware{
-				config: DefaultMiddlewareConfig(),
+				config: &MiddlewareConfig{
+					ErrorHandler:       defaultErrorHandler,
+					TrustForwardedAuth: true,
+				},
 			}
 
 			w := httptest.NewRecorder()
@@ -105,7 +108,10 @@ func TestRequireAuth_IdentitySetOnValidEdgeAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	m := &Middleware{
-		config: DefaultMiddlewareConfig(),
+		config: &MiddlewareConfig{
+			ErrorHandler:       defaultErrorHandler,
+			TrustForwardedAuth: true,
+		},
 	}
 
 	w := httptest.NewRecorder()

@@ -15,8 +15,13 @@ type Querier interface {
 	AssignResourceApproval(ctx context.Context, arg AssignResourceApprovalParams) error
 	// Attach a file to a resource
 	AttachFileToResource(ctx context.Context, arg AttachFileToResourceParams) error
+	// Entity Tags
+	AttachTag(ctx context.Context, arg AttachTagParams) (CrmEntityTag, error)
 	CheckAccountPermission(ctx context.Context, arg CheckAccountPermissionParams) (CheckAccountPermissionRow, error)
 	CountChatMessagesBySession(ctx context.Context, sessionID int32) (int64, error)
+	// Usage Queries (for entitlement)
+	CountContactsByOrganization(ctx context.Context, organizationID int32) (int64, error)
+	CountDealsByOrganization(ctx context.Context, organizationID int32) (int64, error)
 	CountDocumentEmbeddingsByOrganization(ctx context.Context, organizationID int32) (int64, error)
 	CountDocumentsByOrganization(ctx context.Context, organizationID int32) (int64, error)
 	CountDocumentsByStatus(ctx context.Context, arg CountDocumentsByStatusParams) (int64, error)
@@ -24,44 +29,76 @@ type Querier interface {
 	CountResources(ctx context.Context, arg CountResourcesParams) (int64, error)
 	// Accounts queries
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (OrganizationsAccount, error)
+	// Activities
+	CreateActivity(ctx context.Context, arg CreateActivityParams) (CrmActivity, error)
 	// Chat Messages
 	CreateChatMessage(ctx context.Context, arg CreateChatMessageParams) (CognitiveChatMessage, error)
 	// Chat Sessions
 	CreateChatSession(ctx context.Context, arg CreateChatSessionParams) (CognitiveChatSession, error)
+	// Companies
+	CreateCompany(ctx context.Context, arg CreateCompanyParams) (CrmCompany, error)
+	CreateConversation(ctx context.Context, arg CreateConversationParams) (CrmConversation, error)
+	// Deals
+	CreateDeal(ctx context.Context, arg CreateDealParams) (CrmDeal, error)
 	// Documents queries
 	CreateDocument(ctx context.Context, arg CreateDocumentParams) (DocumentsDocument, error)
 	// Cognitive Agent queries
 	// Document Embeddings
 	CreateDocumentEmbedding(ctx context.Context, arg CreateDocumentEmbeddingParams) (CognitiveDocumentEmbedding, error)
 	CreateFileAsset(ctx context.Context, arg CreateFileAssetParams) (FileManagerFileAsset, error)
+	// Messages
+	CreateMessage(ctx context.Context, arg CreateMessageParams) (CrmMessage, error)
 	// Creates a minimal placeholder resource
 	CreateMinimalResource(ctx context.Context, arg CreateMinimalResourceParams) (ExampleResource, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (OrganizationsOrganization, error)
+	// Pipelines
+	CreatePipeline(ctx context.Context, arg CreatePipelineParams) (CrmPipeline, error)
+	// Pipeline Stages
+	CreatePipelineStage(ctx context.Context, arg CreatePipelineStageParams) (CrmPipelineStage, error)
 	// Example Resource Queries
 	// Demonstrates Clean Architecture patterns with CRUD operations,
 	// file attachments, OCR/LLM processing, and approval workflows
 	// CREATE operations
 	CreateResource(ctx context.Context, arg CreateResourceParams) (ExampleResource, error)
+	// Tags
+	CreateTag(ctx context.Context, arg CreateTagParams) (CrmTag, error)
+	CreateWhatsAppConfig(ctx context.Context, arg CreateWhatsAppConfigParams) (WhatsappWhatsappConfig, error)
 	// Decrement invoice count by 1 (called after successful invoice processing)
 	DecrementInvoiceCount(ctx context.Context, organizationID int32) (SubscriptionBillingQuotaTracking, error)
 	DeleteAccount(ctx context.Context, arg DeleteAccountParams) error
 	DeleteChatMessage(ctx context.Context, id int32) error
 	DeleteChatSession(ctx context.Context, arg DeleteChatSessionParams) error
+	DeleteCompany(ctx context.Context, arg DeleteCompanyParams) error
+	DeleteContact(ctx context.Context, arg DeleteContactParams) error
+	DeleteDeal(ctx context.Context, arg DeleteDealParams) error
 	DeleteDocument(ctx context.Context, arg DeleteDocumentParams) error
 	DeleteDocumentEmbeddings(ctx context.Context, arg DeleteDocumentEmbeddingsParams) error
 	DeleteFileAsset(ctx context.Context, id int32) error
 	DeleteOrganization(ctx context.Context, id int32) error
+	DeletePipeline(ctx context.Context, arg DeletePipelineParams) error
+	DeletePipelineStage(ctx context.Context, arg DeletePipelineStageParams) error
 	// DELETE operations
 	// Soft delete a resource
 	DeleteResource(ctx context.Context, arg DeleteResourceParams) error
 	// Delete subscription (when subscription is permanently deleted)
 	DeleteSubscription(ctx context.Context, organizationID int32) error
+	DeleteTag(ctx context.Context, arg DeleteTagParams) error
+	DetachTag(ctx context.Context, arg DetachTagParams) error
 	GetAccountByEmail(ctx context.Context, arg GetAccountByEmailParams) (OrganizationsAccount, error)
 	GetAccountByID(ctx context.Context, arg GetAccountByIDParams) (OrganizationsAccount, error)
 	GetAccountOrganization(ctx context.Context, id int32) (OrganizationsOrganization, error)
 	GetAccountStats(ctx context.Context, id int32) (GetAccountStatsRow, error)
+	GetActiveConversationByContact(ctx context.Context, arg GetActiveConversationByContactParams) (CrmConversation, error)
+	GetActivityByID(ctx context.Context, arg GetActivityByIDParams) (CrmActivity, error)
 	GetChatMessagesBySession(ctx context.Context, sessionID int32) ([]CognitiveChatMessage, error)
 	GetChatSessionByID(ctx context.Context, arg GetChatSessionByIDParams) (CognitiveChatSession, error)
+	GetCompanyByID(ctx context.Context, arg GetCompanyByIDParams) (GetCompanyByIDRow, error)
+	GetContactByID(ctx context.Context, arg GetContactByIDParams) (CrmContact, error)
+	GetContactByPhone(ctx context.Context, arg GetContactByPhoneParams) (CrmContact, error)
+	// Conversations
+	GetConversationByID(ctx context.Context, arg GetConversationByIDParams) (CrmConversation, error)
+	GetDealByID(ctx context.Context, arg GetDealByIDParams) (GetDealByIDRow, error)
+	GetDefaultPipelineByOrganization(ctx context.Context, organizationID int32) (CrmPipeline, error)
 	GetDocumentByFileAssetID(ctx context.Context, arg GetDocumentByFileAssetIDParams) (DocumentsDocument, error)
 	GetDocumentByID(ctx context.Context, arg GetDocumentByIDParams) (DocumentsDocument, error)
 	GetDocumentEmbeddingByID(ctx context.Context, arg GetDocumentEmbeddingByIDParams) (CognitiveDocumentEmbedding, error)
@@ -74,6 +111,8 @@ type Querier interface {
 	GetFileAssetsByEntityAndPurpose(ctx context.Context, arg GetFileAssetsByEntityAndPurposeParams) ([]FileManagerFileAsset, error)
 	GetFileCategories(ctx context.Context) ([]FileManagerFileCategory, error)
 	GetFileContexts(ctx context.Context) ([]FileManagerFileContext, error)
+	GetLastWebhookErrorByOrganization(ctx context.Context, organizationID int32) (GetLastWebhookErrorByOrganizationRow, error)
+	GetMessageByWhatsAppID(ctx context.Context, arg GetMessageByWhatsAppIDParams) (CrmMessage, error)
 	GetOrganizationByID(ctx context.Context, id int32) (OrganizationsOrganization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (OrganizationsOrganization, error)
 	GetOrganizationByStytchID(ctx context.Context, stytchOrgID pgtype.Text) (OrganizationsOrganization, error)
@@ -81,6 +120,7 @@ type Querier interface {
 	GetOrganizationByUserEmail(ctx context.Context, email string) (OrganizationsOrganization, error)
 	// Statistics queries (useful for admin panels)
 	GetOrganizationStats(ctx context.Context, id int32) (GetOrganizationStatsRow, error)
+	GetPipelineByID(ctx context.Context, arg GetPipelineByIDParams) (CrmPipeline, error)
 	// Get quota tracking for an organization
 	GetQuotaByOrgID(ctx context.Context, organizationID int32) (SubscriptionBillingQuotaTracking, error)
 	// Get combined subscription and quota status for fast quota checks
@@ -96,26 +136,53 @@ type Querier interface {
 	GetResourceStats(ctx context.Context, organizationID int32) (GetResourceStatsRow, error)
 	// Get resources created by a specific user
 	GetResourcesByCreator(ctx context.Context, arg GetResourcesByCreatorParams) ([]ExampleResource, error)
+	GetStageByID(ctx context.Context, id int32) (CrmPipelineStage, error)
 	// Get subscription details for an organization
 	GetSubscriptionByOrgID(ctx context.Context, organizationID int32) (SubscriptionBillingSubscription, error)
 	// Get subscription by Polar subscription ID
 	GetSubscriptionBySubscriptionID(ctx context.Context, subscriptionID string) (SubscriptionBillingSubscription, error)
+	GetTagByID(ctx context.Context, arg GetTagByIDParams) (CrmTag, error)
+	GetWebhookLogStatsByOrganization(ctx context.Context, arg GetWebhookLogStatsByOrganizationParams) ([]GetWebhookLogStatsByOrganizationRow, error)
+	GetWhatsAppConfigByOrganizationID(ctx context.Context, organizationID int32) (WhatsappWhatsappConfig, error)
+	// WhatsApp queries
+	GetWhatsAppConfigByPhoneNumberID(ctx context.Context, phoneNumberID string) (WhatsappWhatsappConfig, error)
+	GetWhatsAppConfigByVerifyToken(ctx context.Context, verifyToken string) (WhatsappWhatsappConfig, error)
 	// Hard delete a resource (use with caution)
 	HardDeleteResource(ctx context.Context, arg HardDeleteResourceParams) error
+	InsertWebhookLog(ctx context.Context, arg InsertWebhookLogParams) (WhatsappWebhookLog, error)
 	ListAccountsByOrganization(ctx context.Context, organizationID int32) ([]OrganizationsAccount, error)
 	// List all active subscriptions for monitoring/admin purposes
 	ListActiveSubscriptions(ctx context.Context) ([]SubscriptionBillingSubscription, error)
+	ListActivitiesByCompany(ctx context.Context, arg ListActivitiesByCompanyParams) ([]ListActivitiesByCompanyRow, error)
+	ListActivitiesByContact(ctx context.Context, arg ListActivitiesByContactParams) ([]ListActivitiesByContactRow, error)
+	ListActivitiesByDeal(ctx context.Context, arg ListActivitiesByDealParams) ([]ListActivitiesByDealRow, error)
+	ListActivitiesByOrganization(ctx context.Context, arg ListActivitiesByOrganizationParams) ([]ListActivitiesByOrganizationRow, error)
 	ListChatSessionsByAccount(ctx context.Context, arg ListChatSessionsByAccountParams) ([]CognitiveChatSession, error)
+	ListCompaniesByOrganization(ctx context.Context, arg ListCompaniesByOrganizationParams) ([]ListCompaniesByOrganizationRow, error)
+	ListContactsByOrganization(ctx context.Context, arg ListContactsByOrganizationParams) ([]CrmContact, error)
+	// CRM extended queries (new entities for v2 CRM module)
+	// Contacts (extended)
+	ListContactsByOrganizationFiltered(ctx context.Context, arg ListContactsByOrganizationFilteredParams) ([]CrmContact, error)
+	ListConversationsByOrganization(ctx context.Context, arg ListConversationsByOrganizationParams) ([]ListConversationsByOrganizationRow, error)
+	ListDealsByOrganization(ctx context.Context, arg ListDealsByOrganizationParams) ([]ListDealsByOrganizationRow, error)
 	ListDocumentsByOrganization(ctx context.Context, arg ListDocumentsByOrganizationParams) ([]DocumentsDocument, error)
 	ListDocumentsByStatus(ctx context.Context, arg ListDocumentsByStatusParams) ([]DocumentsDocument, error)
+	ListEntitiesByTag(ctx context.Context, tagID int32) ([]ListEntitiesByTagRow, error)
 	ListFileAssets(ctx context.Context, arg ListFileAssetsParams) ([]ListFileAssetsRow, error)
+	ListMessagesByConversation(ctx context.Context, arg ListMessagesByConversationParams) ([]CrmMessage, error)
 	ListOrganizations(ctx context.Context, arg ListOrganizationsParams) ([]OrganizationsOrganization, error)
+	ListPipelinesByOrganization(ctx context.Context, organizationID int32) ([]ListPipelinesByOrganizationRow, error)
 	// List organizations approaching their quota limit (for alerting)
 	ListQuotasNearLimit(ctx context.Context, invoiceCount int32) ([]ListQuotasNearLimitRow, error)
 	// List resources with filtering and pagination
 	ListResources(ctx context.Context, arg ListResourcesParams) ([]ListResourcesRow, error)
+	ListStagesByPipeline(ctx context.Context, pipelineID int32) ([]CrmPipelineStage, error)
+	ListTagsByEntity(ctx context.Context, arg ListTagsByEntityParams) ([]CrmTag, error)
+	ListTagsByOrganization(ctx context.Context, organizationID int32) ([]CrmTag, error)
 	// Reset quota counters for a new billing period
 	ResetQuotaForPeriod(ctx context.Context, arg ResetQuotaForPeriodParams) (SubscriptionBillingQuotaTracking, error)
+	SearchCompanies(ctx context.Context, arg SearchCompaniesParams) ([]SearchCompaniesRow, error)
+	SearchContacts(ctx context.Context, arg SearchContactsParams) ([]CrmContact, error)
 	// SEARCH operations
 	// Full-text search on title and description
 	SearchResourcesByText(ctx context.Context, arg SearchResourcesByTextParams) ([]SearchResourcesByTextRow, error)
@@ -124,12 +191,20 @@ type Querier interface {
 	UpdateAccountLastLogin(ctx context.Context, arg UpdateAccountLastLoginParams) (OrganizationsAccount, error)
 	UpdateAccountStytchInfo(ctx context.Context, arg UpdateAccountStytchInfoParams) (OrganizationsAccount, error)
 	UpdateChatSessionTitle(ctx context.Context, arg UpdateChatSessionTitleParams) (CognitiveChatSession, error)
+	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (CrmCompany, error)
+	UpdateContact(ctx context.Context, arg UpdateContactParams) (CrmContact, error)
+	UpdateConversationLastMessageAt(ctx context.Context, arg UpdateConversationLastMessageAtParams) (CrmConversation, error)
+	UpdateConversationStatus(ctx context.Context, arg UpdateConversationStatusParams) (CrmConversation, error)
+	UpdateDeal(ctx context.Context, arg UpdateDealParams) (CrmDeal, error)
+	UpdateDealStage(ctx context.Context, arg UpdateDealStageParams) (CrmDeal, error)
 	UpdateDocument(ctx context.Context, arg UpdateDocumentParams) (DocumentsDocument, error)
 	UpdateDocumentExtractedText(ctx context.Context, arg UpdateDocumentExtractedTextParams) (DocumentsDocument, error)
 	UpdateDocumentStatus(ctx context.Context, arg UpdateDocumentStatusParams) (DocumentsDocument, error)
 	UpdateFileAsset(ctx context.Context, arg UpdateFileAssetParams) error
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (OrganizationsOrganization, error)
 	UpdateOrganizationStytchInfo(ctx context.Context, arg UpdateOrganizationStytchInfoParams) (OrganizationsOrganization, error)
+	UpdatePipeline(ctx context.Context, arg UpdatePipelineParams) (CrmPipeline, error)
+	UpdatePipelineStage(ctx context.Context, arg UpdatePipelineStageParams) (CrmPipelineStage, error)
 	// UPDATE operations
 	UpdateResource(ctx context.Context, arg UpdateResourceParams) error
 	// Update approval workflow status
@@ -137,6 +212,12 @@ type Querier interface {
 	// Update OCR/LLM processing results
 	UpdateResourceProcessingData(ctx context.Context, arg UpdateResourceProcessingDataParams) error
 	UpdateResourceStatus(ctx context.Context, arg UpdateResourceStatusParams) error
+	UpdateTag(ctx context.Context, arg UpdateTagParams) (CrmTag, error)
+	UpdateWebhookLogStatus(ctx context.Context, arg UpdateWebhookLogStatusParams) (WhatsappWebhookLog, error)
+	UpdateWhatsAppConfig(ctx context.Context, arg UpdateWhatsAppConfigParams) (WhatsappWhatsappConfig, error)
+	// CRM queries
+	// Contacts
+	UpsertContact(ctx context.Context, arg UpsertContactParams) (CrmContact, error)
 	// Create or update quota tracking
 	UpsertQuota(ctx context.Context, arg UpsertQuotaParams) (SubscriptionBillingQuotaTracking, error)
 	// Create or update subscription from Polar webhook

@@ -5,9 +5,11 @@ package helpers
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
+	"github.com/shopspring/decimal"
 )
 
 // ToPgText converts a string to pgtype.Text
@@ -45,6 +47,95 @@ func FromPgInt4(i pgtype.Int4) int32 {
 		return 0
 	}
 	return i.Int32
+}
+
+// FromPgInt4Ptr converts pgtype.Int4 to a pointer to int32
+func FromPgInt4Ptr(i pgtype.Int4) *int32 {
+	if !i.Valid {
+		return nil
+	}
+	v := i.Int32
+	return &v
+}
+
+// ToPgTimestamptz converts a time.Time to pgtype.Timestamptz
+func ToPgTimestamptz(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: true}
+}
+
+// ToPgTimestamptzPtr converts a pointer to time.Time to pgtype.Timestamptz
+func ToPgTimestamptzPtr(t *time.Time) pgtype.Timestamptz {
+	if t == nil {
+		return pgtype.Timestamptz{Valid: false}
+	}
+	return pgtype.Timestamptz{Time: *t, Valid: true}
+}
+
+// FromPgTimestamptzPtr converts pgtype.Timestamptz to a pointer to time.Time
+func FromPgTimestamptzPtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time
+	return &v
+}
+
+// ToPgTimestamp converts a time.Time to pgtype.Timestamp
+func ToPgTimestamp(t time.Time) pgtype.Timestamp {
+	return pgtype.Timestamp{Time: t, Valid: true}
+}
+
+// ToPgTimestampPtr converts a pointer to time.Time to pgtype.Timestamp
+func ToPgTimestampPtr(t *time.Time) pgtype.Timestamp {
+	if t == nil {
+		return pgtype.Timestamp{Valid: false}
+	}
+	return pgtype.Timestamp{Time: *t, Valid: true}
+}
+
+// FromPgTimestampPtr converts pgtype.Timestamp to a pointer to time.Time
+func FromPgTimestampPtr(t pgtype.Timestamp) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time
+	return &v
+}
+
+// ToPgDate converts a pointer to time.Time to pgtype.Date
+func ToPgDate(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{Valid: false}
+	}
+	return pgtype.Date{Time: *t, Valid: true}
+}
+
+// FromPgDate converts pgtype.Date to a pointer to time.Time
+func FromPgDate(d pgtype.Date) *time.Time {
+	if !d.Valid {
+		return nil
+	}
+	v := d.Time
+	return &v
+}
+
+// ToPgNumeric converts a pointer to float64 to pgtype.Numeric
+func ToPgNumeric(f *float64) pgtype.Numeric {
+	if f == nil {
+		return pgtype.Numeric{Valid: false}
+	}
+	d := decimal.NewFromFloat(*f)
+	return pgtype.Numeric{Int: d.Coefficient(), Exp: d.Exponent(), Valid: true}
+}
+
+// FromPgNumeric converts pgtype.Numeric to a pointer to float64
+func FromPgNumeric(n pgtype.Numeric) *float64 {
+	if !n.Valid || n.Int == nil {
+		return nil
+	}
+	d := decimal.NewFromBigInt(n.Int, n.Exp)
+	f, _ := d.Float64()
+	return &f
 }
 
 // ToPgBool converts a bool to pgtype.Bool

@@ -54,8 +54,8 @@ func (r *configRepository) Create(ctx context.Context, config *domain.WhatsAppCo
 		AppID:          helpers.ToPgText(config.AppID),
 		WabaID:         helpers.ToPgText(config.WABAID),
 		AccessToken:    helpers.ToPgText(config.AccessToken),
-		APIVersion:     helpers.ToPgText(config.APIVersion),
-		GraphAPIURL:    helpers.ToPgText(config.GraphAPIURL),
+		ApiVersion:     config.APIVersion,
+		GraphApiUrl:    config.GraphAPIURL,
 		Metadata:       helpers.ToJSONB(config.Metadata),
 	}
 
@@ -69,18 +69,18 @@ func (r *configRepository) Create(ctx context.Context, config *domain.WhatsAppCo
 
 func (r *configRepository) Update(ctx context.Context, config *domain.WhatsAppConfig) (*domain.WhatsAppConfig, error) {
 	params := sqlc.UpdateWhatsAppConfigParams{
-		ID:             config.ID,
-		PhoneNumberID:  config.PhoneNumberID,
-		BusinessPhone:  config.BusinessPhone,
-		WebhookSecret:  config.WebhookSecret,
-		VerifyToken:    config.VerifyToken,
-		AppID:          helpers.ToPgText(config.AppID),
-		WabaID:         helpers.ToPgText(config.WABAID),
-		AccessToken:    helpers.ToPgText(config.AccessToken),
-		APIVersion:     helpers.ToPgText(config.APIVersion),
-		GraphAPIURL:    helpers.ToPgText(config.GraphAPIURL),
-		IsActive:       config.IsActive,
-		Metadata:       helpers.ToJSONB(config.Metadata),
+		ID:            config.ID,
+		PhoneNumberID: config.PhoneNumberID,
+		BusinessPhone: config.BusinessPhone,
+		WebhookSecret: config.WebhookSecret,
+		VerifyToken:   config.VerifyToken,
+		AppID:         helpers.ToPgText(config.AppID),
+		WabaID:        helpers.ToPgText(config.WABAID),
+		AccessToken:   helpers.ToPgText(config.AccessToken),
+		ApiVersion:    config.APIVersion,
+		GraphApiUrl:   config.GraphAPIURL,
+		IsActive:      config.IsActive,
+		Metadata:      helpers.ToJSONB(config.Metadata),
 	}
 
 	result, err := r.store.UpdateWhatsAppConfig(ctx, params)
@@ -102,8 +102,8 @@ func (r *configRepository) mapToDomain(c *sqlc.WhatsappWhatsappConfig) *domain.W
 		AppID:          helpers.FromPgText(c.AppID),
 		WABAID:         helpers.FromPgText(c.WabaID),
 		AccessToken:    helpers.FromPgText(c.AccessToken),
-		APIVersion:     helpers.FromPgText(c.APIVersion),
-		GraphAPIURL:    helpers.FromPgText(c.GraphAPIURL),
+		APIVersion:     c.ApiVersion,
+		GraphAPIURL:    c.GraphApiUrl,
 		IsActive:       c.IsActive,
 		Metadata:       helpers.FromJSONB(c.Metadata),
 		CreatedAt:      c.CreatedAt.Time,

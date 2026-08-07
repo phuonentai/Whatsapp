@@ -45,6 +45,194 @@ type CognitiveDocumentEmbedding struct {
 	UpdatedAt  pgtype.Timestamp `json:"updated_at"`
 }
 
+// Línea de tiempo de actividades CRM (notas, llamadas, correos, etc.)
+type CrmActivity struct {
+	ID             int32       `json:"id"`
+	OrganizationID int32       `json:"organization_id"`
+	ContactID      pgtype.Int4 `json:"contact_id"`
+	CompanyID      pgtype.Int4 `json:"company_id"`
+	DealID         pgtype.Int4 `json:"deal_id"`
+	ConversationID pgtype.Int4 `json:"conversation_id"`
+	// Tipo de actividad: nota, llamada, correo, reunion, tarea, whatsapp_message, sistema
+	Tipo string `json:"tipo"`
+	// Asunto o título de la actividad
+	Asunto pgtype.Text `json:"asunto"`
+	// Contenido detallado de la actividad
+	Contenido pgtype.Text `json:"contenido"`
+	// Estado (ej: pendiente, completada para tareas)
+	Estado pgtype.Text `json:"estado"`
+	// Fecha de vencimiento (para tareas)
+	FechaVencimiento pgtype.Timestamptz `json:"fecha_vencimiento"`
+	// Usuario que realizó la actividad
+	RealizadaPor pgtype.Int4 `json:"realizada_por"`
+	// Cuándo ocurrió la actividad
+	RealizadaEn pgtype.Timestamptz `json:"realizada_en"`
+	// Metadatos adicionales (ej: message_id para WhatsApp)
+	Metadata  []byte             `json:"metadata"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Empresas/clientes CRM (no confundir con organizations que son los tenants)
+type CrmCompany struct {
+	ID             int32  `json:"id"`
+	OrganizationID int32  `json:"organization_id"`
+	Name           string `json:"name"`
+	// NIT con dígito de verificación
+	Nit pgtype.Text `json:"nit"`
+	// Tamaño: microempresa, pequena, mediana, grande
+	TipoEmpresa pgtype.Text `json:"tipo_empresa"`
+	// Sector industrial
+	Sector pgtype.Text `json:"sector"`
+	// Ciudad colombiana
+	Ciudad pgtype.Text `json:"ciudad"`
+	// Departamento colombiano
+	Departamento pgtype.Text `json:"departamento"`
+	Website      pgtype.Text `json:"website"`
+	Phone        pgtype.Text `json:"phone"`
+	Address      pgtype.Text `json:"address"`
+	Notes        pgtype.Text `json:"notes"`
+	Metadata     []byte      `json:"metadata"`
+	// Responsable de la empresa
+	OwnerAccountID pgtype.Int4        `json:"owner_account_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Contacts (people who send messages) scoped by organization
+type CrmContact struct {
+	ID             int32            `json:"id"`
+	OrganizationID int32            `json:"organization_id"`
+	PhoneNumber    string           `json:"phone_number"`
+	DisplayName    pgtype.Text      `json:"display_name"`
+	AvatarUrl      pgtype.Text      `json:"avatar_url"`
+	Metadata       []byte           `json:"metadata"`
+	IsBlocked      bool             `json:"is_blocked"`
+	LastMessageAt  pgtype.Timestamp `json:"last_message_at"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	// Email del contacto (unique per org when non-null)
+	Email pgtype.Text `json:"email"`
+	// Empresa asociada (FK to crm.companies)
+	CompanyID pgtype.Int4 `json:"company_id"`
+	// Origen del contacto: whatsapp, manual, import, api
+	Source string `json:"source"`
+	// Estado comercial: nuevo, contactado, calificado, descalificado, cliente
+	LeadStatus string `json:"lead_status"`
+	// Cargo del contacto
+	JobTitle pgtype.Text `json:"job_title"`
+	// Responsable asignado (FK to accounts)
+	AssignedTo pgtype.Int4 `json:"assigned_to"`
+	// Tipo de documento: CC, NIT, CE, TI, PP
+	TipoDocumento pgtype.Text `json:"tipo_documento"`
+	// Número de documento de identidad
+	NumeroDocumento pgtype.Text `json:"numero_documento"`
+}
+
+// Conversation threads with contact, supporting 24-hour window matching
+type CrmConversation struct {
+	ID             int32            `json:"id"`
+	OrganizationID int32            `json:"organization_id"`
+	ContactID      int32            `json:"contact_id"`
+	Status         string           `json:"status"`
+	LastMessageAt  pgtype.Timestamp `json:"last_message_at"`
+	Metadata       []byte           `json:"metadata"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+}
+
+// Negocios/oportunidades de venta
+type CrmDeal struct {
+	ID             int32 `json:"id"`
+	OrganizationID int32 `json:"organization_id"`
+	// Nombre del negocio
+	Nombre     string      `json:"nombre"`
+	ContactID  pgtype.Int4 `json:"contact_id"`
+	CompanyID  pgtype.Int4 `json:"company_id"`
+	PipelineID int32       `json:"pipeline_id"`
+	StageID    pgtype.Int4 `json:"stage_id"`
+	// Valor en COP (pesos colombianos)
+	Monto pgtype.Numeric `json:"monto"`
+	// Moneda (default COP)
+	Moneda              string      `json:"moneda"`
+	FechaCierreEsperada pgtype.Date `json:"fecha_cierre_esperada"`
+	// Estado: abierto, ganado, perdido, abandonado
+	Estado       string             `json:"estado"`
+	Probabilidad pgtype.Int4        `json:"probabilidad"`
+	Notas        pgtype.Text        `json:"notas"`
+	Metadata     []byte             `json:"metadata"`
+	AssignedTo   pgtype.Int4        `json:"assigned_to"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Relación muchos-a-muchos entre etiquetas y entidades CRM
+type CrmEntityTag struct {
+	ID         int32              `json:"id"`
+	TagID      int32              `json:"tag_id"`
+	EntityType string             `json:"entity_type"`
+	EntityID   int32              `json:"entity_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Individual messages within conversations with WhatsApp metadata
+type CrmMessage struct {
+	ID                int32            `json:"id"`
+	OrganizationID    int32            `json:"organization_id"`
+	ConversationID    int32            `json:"conversation_id"`
+	ContactID         int32            `json:"contact_id"`
+	WhatsappMessageID pgtype.Text      `json:"whatsapp_message_id"`
+	Direction         string           `json:"direction"`
+	MessageType       string           `json:"message_type"`
+	Content           pgtype.Text      `json:"content"`
+	Status            string           `json:"status"`
+	MessageData       []byte           `json:"message_data"`
+	ChatTimestamp     pgtype.Timestamp `json:"chat_timestamp"`
+	CreatedAt         pgtype.Timestamp `json:"created_at"`
+	UpdatedAt         pgtype.Timestamp `json:"updated_at"`
+}
+
+// Pipelines de ventas configurables por tenant
+type CrmPipeline struct {
+	ID             int32 `json:"id"`
+	OrganizationID int32 `json:"organization_id"`
+	// Nombre del pipeline (ej: Pipeline de Ventas)
+	Nombre string `json:"nombre"`
+	// Indica si es el pipeline por defecto
+	EsPredeterminado bool `json:"es_predeterminado"`
+	// Orden de visualización
+	Orden     int32              `json:"orden"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Etapas de cada pipeline de ventas
+type CrmPipelineStage struct {
+	ID         int32 `json:"id"`
+	PipelineID int32 `json:"pipeline_id"`
+	// Nombre en español (ej: Prospección, Calificado, etc.)
+	Nombre string `json:"nombre"`
+	Orden  int32  `json:"orden"`
+	// Color hex para kanban (ej: #3B82F6)
+	Color pgtype.Text `json:"color"`
+	// Probabilidad de cierre (0-100, NULL para etapas de salida)
+	Probabilidad pgtype.Int4        `json:"probabilidad"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Etiquetas para segmentar contactos, empresas y negocios
+type CrmTag struct {
+	ID             int32 `json:"id"`
+	OrganizationID int32 `json:"organization_id"`
+	// Nombre de la etiqueta
+	Nombre string `json:"nombre"`
+	// Color hex (ej: #F59E0B)
+	Color     pgtype.Text        `json:"color"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Stores uploaded documents (PDFs) with extracted text for RAG
 type DocumentsDocument struct {
 	ID             int32  `json:"id"`
@@ -126,6 +314,7 @@ type FileManagerFileAsset struct {
 	Metadata         []byte             `json:"metadata"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	OrganizationID   int32              `json:"organization_id"`
 }
 
 type FileManagerFileCategory struct {
@@ -174,9 +363,10 @@ type OrganizationsOrganization struct {
 	StytchConnectionID pgtype.Text `json:"stytch_connection_id"`
 	// Optional Stytch connection name associated with the organization
 	StytchConnectionName pgtype.Text      `json:"stytch_connection_name"`
-	BillingProvider      pgtype.Text      `json:"billing_provider"`
 	CreatedAt            pgtype.Timestamp `json:"created_at"`
 	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
+	// Billing provider preference for this organization. NULL/polar = Polar.sh, mercadopago = MercadoPago
+	BillingProvider pgtype.Text `json:"billing_provider"`
 }
 
 // Stores vector embeddings for resources using OpenAI text-embedding-3-small (1536 dimensions)
@@ -227,168 +417,7 @@ type SubscriptionBillingSubscription struct {
 	Metadata           []byte           `json:"metadata"`
 }
 
-type CrmActivity struct {
-	ID               int32              `json:"id"`
-	OrganizationID   int32              `json:"organization_id"`
-	ContactID        pgtype.Int4        `json:"contact_id"`
-	CompanyID        pgtype.Int4        `json:"company_id"`
-	DealID           pgtype.Int4        `json:"deal_id"`
-	ConversationID   pgtype.Int4        `json:"conversation_id"`
-	Tipo             string             `json:"tipo"`
-	Asunto           pgtype.Text        `json:"asunto"`
-	Contenido        pgtype.Text        `json:"contenido"`
-	Estado           pgtype.Text        `json:"estado"`
-	FechaVencimiento pgtype.Timestamptz `json:"fecha_vencimiento"`
-	RealizadaPor     pgtype.Int4        `json:"realizada_por"`
-	RealizadaEn      pgtype.Timestamptz `json:"realizada_en"`
-	Metadata         []byte             `json:"metadata"`
-	CreatedAt        pgtype.Timestamp   `json:"created_at"`
-	UpdatedAt        pgtype.Timestamp   `json:"updated_at"`
-}
-
-type CrmCompany struct {
-	ID             int32            `json:"id"`
-	OrganizationID int32            `json:"organization_id"`
-	Name           string           `json:"name"`
-	Nit            pgtype.Text      `json:"nit"`
-	TipoEmpresa    pgtype.Text      `json:"tipo_empresa"`
-	Sector         pgtype.Text      `json:"sector"`
-	Ciudad         pgtype.Text      `json:"ciudad"`
-	Departamento   pgtype.Text      `json:"departamento"`
-	Website        pgtype.Text      `json:"website"`
-	Phone          pgtype.Text      `json:"phone"`
-	Address        pgtype.Text      `json:"address"`
-	Notes          pgtype.Text      `json:"notes"`
-	Metadata       []byte           `json:"metadata"`
-	OwnerAccountID pgtype.Int4      `json:"owner_account_id"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmContact struct {
-	ID              int32            `json:"id"`
-	OrganizationID  int32            `json:"organization_id"`
-	PhoneNumber     string           `json:"phone_number"`
-	DisplayName     pgtype.Text      `json:"display_name"`
-	AvatarUrl       pgtype.Text      `json:"avatar_url"`
-	Metadata        []byte           `json:"metadata"`
-	IsBlocked       bool             `json:"is_blocked"`
-	LastMessageAt   pgtype.Timestamp `json:"last_message_at"`
-	CreatedAt       pgtype.Timestamp `json:"created_at"`
-	UpdatedAt       pgtype.Timestamp `json:"updated_at"`
-	Email           pgtype.Text      `json:"email"`
-	CompanyID       pgtype.Int4      `json:"company_id"`
-	Source          pgtype.Text      `json:"source"`
-	LeadStatus      pgtype.Text      `json:"lead_status"`
-	JobTitle        pgtype.Text      `json:"job_title"`
-	AssignedTo      pgtype.Int4      `json:"assigned_to"`
-	TipoDocumento   pgtype.Text      `json:"tipo_documento"`
-	NumeroDocumento pgtype.Text      `json:"numero_documento"`
-}
-
-type CrmConversation struct {
-	ID             int32            `json:"id"`
-	OrganizationID int32            `json:"organization_id"`
-	ContactID      int32            `json:"contact_id"`
-	Status         string           `json:"status"`
-	LastMessageAt  pgtype.Timestamp `json:"last_message_at"`
-	Metadata       []byte           `json:"metadata"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmDeal struct {
-	ID                 int32            `json:"id"`
-	OrganizationID     int32            `json:"organization_id"`
-	Nombre             string           `json:"nombre"`
-	ContactID          pgtype.Int4      `json:"contact_id"`
-	CompanyID          pgtype.Int4      `json:"company_id"`
-	PipelineID         int32            `json:"pipeline_id"`
-	StageID            pgtype.Int4      `json:"stage_id"`
-	Monto              pgtype.Numeric   `json:"monto"`
-	Moneda             string           `json:"moneda"`
-	FechaCierreEsperada pgtype.Date     `json:"fecha_cierre_esperada"`
-	Estado             string           `json:"estado"`
-	Probabilidad       pgtype.Int4      `json:"probabilidad"`
-	Notas              pgtype.Text      `json:"notas"`
-	Metadata           []byte           `json:"metadata"`
-	AssignedTo         pgtype.Int4      `json:"assigned_to"`
-	CreatedAt          pgtype.Timestamp `json:"created_at"`
-	UpdatedAt          pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmMessage struct {
-	ID               int32            `json:"id"`
-	OrganizationID   int32            `json:"organization_id"`
-	ConversationID   int32            `json:"conversation_id"`
-	ContactID        int32            `json:"contact_id"`
-	WhatsappMessageID pgtype.Text    `json:"whatsapp_message_id"`
-	Direction        string           `json:"direction"`
-	MessageType      string           `json:"message_type"`
-	Content          pgtype.Text      `json:"content"`
-	Status           string           `json:"status"`
-	MessageData      []byte           `json:"message_data"`
-	ChatTimestamp    pgtype.Timestamp `json:"chat_timestamp"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
-	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmPipeline struct {
-	ID               int32            `json:"id"`
-	OrganizationID   int32            `json:"organization_id"`
-	Nombre           string           `json:"nombre"`
-	EsPredeterminado bool             `json:"es_predeterminado"`
-	Orden            int32            `json:"orden"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
-	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmPipelineStage struct {
-	ID           int32            `json:"id"`
-	PipelineID   int32            `json:"pipeline_id"`
-	Nombre       string           `json:"nombre"`
-	Orden        int32            `json:"orden"`
-	Color        pgtype.Text      `json:"color"`
-	Probabilidad pgtype.Int4      `json:"probabilidad"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmTag struct {
-	ID             int32            `json:"id"`
-	OrganizationID int32            `json:"organization_id"`
-	Nombre         string           `json:"nombre"`
-	Color          pgtype.Text      `json:"color"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
-}
-
-type CrmEntityTag struct {
-	ID         int32            `json:"id"`
-	TagID      int32            `json:"tag_id"`
-	EntityType string           `json:"entity_type"`
-	EntityID   int32            `json:"entity_id"`
-	CreatedAt  pgtype.Timestamp `json:"created_at"`
-}
-
-type WhatsappWhatsappConfig struct {
-	ID              int32            `json:"id"`
-	OrganizationID  int32            `json:"organization_id"`
-	PhoneNumberID   string           `json:"phone_number_id"`
-	BusinessPhone   string           `json:"business_phone"`
-	WebhookSecret   string           `json:"webhook_secret"`
-	VerifyToken     string           `json:"verify_token"`
-	AppID           pgtype.Text      `json:"app_id"`
-	WabaID          pgtype.Text      `json:"waba_id"`
-	AccessToken     pgtype.Text      `json:"access_token"`
-	ApiVersion      string           `json:"api_version"`
-	GraphApiUrl     string           `json:"graph_api_url"`
-	IsActive        bool             `json:"is_active"`
-	Metadata        []byte           `json:"metadata"`
-	CreatedAt       pgtype.Timestamp `json:"created_at"`
-	UpdatedAt       pgtype.Timestamp `json:"updated_at"`
-}
-
+// Raw webhook payloads for audit and replay
 type WhatsappWebhookLog struct {
 	ID             int32            `json:"id"`
 	OrganizationID int32            `json:"organization_id"`
@@ -400,4 +429,27 @@ type WhatsappWebhookLog struct {
 	ErrorMessage   pgtype.Text      `json:"error_message"`
 	ProcessedAt    pgtype.Timestamp `json:"processed_at"`
 	CreatedAt      pgtype.Timestamp `json:"created_at"`
+}
+
+// Maps WhatsApp phone_number_id to organizations with webhook secrets
+type WhatsappWhatsappConfig struct {
+	ID             int32            `json:"id"`
+	OrganizationID int32            `json:"organization_id"`
+	PhoneNumberID  string           `json:"phone_number_id"`
+	BusinessPhone  string           `json:"business_phone"`
+	WebhookSecret  string           `json:"webhook_secret"`
+	VerifyToken    string           `json:"verify_token"`
+	AppID          pgtype.Text      `json:"app_id"`
+	IsActive       bool             `json:"is_active"`
+	Metadata       []byte           `json:"metadata"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	// WhatsApp Business Account ID for outbound API calls
+	WabaID pgtype.Text `json:"waba_id"`
+	// Permanent access token for WhatsApp Cloud API authentication
+	AccessToken pgtype.Text `json:"access_token"`
+	// WhatsApp Cloud API version (default: v21.0)
+	ApiVersion string `json:"api_version"`
+	// Base URL for Graph API (default: https://graph.facebook.com)
+	GraphApiUrl string `json:"graph_api_url"`
 }

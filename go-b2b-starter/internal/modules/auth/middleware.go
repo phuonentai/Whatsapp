@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // OrganizationResolver looks up organization by provider org ID.
@@ -33,6 +34,19 @@ type AccountResolver interface {
 type MiddlewareConfig struct {
 	// ErrorHandler is called when an error occurs. If nil, default JSON responses are used.
 	ErrorHandler func(c *gin.Context, statusCode int, message string, err error)
+
+	// TrustForwardedAuth enables trusting X-Forwarded-Auth headers set by an
+	// edge proxy that already verified the Stytch session (e.g., a Stytch
+	// B2B-powered ingress). When enabled, requests carrying
+	// "X-Forwarded-Auth: true" plus "X-Stytch-Organization-Id" and
+	// "X-Stytch-Member-Id" are authenticated from those headers.
+	// Defaults to false. Only enable when the edge strips/overrides these
+	// headers for all direct client traffic.
+	TrustForwardedAuth bool
+
+	// EnableMockAuth enables the X-Test-Org-ID mock cookie bypass that grants
+	// admin access. Intended for local development only. Defaults to false.
+	EnableMockAuth bool
 }
 
 // DefaultMiddlewareConfig returns the default middleware configuration.
@@ -106,22 +120,53 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Check for mock auth cookie when in development mode
-		if mockOrgId, err := c.Cookie("X-Test-Org-ID"); err == nil && mockOrgId != "" {
-			parts := strings.SplitN(mockOrgId, ":", 2)
-			if len(parts) == 2 {
-				identity := &Identity{
-					UserID:         "mock-" + parts[1],
-					Email:          parts[1],
-					EmailVerified:  true,
-					OrganizationID: parts[0],
-					Roles:          []Role{RoleAdmin},
-					Permissions:    []Permission{NewPermission("*", "*")},
-					ExpiresAt:      time.Now().Add(24 * time.Hour),
-				}
-				SetIdentity(c, identity)
-				c.Next()
+		// Edge proxy forwarded auth (e.g., Stytch B2B ingress)
+		if m.config.TrustForwardedAuth && c.GetHeader("X-Forwarded-Auth") == "true" {
+			orgID := c.GetHeader("X-Stytch-Organization-Id")
+			memberID := c.GetHeader("X-Stytch-Member-Id")
+			if orgID == "" || memberID == "" {
+				m.config.ErrorHandler(c, http.StatusUnauthorized, "missing forwarded identity headers", ErrInvalidToken)
+				c.Abort()
 				return
+			}
+			if _, err := uuid.Parse(orgID); err != nil {
+				m.config.ErrorHandler(c, http.StatusUnauthorized, "invalid organization id", ErrInvalidToken)
+				c.Abort()
+				return
+			}
+			if _, err := uuid.Parse(memberID); err != nil {
+				m.config.ErrorHandler(c, http.StatusUnauthorized, "invalid member id", ErrInvalidToken)
+				c.Abort()
+				return
+			}
+			identity := &Identity{
+				UserID:         memberID,
+				OrganizationID: orgID,
+				ExpiresAt:      time.Now().Add(15 * time.Minute),
+			}
+			SetIdentity(c, identity)
+			c.Next()
+			return
+		}
+
+		// Mock auth cookie for local development (must be explicitly enabled)
+		if m.config.EnableMockAuth {
+			if mockOrgId, err := c.Cookie("X-Test-Org-ID"); err == nil && mockOrgId != "" {
+				parts := strings.SplitN(mockOrgId, ":", 2)
+				if len(parts) == 2 {
+					identity := &Identity{
+						UserID:         "mock-" + parts[1],
+						Email:          parts[1],
+						EmailVerified:  true,
+						OrganizationID: parts[0],
+						Roles:          []Role{RoleAdmin},
+						Permissions:    []Permission{NewPermission("*", "*")},
+						ExpiresAt:      time.Now().Add(24 * time.Hour),
+					}
+					SetIdentity(c, identity)
+					c.Next()
+					return
+				}
 			}
 		}
 

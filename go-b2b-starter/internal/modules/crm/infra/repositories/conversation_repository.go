@@ -98,7 +98,7 @@ func (r *conversationRepository) ListByOrganization(ctx context.Context, orgID i
 		OrganizationID: orgID,
 		Limit:          limit,
 		Offset:         offset,
-		StatusFilter:   statusFilter,
+		Column4:        statusFilter,
 	}
 
 	results, err := r.store.ListConversationsByOrganization(ctx, params)
