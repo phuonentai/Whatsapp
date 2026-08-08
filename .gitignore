@@ -103,3 +103,6 @@ next_b2b_starter/build/
 # TypeScript Build Info
 next_b2b_starter/*.tsbuildinfo
 next_b2b_starter/.turbo/
+
+# --- Playwright Test Artifacts ---
+next_b2b_starter/test-results/
