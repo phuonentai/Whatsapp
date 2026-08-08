@@ -71,7 +71,7 @@ function AccessDenied({ onGoBack }: { onGoBack: () => void }) {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
           <AlertDescription className="mt-2">
-            You don't have permission to access this page. Please contact your
+            You don&apos;t have permission to access this page. Please contact your
             administrator if you believe this is a mistake.
           </AlertDescription>
         </Alert>
