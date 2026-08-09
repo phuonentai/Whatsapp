@@ -56,6 +56,7 @@ var seedOrgs = []seedOrg{
 		plan: planPro,
 		accounts: []seedAccountRow{
 			{email: "admin-pro@test.com", fullName: "Pro Admin", role: "admin"},
+			{email: "member-pro@test.com", fullName: "Pro Member", role: "member"},
 		},
 	},
 	{
@@ -82,11 +83,11 @@ func planMetadata(plan string) []byte {
 	}
 	switch plan {
 	case planPro:
-		features["crm_features"] = "crm_companies,crm_deals,crm_activities"
+		features["crm_features"] = "crm_contacts_manage,crm_companies,crm_deals,crm_activities"
 	case planEnterprise:
-		features["crm_features"] = "crm_companies,crm_deals,crm_activities,crm_tags"
+		features["crm_features"] = "crm_contacts_manage,crm_companies,crm_deals,crm_activities,crm_tags"
 	case planFree:
-		features["crm_features"] = "crm_companies"
+		features["crm_features"] = "crm_contacts_manage"
 	}
 	raw, _ := json.Marshal(features)
 	return raw
@@ -234,6 +235,23 @@ func seedOrgRow(ctx context.Context, pool *pgxpool.Pool, org seedOrg) error {
 	)
 	if err != nil {
 		return fmt.Errorf("upsert quota: %w", err)
+	}
+
+	// Agent: kill_switch=true so the LLM pipeline never runs during e2e.
+	// Without it every inbound webhook triggers the metered OpenAI call
+	// (placeholder key → 401 + retry), which stalls the synchronous webhook
+	// handler and flaky-timeouts the whatsapp-inbox idempotency spec.
+	_, err = tx.Exec(ctx, `
+		INSERT INTO agent.agent_settings (
+			organization_id, mode, tone, timezone, kill_switch,
+			consent_required, guardrails
+		) VALUES ($1, 'copilot', 'formal', 'America/Bogota', true, true, '{}'::jsonb)
+		ON CONFLICT (organization_id) DO UPDATE SET
+			kill_switch = EXCLUDED.kill_switch`,
+		orgID,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert agent settings: %w", err)
 	}
 
 	return tx.Commit(ctx)
