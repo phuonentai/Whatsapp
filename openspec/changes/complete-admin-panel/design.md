@@ -39,7 +39,7 @@ Add `whatsapp` to `SettingsView` union, `parseViewParam`, `DETAIL_META`, an over
 ### 4. Member role change — new Stytch-synced endpoint
 The member list exposes Stytch `member_id`, but `PUT /accounts/:id` addresses accounts by local integer id, so it cannot be called from the member UI. Add `PUT /auth/members/:member_id/role` (org:manage) implemented in `memberService.ChangeMemberRole`: it SHALL call Stytch B2B `Members.Update` (role slug) FIRST and reject the request on failure (no local-only write), enforce the last-admin guard, then persist the local row. Role vocabulary is `admin|approver|member`, matching `mapRoleSlugToAccountRole` and the account binding. FE: role control on member rows (disabled for current user and pending members), aligned `MemberRole`/`getRoleConfig`/`DEFAULT_ROLES` from `admin|manager|member` to `admin|approver|member`, fixing the existing approver mislabel.
 
-- **Implemented:** `UpdateAccount` assigns the role slug through `stytchMemberRepository.AssignRoles` (`Members.Update`) before the local write and rejects on failure; last-admin demotion is refused in the service layer. FE: role control added to member rows (disabled for the current user and for non-managers), aligned `MemberRole`/`getRoleConfig`/`DEFAULT_ROLES` to `admin|approver|member`, fixing the existing approver mislabel.
+- **Implemented:** `ChangeMemberRole` (`PUT /auth/members/:member_id/role`) assigns the role slug through `stytchMemberRepository.AssignRoles` (`Members.Update`) before the local write and rejects on failure; last-admin demotion is refused in the service layer. FE: role control added to member rows (disabled for the current user and for non-managers), aligned `MemberRole`/`getRoleConfig`/`DEFAULT_ROLES` to `admin|approver|member`, fixing the existing approver mislabel.
 
 - **Rationale:** role must take effect at the authorization boundary (Stytch), not just the local copy.
 
@@ -76,7 +76,7 @@ The new org/account sync calls are the first org-scoped `PUT` flows that mutate 
 
 ## Migration Plan
 
-1. Deploy backend first (extended `UpdateOrganization`/`UpdateAccount` semantics are backward-compatible with existing callers; no migration of stored data).
+1. Deploy backend first (extended `UpdateOrganization` + new `ChangeMemberRole` semantics are backward-compatible with existing callers; no migration of stored data).
 2. Deploy frontend nav + settings wiring + header changes.
 3. Deploy member-role vocabulary alignment (single commit touching model + UI).
 4. Rollback: git revert per commit; re-issue prior Stytch org display name / member roles via the same extended endpoints for any mutated rows.

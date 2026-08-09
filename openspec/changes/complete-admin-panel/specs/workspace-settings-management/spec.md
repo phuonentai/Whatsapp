@@ -26,14 +26,14 @@ Every outbound Stytch B2B call made by the org display-name and member-role upda
 
 #### Scenario: Breaker open rejects the update without local write
 
-- **WHEN** the Stytch circuit breaker is open during a `PUT /organizations` or `PUT /accounts/:id` call
+- **WHEN** the Stytch circuit breaker is open during a `PUT /organizations` or `PUT /auth/members/:member_id/role` call
 - **THEN** the system SHALL return an error to the caller
-- **AND** the local organization or account row SHALL NOT be modified
+- **AND** the local organization or account/member row SHALL NOT be modified
 
 #### Scenario: Breaker recovers and updates resume
 
 - **WHEN** the Stytch circuit breaker transitions back to closed (half-open probe succeeds)
-- **THEN** subsequent `PUT /organizations` and `PUT /accounts/:id` calls SHALL sync to Stytch and persist locally as normal
+- **THEN** subsequent `PUT /organizations` and `PUT /auth/members/:member_id/role` calls SHALL sync to Stytch and persist locally as normal
 
 ### Requirement: Admin can change a member's role
 
