@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSessionsQuery, useSessionMessagesQuery } from "@/lib/hooks/queries/use-sessions-query";
-import { useChat } from "@/lib/hooks/mutations/use-chat";
+import { useChatStream } from "@/lib/hooks/mutations/use-chat-stream";
 import { useDocumentsQuery } from "@/lib/hooks/queries/use-documents-query";
 import { useUploadDocument } from "@/lib/hooks/mutations/use-upload-document";
 import { useDeleteDocument } from "@/lib/hooks/mutations/use-delete-document";
@@ -34,6 +34,7 @@ export function KnowledgeContent() {
 
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [messageSources, setMessageSources] = useState<Record<number, SimilarDocument[]>>({});
 
   const {
@@ -46,20 +47,26 @@ export function KnowledgeContent() {
     enabled: currentSessionId !== null && currentSessionId > 0,
   });
 
-  const chatMutation = useChat();
-  const messages = [...(sessionMessages ?? []), ...optimisticMessages];
+  const { sendMessage: sendStreamMessage, isStreaming } = useChatStream();
+  // Derive the visible list instead of mutating optimistic state on prop change:
+  // hide optimistic messages that belong to another session or that the server
+  // has already confirmed (same id).
+  const serverMessages = sessionMessages ?? [];
+  const visibleOptimisticMessages = optimisticMessages.filter(
+    (m) =>
+      m.sessionId === currentSessionId &&
+      !serverMessages.some((s) => s.id === m.id)
+  );
+  const messages = [...serverMessages, ...visibleOptimisticMessages];
 
-  useEffect(() => {
-    if (sessionMessages && sessionMessages.length > 0) {
-      setOptimisticMessages([]);
-    }
-  }, [sessionMessages]);
-
-  useEffect(() => {
+  // Select the first session automatically when sessions first load.
+  const [prevSessions, setPrevSessions] = useState(sessions);
+  if (sessions !== prevSessions) {
+    setPrevSessions(sessions);
     if (!currentSessionId && sessions && sessions.length > 0) {
       setCurrentSessionId(sessions[0].id);
     }
-  }, [currentSessionId, sessions]);
+  }
 
   const currentSession = sessions?.find((s) => s.id === currentSessionId);
   const sessionTitle = currentSession?.title;
@@ -73,13 +80,40 @@ export function KnowledgeContent() {
       tokensUsed: 0,
       createdAt: new Date(),
     };
+    const optimisticAssistantId = Date.now() + 1;
     setOptimisticMessages((prev) => [...prev, optimisticUserMessage]);
+    setStreamingMessageId(optimisticAssistantId);
 
     try {
-      const response = await chatMutation.mutateAsync({
+      const response = await sendStreamMessage({
         sessionId: currentSessionId ?? undefined,
         message,
         useRag,
+      }, {
+        onToken: (token) => {
+          setOptimisticMessages((prev) => {
+            const existing = prev.find((m) => m.id === optimisticAssistantId);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === optimisticAssistantId
+                  ? { ...m, content: m.content + token }
+                  : m
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: optimisticAssistantId,
+                sessionId: currentSessionId ?? 0,
+                role: "assistant",
+                content: token,
+                tokensUsed: 0,
+                createdAt: new Date(),
+              },
+            ];
+          });
+        },
+        onDone: () => setStreamingMessageId(null),
       });
 
       if (response.sessionId && response.sessionId !== currentSessionId) {
@@ -92,9 +126,15 @@ export function KnowledgeContent() {
           [response.message.id]: response.referencedDocs!,
         }));
       }
-      setOptimisticMessages([]);
+      setOptimisticMessages((prev) =>
+        prev.filter((m) => m.id !== optimisticUserMessage.id)
+      );
+      setStreamingMessageId(null);
     } catch {
-      setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticUserMessage.id));
+      setOptimisticMessages((prev) =>
+        prev.filter((m) => m.id !== optimisticUserMessage.id && m.id !== optimisticAssistantId)
+      );
+      setStreamingMessageId(null);
     }
   };
 
@@ -134,7 +174,8 @@ export function KnowledgeContent() {
           messages={messages}
           sessionTitle={sessionTitle}
           isLoading={isSessionsLoading || isMessagesLoading}
-          isSending={chatMutation.isPending}
+          isSending={isStreaming}
+          streamingMessageId={streamingMessageId}
           onSendMessage={handleSendMessage}
           onNewChat={handleNewChat}
           messageSources={messageSources}

@@ -2,7 +2,10 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
@@ -20,6 +23,9 @@ func NewConfigRepository(store sqlc.Store) domain.ConfigRepository {
 func (r *configRepository) GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (*domain.WhatsAppConfig, error) {
 	result, err := r.store.GetWhatsAppConfigByPhoneNumberID(ctx, phoneNumberID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrConfigNotFound
+		}
 		return nil, fmt.Errorf("failed to get config by phone number ID: %w", err)
 	}
 
@@ -29,6 +35,9 @@ func (r *configRepository) GetByPhoneNumberID(ctx context.Context, phoneNumberID
 func (r *configRepository) GetByOrganizationID(ctx context.Context, orgID int32) (*domain.WhatsAppConfig, error) {
 	result, err := r.store.GetWhatsAppConfigByOrganizationID(ctx, orgID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrConfigNotFound
+		}
 		return nil, fmt.Errorf("failed to get config by organization ID: %w", err)
 	}
 
@@ -38,6 +47,9 @@ func (r *configRepository) GetByOrganizationID(ctx context.Context, orgID int32)
 func (r *configRepository) GetByVerifyToken(ctx context.Context, verifyToken string) (*domain.WhatsAppConfig, error) {
 	result, err := r.store.GetWhatsAppConfigByVerifyToken(ctx, verifyToken)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrConfigNotFound
+		}
 		return nil, fmt.Errorf("failed to get config by verify token: %w", err)
 	}
 

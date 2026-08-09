@@ -1,12 +1,14 @@
 package organizations
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/app/services"
+	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
@@ -284,6 +286,67 @@ func (h *MemberHandler) DeleteMember(c *gin.Context) {
 	})
 
 	response.Success(c, http.StatusNoContent, nil)
+}
+
+// @Summary Change member role
+// @Description Updates a member's role in Stytch and the internal database. Role must be one of admin, approver, member. Organization ID is extracted from JWT. Request body: {"role": "approver"}
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer JWT token"
+// @Param member_id path string true "Member ID"
+// @Param role body services.ChangeMemberRoleRequest true "New role"
+// @Success 200 {object} map[string]any "Role updated"
+// @Failure 400 {object} map[string]any "Invalid request payload or missing organization context"
+// @Failure 403 {object} map[string]any "Cannot demote the last admin"
+// @Failure 500 {object} map[string]any "Failed to update role"
+// @Router /auth/members/{member_id}/role [put]
+func (h *MemberHandler) ChangeMemberRole(c *gin.Context) {
+	reqCtx := auth.GetRequestContext(c)
+	if reqCtx == nil {
+		h.logger.Error("request context not found", nil)
+		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
+		return
+	}
+
+	memberID := c.Param("member_id")
+	if memberID == "" {
+		response.Error(c, http.StatusBadRequest, "member_id is required", nil)
+		return
+	}
+
+	var req services.ChangeMemberRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("invalid change role request payload", map[string]any{
+			"error": err.Error(),
+		})
+		response.Error(c, http.StatusBadRequest, "invalid request payload", err)
+		return
+	}
+
+	err := h.memberService.ChangeMemberRole(c.Request.Context(), reqCtx.ProviderOrgID, memberID, req.Role)
+	if err != nil {
+		h.logger.Error("failed to change member role", map[string]any{
+			"org_id":    reqCtx.ProviderOrgID,
+			"member_id": memberID,
+			"role":      req.Role,
+			"error":     err.Error(),
+		})
+		if errors.Is(err, domain.ErrLastAdminDemotion) {
+			response.Error(c, http.StatusForbidden, err.Error(), err)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to update role", err)
+		return
+	}
+
+	h.logger.Info("member role updated", map[string]any{
+		"org_id":    reqCtx.ProviderOrgID,
+		"member_id": memberID,
+		"role":      req.Role,
+	})
+
+	response.Success(c, http.StatusOK, gin.H{"success": true})
 }
 
 // @Summary Check if email exists

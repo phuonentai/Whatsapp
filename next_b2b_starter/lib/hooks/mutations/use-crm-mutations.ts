@@ -1,12 +1,19 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { crmRepository } from "../../api/api/repositories/crm-repository";
 import { queryKeys } from "../queries/query-keys";
+import { toSpanishMutationError } from "../../crm/errors";
+
+function onMutationError(error: unknown) {
+  toast.error(toSpanishMutationError(error));
+}
 
 export function useCreateContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Parameters<typeof crmRepository.createContact>[0]) => crmRepository.createContact(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.contacts() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -15,7 +22,8 @@ export function useUpdateContact() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.updateContact>[1] }) =>
       crmRepository.updateContact(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.contacts() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -23,7 +31,36 @@ export function useDeleteContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => crmRepository.deleteContact(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.contacts() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useCreateCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof crmRepository.createCompany>[0]) => crmRepository.createCompany(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useUpdateCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.updateCompany>[1] }) =>
+      crmRepository.updateCompany(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useDeleteCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => crmRepository.deleteCompany(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -31,7 +68,8 @@ export function useCreateDeal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Parameters<typeof crmRepository.createDeal>[0]) => crmRepository.createDeal(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.deals() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -40,7 +78,8 @@ export function useUpdateDeal() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.updateDeal>[1] }) =>
       crmRepository.updateDeal(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.deals() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -49,7 +88,8 @@ export function useMoveDealStage() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.moveDealStage>[1] }) =>
       crmRepository.moveDealStage(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.deals() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -57,15 +97,8 @@ export function useCreateActivity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Parameters<typeof crmRepository.createActivity>[0]) => crmRepository.createActivity(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.activities() }),
-  });
-}
-
-export function useCreateCompany() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Parameters<typeof crmRepository.createCompany>[0]) => crmRepository.createCompany(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.companies() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -73,7 +106,38 @@ export function useCreateTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Parameters<typeof crmRepository.createTag>[0]) => crmRepository.createTag(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.tags() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useUpdateTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.updateTag>[1] }) =>
+      crmRepository.updateTag(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useTagEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { entityType: string; entityId: number; tagId: number }) =>
+      crmRepository.tagEntity(args.entityType, args.entityId, args.tagId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useUntagEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { entityType: string; entityId: number; tagId: number }) =>
+      crmRepository.untagEntity(args.entityType, args.entityId, args.tagId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }
 
@@ -81,6 +145,55 @@ export function useDeleteTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => crmRepository.deleteTag(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.tags() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useDeleteDeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => crmRepository.deleteDeal(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useCreatePipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Parameters<typeof crmRepository.createPipeline>[0]) => crmRepository.createPipeline(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useUpdatePipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.updatePipeline>[1] }) =>
+      crmRepository.updatePipeline(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useCreateStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { pipelineId: number; data: Parameters<typeof crmRepository.createStage>[1] }) =>
+      crmRepository.createStage(args.pipelineId, args.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
+  });
+}
+
+export function useUpdateStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { pipelineId: number; stageId: number; data: Parameters<typeof crmRepository.updateStage>[2] }) =>
+      crmRepository.updateStage(args.pipelineId, args.stageId, args.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
+    onError: onMutationError,
   });
 }

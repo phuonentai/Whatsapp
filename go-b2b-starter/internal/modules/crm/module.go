@@ -4,6 +4,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"go.uber.org/dig"
@@ -41,8 +42,9 @@ func (m *Module) RegisterDependencies() error {
 		pipelineRepo domain.PipelineRepository,
 		activityRepo domain.ActivityRepository,
 		featureProvider features.FeatureProvider,
+		bus eventbus.EventBus,
 	) services.DealService {
-		return services.NewDealService(dealRepo, pipelineRepo, activityRepo, featureProvider, nil)
+		return services.NewDealService(dealRepo, pipelineRepo, activityRepo, featureProvider, bus)
 	}); err != nil {
 		return err
 	}
@@ -104,6 +106,24 @@ func (m *Module) RegisterDependencies() error {
 		log logger.Logger,
 	) services.MessageListener {
 		return services.NewMessageListener(crmService, log)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		crmService services.CRMService,
+		log logger.Logger,
+	) services.EchoListener {
+		return services.NewEchoListener(crmService, log)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		activityService services.ActivityService,
+		log logger.Logger,
+	) services.DealStageListener {
+		return services.NewDealStageListener(activityService, log)
 	}); err != nil {
 		return err
 	}

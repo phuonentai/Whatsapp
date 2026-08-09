@@ -44,8 +44,9 @@ type MiddlewareConfig struct {
 	// headers for all direct client traffic.
 	TrustForwardedAuth bool
 
-	// EnableMockAuth enables the X-Test-Org-ID mock cookie bypass that grants
-	// admin access. Intended for local development only. Defaults to false.
+	// EnableMockAuth enables the X-Test-Org-ID mock bypass (header or cookie)
+	// that grants admin access. Intended for local development only. Defaults
+	// to false.
 	EnableMockAuth bool
 }
 
@@ -149,9 +150,14 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Mock auth cookie for local development (must be explicitly enabled)
+		// Mock auth for local development (must be explicitly enabled):
+		// X-Test-Org-ID header first, then cookie for backward compatibility.
 		if m.config.EnableMockAuth {
-			if mockOrgId, err := c.Cookie("X-Test-Org-ID"); err == nil && mockOrgId != "" {
+			mockOrgId := c.GetHeader("X-Test-Org-ID")
+			if mockOrgId == "" {
+				mockOrgId, _ = c.Cookie("X-Test-Org-ID")
+			}
+			if mockOrgId != "" {
 				parts := strings.SplitN(mockOrgId, ":", 2)
 				if len(parts) == 2 {
 					identity := &Identity{

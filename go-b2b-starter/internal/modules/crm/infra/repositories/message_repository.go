@@ -2,8 +2,10 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
@@ -37,6 +39,35 @@ func (r *messageRepository) Create(ctx context.Context, msg *domain.Message) (*d
 	}
 
 	return r.mapToDomain(&result), nil
+}
+
+func (r *messageRepository) InsertIdempotent(ctx context.Context, msg *domain.Message) (*domain.Message, bool, error) {
+	params := sqlc.InsertMessageIdempotentParams{
+		OrganizationID:    msg.OrganizationID,
+		ConversationID:    msg.ConversationID,
+		ContactID:         msg.ContactID,
+		WhatsappMessageID: helpers.ToPgText(msg.WhatsAppMessageID),
+		Direction:         string(msg.Direction),
+		MessageType:       string(msg.MessageType),
+		Content:           helpers.ToPgText(msg.Content),
+		Status:            msg.Status,
+		MessageData:       helpers.ToJSONB(msg.MessageData),
+		ChatTimestamp:     helpers.ToPgTimestampPtr(msg.ChatTimestamp),
+	}
+
+	result, err := r.store.InsertMessageIdempotent(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) && msg.WhatsAppMessageID != "" {
+			existing, getErr := r.GetByWhatsAppID(ctx, msg.OrganizationID, msg.WhatsAppMessageID)
+			if getErr != nil {
+				return nil, false, fmt.Errorf("failed to fetch message after idempotent insert: %w", getErr)
+			}
+			return existing, false, nil
+		}
+		return nil, false, fmt.Errorf("failed to insert message idempotently: %w", err)
+	}
+
+	return r.mapToDomain(&result), true, nil
 }
 
 func (r *messageRepository) GetByWhatsAppID(ctx context.Context, orgID int32, whatsappMessageID string) (*domain.Message, error) {

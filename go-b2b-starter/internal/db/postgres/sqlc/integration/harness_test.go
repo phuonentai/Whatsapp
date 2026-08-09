@@ -47,6 +47,8 @@ var migrationsToApply = []string{
 	"000014_add_whatsapp_config_outbound_fields.up.sql",
 	"000015_add_billing_provider_to_organizations.up.sql",
 	"000016_create_crm_integrity_constraints.up.sql",
+	"000020_create_whatsapp_signup_flows.up.sql",
+	"000021_create_invoices.up.sql",
 }
 
 func TestMain(m *testing.M) {

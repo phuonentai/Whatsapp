@@ -27,3 +27,23 @@ func (p *openAIAssistantProvider) GenerateResponse(ctx context.Context, prompt s
 		TokensUsed: resp.TokensUsed,
 	}, nil
 }
+
+func (p *openAIAssistantProvider) GenerateResponseStream(ctx context.Context, prompt string, emit func(domain.StreamEvent) error) (*domain.AssistantResponse, error) {
+	req := llmdomain.CompletionRequest{Prompt: prompt}
+	resp, err := p.llmClient.CompleteStream(ctx, req, func(chunk llmdomain.StreamChunk) error {
+		if chunk.Done {
+			return emit(domain.StreamEvent{Done: true})
+		}
+		return emit(domain.StreamEvent{Content: chunk.Content})
+	})
+	if err != nil {
+		// Fail the stream even when the callback has not yet emitted a done
+		// event so the SSE consumer always terminates.
+		_ = emit(domain.StreamEvent{Done: true})
+		return nil, err
+	}
+	return &domain.AssistantResponse{
+		Content:    resp.Text,
+		TokensUsed: resp.TokensUsed,
+	}, nil
+}

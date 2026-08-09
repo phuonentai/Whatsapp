@@ -52,6 +52,18 @@ LIMIT $1 OFFSET $2;
 DELETE FROM organizations.organizations
 WHERE id = $1;
 
+-- name: GetOrganizationBillingProvider :one
+SELECT COALESCE(billing_provider, 'polar') AS billing_provider
+FROM organizations.organizations
+WHERE id = $1;
+
+-- name: SetOrganizationBillingProvider :one
+UPDATE organizations.organizations
+SET billing_provider = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING COALESCE(billing_provider, 'polar') AS billing_provider;
+
 -- Accounts queries
 
 -- name: CreateAccount :one

@@ -10,6 +10,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/app/services"
 	docEvents "github.com/moasq/go-b2b-starter/internal/modules/documents/domain/events"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
+	llmdomain "github.com/moasq/go-b2b-starter/internal/platform/llm/domain"
 )
 
 func Init(container *dig.Container) error {
@@ -31,8 +32,11 @@ func Init(container *dig.Container) error {
 				return fmt.Errorf("unexpected event type: %T", event)
 			}
 
-			// Handle the event
-			return listener.HandleDocumentUploaded(ctx, docEvent.DocumentID, docEvent.OrganizationID, docEvent.ExtractedText)
+			// Handle the event (attach the org so AI usage is metered)
+			return listener.HandleDocumentUploaded(
+				llmdomain.WithOrgID(ctx, docEvent.OrganizationID),
+				docEvent.DocumentID, docEvent.OrganizationID, docEvent.ExtractedText,
+			)
 		})
 	}); err != nil {
 		return fmt.Errorf("failed to wire document event listener: %w", err)

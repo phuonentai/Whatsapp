@@ -34,3 +34,14 @@ export function useIsGracePeriod(): boolean {
   const { data } = useEntitlementQuery();
   return data?.periodo_gracia ?? false;
 }
+
+export function useModule(key: string): { enabled: boolean; config?: Record<string, unknown> } {
+  const { data } = useEntitlementQuery();
+  const state = data?.modulos?.[key];
+  return { enabled: state?.enabled ?? false, config: state?.config };
+}
+
+export function useModules(): Record<string, { enabled: boolean; config?: Record<string, unknown> }> {
+  const { data } = useEntitlementQuery();
+  return data?.modulos ?? {};
+}

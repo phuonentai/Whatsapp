@@ -17,32 +17,32 @@ type CompanyService interface {
 }
 
 type CreateCompanyRequest struct {
-	Nombre         string
-	Nit            string
-	TipoEmpresa    string
-	Sector         string
-	Ciudad         string
-	Departamento   string
-	Website        string
-	Phone          string
-	Address        string
-	Notes          string
-	OwnerAccountID *int32
+	Nombre         string `json:"name"`
+	Nit            string `json:"nit"`
+	TipoEmpresa    string `json:"tipo_empresa"`
+	Sector         string `json:"sector"`
+	Ciudad         string `json:"ciudad"`
+	Departamento   string `json:"departamento"`
+	Website        string `json:"website"`
+	Phone          string `json:"phone"`
+	Address        string `json:"address"`
+	Notes          string `json:"notes"`
+	OwnerAccountID *int32 `json:"owner_account_id"`
 }
 
 type UpdateCompanyRequest struct {
-	ID             int32
-	Nombre         string
-	Nit            string
-	TipoEmpresa    string
-	Sector         string
-	Ciudad         string
-	Departamento   string
-	Website        string
-	Phone          string
-	Address        string
-	Notes          string
-	OwnerAccountID *int32
+	ID             int32  `json:"id"`
+	Nombre         string `json:"name"`
+	Nit            string `json:"nit"`
+	TipoEmpresa    string `json:"tipo_empresa"`
+	Sector         string `json:"sector"`
+	Ciudad         string `json:"ciudad"`
+	Departamento   string `json:"departamento"`
+	Website        string `json:"website"`
+	Phone          string `json:"phone"`
+	Address        string `json:"address"`
+	Notes          string `json:"notes"`
+	OwnerAccountID *int32 `json:"owner_account_id"`
 }
 
 type companyService struct {
@@ -62,7 +62,14 @@ func (s *companyService) Create(ctx context.Context, orgID int32, req *CreateCom
 		Address: req.Address, Notes: req.Notes, OwnerAccountID: req.OwnerAccountID,
 	}
 	if err := company.Validate(); err != nil { return nil, err }
-	return s.companyRepo.Create(ctx, company)
+	created, err := s.companyRepo.Create(ctx, company)
+	if err != nil {
+		if isUniqueViolationOn(err, "companies_organization_id_name_key") {
+			return nil, domain.ErrCompanyDuplicateName
+		}
+		return nil, err
+	}
+	return created, nil
 }
 func (s *companyService) GetByID(ctx context.Context, orgID, companyID int32) (*domain.CompanyWithCounts, error) {
 	return s.companyRepo.GetByID(ctx, orgID, companyID)
@@ -78,7 +85,14 @@ func (s *companyService) Update(ctx context.Context, orgID int32, req *UpdateCom
 		TipoEmpresa: req.TipoEmpresa, Sector: req.Sector, Ciudad: req.Ciudad,
 		Departamento: req.Departamento, Website: req.Website, Phone: req.Phone,
 		Address: req.Address, Notes: req.Notes, OwnerAccountID: req.OwnerAccountID}
-	return s.companyRepo.Update(ctx, company)
+	updated, err := s.companyRepo.Update(ctx, company)
+	if err != nil {
+		if isUniqueViolationOn(err, "companies_organization_id_name_key") {
+			return nil, domain.ErrCompanyDuplicateName
+		}
+		return nil, err
+	}
+	return updated, nil
 }
 func (s *companyService) Delete(ctx context.Context, orgID, companyID int32) error {
 	return s.companyRepo.Delete(ctx, orgID, companyID)

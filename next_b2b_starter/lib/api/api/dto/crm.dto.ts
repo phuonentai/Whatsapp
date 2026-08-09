@@ -14,6 +14,7 @@ export interface ContactDto {
   avatar_url?: string;
   is_blocked: boolean;
   last_message_at?: string;
+  tags?: TagDto[];
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface CompanyDto {
   owner_account_id?: number;
   total_contactos?: number;
   total_negocios?: number;
+  tags?: TagDto[];
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +57,7 @@ export interface DealDto {
   assigned_to?: number;
   contact_name?: string;
   company_name?: string;
+  tags?: TagDto[];
   created_at: string;
   updated_at: string;
 }
@@ -110,6 +113,12 @@ export interface TagDto {
   updated_at: string;
 }
 
+export interface ModuleStateDto {
+  enabled: boolean;
+  features?: string[];
+  config?: Record<string, unknown>;
+}
+
 export interface EntitlementDto {
   funcionalidades: Record<string, boolean>;
   cuotas: Record<string, number>;
@@ -117,4 +126,5 @@ export interface EntitlementDto {
   solo_lectura: boolean;
   periodo_gracia: boolean;
   plan: string;
+  modulos: Record<string, ModuleStateDto>;
 }

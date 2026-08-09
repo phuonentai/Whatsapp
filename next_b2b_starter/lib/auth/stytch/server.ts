@@ -1,6 +1,6 @@
 import Stytch, { envs as stytchEnvs } from "stytch";
 import type { B2BSessionsAuthenticateResponse } from "stytch";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -173,7 +173,10 @@ export const getMemberSession = cache(
   async (): Promise<B2BSessionsAuthenticateResponse | null> => {
     if (process.env.AUTH_MOCK_ENABLED === "true") {
       const cookieStore = await cookies();
-      const mockOrgId = cookieStore.get("X-Test-Org-ID")?.value;
+      const headerStore = await headers();
+      const mockOrgId =
+        headerStore.get("x-test-org-id")?.value ||
+        cookieStore.get("X-Test-Org-ID")?.value;
       if (mockOrgId) {
         const [orgSlug, email] = mockOrgId.split(":", 2);
         const mockSession: MockSession = {

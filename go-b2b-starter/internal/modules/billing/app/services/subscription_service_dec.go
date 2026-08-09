@@ -2,8 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/routing"
+	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 )
 
@@ -68,25 +71,59 @@ type BillingService interface {
 	// to double-check with the provider in case we missed a webhook
 	// Returns updated BillingStatus after syncing with provider
 	RefreshSubscriptionStatus(ctx context.Context, organizationID int32) (*domain.BillingStatus, error)
+
+	// CreateMPCheckout creates a MercadoPago checkout (preapproval) and returns
+	// a BillingStatus carrying the redirect URL for the hosted Checkout Pro flow
+	CreateMPCheckout(ctx context.Context, planID string) (*domain.BillingStatus, error)
+
+	// VerifyMPPayment verifies a MercadoPago payment after checkout redirect by
+	// polling the MercadoPago API. On approval, upserts the local subscription,
+	// quota, and sets the organization's billing provider to "mercadopago"
+	VerifyMPPayment(ctx context.Context, paymentID string) (*domain.BillingStatus, error)
+
+	// ProcessMPWebhookEvent processes a MercadoPago IPN webhook payload and
+	// updates local subscription state (authorized/cancelled/updated)
+	ProcessMPWebhookEvent(ctx context.Context, rawPayload json.RawMessage) error
+
+	// CancelMPSubscription cancels a MercadoPago preapproval via the API and
+	// marks the local subscription as canceled
+	CancelMPSubscription(ctx context.Context, subscriptionID string) (*domain.BillingStatus, error)
+
+	// GetAiUsageStatus returns the read-only AI usage state for the org's
+	// current billing period (tokens, credits used/max/remaining). Does not
+	// consume anything.
+	GetAiUsageStatus(ctx context.Context, organizationID int32) (*domain.AiUsageStatus, error)
 }
 
 type billingService struct {
 	repo            domain.SubscriptionRepository
+	aiRepo          domain.AiUsageRepository
 	orgAdapter      domain.OrganizationAdapter
 	billingProvider domain.BillingProvider
+	mpProvider      domain.BillingProvider
+	resolver        routing.BillingProviderResolver
+	moduleService   registryServices.ModuleService
 	logger          logger.Logger
 }
 
 func NewBillingService(
 	repo domain.SubscriptionRepository,
+	aiRepo domain.AiUsageRepository,
 	orgAdapter domain.OrganizationAdapter,
 	billingProvider domain.BillingProvider,
+	mpProvider domain.BillingProvider,
+	resolver routing.BillingProviderResolver,
+	moduleService registryServices.ModuleService,
 	logger logger.Logger,
 ) BillingService {
 	return &billingService{
 		repo:            repo,
+		aiRepo:          aiRepo,
 		orgAdapter:      orgAdapter,
 		billingProvider: billingProvider,
+		mpProvider:      mpProvider,
+		resolver:        resolver,
+		moduleService:   moduleService,
 		logger:          logger,
 	}
 }

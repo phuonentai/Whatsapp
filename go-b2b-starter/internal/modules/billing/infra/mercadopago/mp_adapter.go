@@ -18,15 +18,63 @@ import (
 var _ domain.BillingProvider = (*mpAdapter)(nil)
 
 type mpAdapter struct {
-	client *mp.Client
-	logger logger.Logger
+	client  *mp.Client
+	logger  logger.Logger
+	backURL string
 }
 
-func NewMPAdapter(client *mp.Client, log logger.Logger) domain.BillingProvider {
+func NewMPAdapter(client *mp.Client, log logger.Logger, backURL string) domain.BillingProvider {
 	return &mpAdapter{
-		client: client,
-		logger: log,
+		client:  client,
+		logger:  log,
+		backURL: backURL,
 	}
+}
+
+// CreateCheckoutSession creates a MercadoPago preapproval for the given plan
+// and returns the hosted Checkout Pro redirect URL (init_point).
+func (a *mpAdapter) CreateCheckoutSession(ctx context.Context, planID, externalReference string) (*domain.CheckoutSessionResponse, error) {
+	body := map[string]any{
+		"preapproval_plan_id": planID,
+		"external_reference":  externalReference,
+		"reason":              "Subscription checkout",
+		"back_url":            a.backURL,
+		"auto_recurring":      true,
+	}
+
+	resp, err := a.client.Post(ctx, "/preapproval", body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call MercadoPago preapproval API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 && resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("MercadoPago preapproval API returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		ID        string `json:"id"`
+		Status    string `json:"status"`
+		InitPoint string `json:"init_point"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode MercadoPago preapproval response: %w", err)
+	}
+
+	a.logger.Info("MercadoPago preapproval created", loggerdomain.Fields{
+		"preapproval_id": result.ID,
+		"external_ref":   externalReference,
+		"status":         result.Status,
+		"init_point":     result.InitPoint,
+	})
+
+	return &domain.CheckoutSessionResponse{
+		ID:         result.ID,
+		Status:     result.Status,
+		CustomerID: externalReference,
+		InitPoint:  result.InitPoint,
+	}, nil
 }
 
 func (a *mpAdapter) GetSubscription(ctx context.Context, externalCustomerID string) (*domain.Subscription, error) {
@@ -257,6 +305,29 @@ func (a *mpAdapter) GetCheckoutSessionWithPolling(ctx context.Context, sessionID
 		"last_status": lastStatus,
 	})
 	return nil, fmt.Errorf("payment verification timed out after 10 seconds (last status: %s)", lastStatus)
+}
+
+// CancelSubscription cancels a MercadoPago preapproval (subscription).
+func (a *mpAdapter) CancelSubscription(ctx context.Context, subscriptionID string) error {
+	body := map[string]any{
+		"status": "cancelled",
+	}
+
+	resp, err := a.client.Put(ctx, fmt.Sprintf("/preapproval/%s", subscriptionID), body)
+	if err != nil {
+		return fmt.Errorf("failed to call MercadoPago preapproval API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("MercadoPago preapproval API returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	a.logger.Info("MercadoPago preapproval cancelled", loggerdomain.Fields{
+		"preapproval_id": subscriptionID,
+	})
+	return nil
 }
 
 func (a *mpAdapter) IngestMeterEvent(ctx context.Context, externalCustomerID string, meterSlug string, amount int32) error {

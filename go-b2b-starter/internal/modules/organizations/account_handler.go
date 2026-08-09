@@ -172,6 +172,10 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, "account not found", err)
 			return
 		}
+		if err == domain.ErrLastAdminDemotion {
+			response.Error(c, http.StatusBadRequest, "at least one admin must remain in the organization", err)
+			return
+		}
 		h.logger.Error("failed to update account", map[string]interface{}{"org_id": reqCtx.OrganizationID, "account_id": accountID, "error": err.Error()})
 		response.Error(c, http.StatusInternalServerError, "failed to update account", err)
 		return

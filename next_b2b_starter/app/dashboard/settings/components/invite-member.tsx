@@ -43,8 +43,8 @@ const DEFAULT_ROLES: RoleOption[] = [
     typicalUsers: "Team members, staff",
   },
   {
-    id: "manager",
-    name: "Manager",
+    id: "approver",
+    name: "Approver",
     description: "Elevated access - can edit, delete, approve resources and view organization",
     typicalUsers: "Team leads, supervisors, managers",
   },
@@ -88,7 +88,7 @@ export function InviteMember({
 
         const formattedRoles = roles
           .filter((item) =>
-            ["member", "manager", "admin"].includes(item.id)
+            ["member", "approver", "admin"].includes(item.id)
           )
           .map((item) => ({
             id: item.id as MemberRole,

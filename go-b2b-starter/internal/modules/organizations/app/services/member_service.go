@@ -29,6 +29,10 @@ type MemberService interface {
 	// Deletes from both auth provider and internal database
 	DeleteOrganizationMember(ctx context.Context, orgID, memberID string) error
 
+	// ChangeMemberRole updates a member's role in both the auth provider (Stytch)
+	// and the internal database. Rejects demotion of the last remaining admin.
+	ChangeMemberRole(ctx context.Context, orgID, memberID, role string) error
+
 	// CheckEmailExists checks if an email exists in the system
 	// Returns true if email is found, false otherwise
 	// Used for login flow to verify if user has an account
@@ -157,4 +161,9 @@ type ProfileOrganization struct {
 // Used for login flow to verify if user has an account
 type CheckEmailRequest struct {
 	Email string `form:"email" binding:"required,email"`
+}
+
+// ChangeMemberRoleRequest represents the payload to update a member's role
+type ChangeMemberRoleRequest struct {
+	Role string `json:"role" binding:"required,oneof=admin approver member"`
 }

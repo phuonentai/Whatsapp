@@ -9,10 +9,23 @@ interface ReplyInputProps {
   onSend: (content: string) => Promise<void>;
   isSending: boolean;
   conversationId: number;
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export function ReplyInput({ onSend, isSending, conversationId }: ReplyInputProps) {
-  const [text, setText] = useState("");
+export function ReplyInput({ onSend, isSending, conversationId, value, onChange }: ReplyInputProps) {
+  const [internalText, setInternalText] = useState("");
+
+  const isControlled = value !== undefined && onChange !== undefined;
+  const text = isControlled ? value : internalText;
+
+  const setText = (next: string) => {
+    if (isControlled) {
+      onChange?.(next);
+    } else {
+      setInternalText(next);
+    }
+  };
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;

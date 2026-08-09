@@ -25,6 +25,24 @@ func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*
 		"org_id":  orgID,
 	})
 
+	creator, ok := s.mpProvider.(interface {
+		CreateCheckoutSession(ctx context.Context, planID, externalReference string) (*domain.CheckoutSessionResponse, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("MercadoPago provider does not support checkout creation")
+	}
+
+	checkoutSession, err := creator.CreateCheckoutSession(ctx, planID, fmt.Sprintf("%v", externalCustomerID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MercadoPago checkout: %w", err)
+	}
+
+	s.logger.Info("MercadoPago checkout created", map[string]any{
+		"checkout_id": checkoutSession.ID,
+		"org_id":      orgID,
+		"has_init":    checkoutSession.InitPoint != "",
+	})
+
 	return &domain.BillingStatus{
 		OrganizationID:        orgID,
 		ExternalID:            fmt.Sprintf("%v", externalCustomerID),
@@ -32,6 +50,59 @@ func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*
 		CanProcessInvoices:    false,
 		InvoiceCount:          0,
 		Reason:                "Checkout initiated",
+		CheckedAt:             time.Now(),
+		CheckoutURL:           checkoutSession.InitPoint,
+	}, nil
+}
+
+func (s *billingService) CancelMPSubscription(ctx context.Context, subscriptionID string) (*domain.BillingStatus, error) {
+	externalCustomerID := ctx.Value("stytch_org_id")
+	if externalCustomerID == nil {
+		return nil, fmt.Errorf("organization context required for subscription cancellation")
+	}
+
+	organizationID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, fmt.Sprintf("%v", externalCustomerID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve organization: %w", err)
+	}
+
+	canceller, ok := s.mpProvider.(interface {
+		CancelSubscription(ctx context.Context, subscriptionID string) error
+	})
+	if !ok {
+		return nil, fmt.Errorf("MercadoPago provider does not support subscription cancellation")
+	}
+
+	if err := canceller.CancelSubscription(ctx, subscriptionID); err != nil {
+		return nil, fmt.Errorf("failed to cancel MercadoPago subscription: %w", err)
+	}
+
+	now := time.Now()
+	subscription := &domain.Subscription{
+		OrganizationID:     organizationID,
+		ExternalCustomerID: fmt.Sprintf("%v", externalCustomerID),
+		SubscriptionID:     subscriptionID,
+		SubscriptionStatus: "canceled",
+		CancelAtPeriodEnd:  false,
+		CanceledAt:         &now,
+	}
+
+	if _, err := s.repo.UpsertSubscription(ctx, subscription); err != nil {
+		return nil, fmt.Errorf("failed to mark subscription canceled: %w", err)
+	}
+
+	s.logger.Info("MercadoPago subscription cancelled", map[string]any{
+		"subscription_id": subscriptionID,
+		"organization_id": organizationID,
+	})
+
+	return &domain.BillingStatus{
+		OrganizationID:        organizationID,
+		ExternalID:            fmt.Sprintf("%v", externalCustomerID),
+		HasActiveSubscription: false,
+		CanProcessInvoices:    false,
+		InvoiceCount:          0,
+		Reason:                "Subscription cancelled",
 		CheckedAt:             time.Now(),
 	}, nil
 }
@@ -41,7 +112,7 @@ func (s *billingService) VerifyMPPayment(ctx context.Context, paymentID string) 
 		"payment_id": paymentID,
 	})
 
-	checkoutSession, err := s.billingProvider.GetCheckoutSessionWithPolling(ctx, paymentID)
+	checkoutSession, err := s.mpProvider.GetCheckoutSessionWithPolling(ctx, paymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify payment: %w", err)
 	}
@@ -97,6 +168,10 @@ func (s *billingService) VerifyMPPayment(ctx context.Context, paymentID string) 
 	_, err = s.repo.UpsertQuota(ctx, quota)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save quota: %w", err)
+	}
+
+	if err := s.resolver.SetBillingProvider(ctx, organizationID, "mercadopago"); err != nil {
+		return nil, fmt.Errorf("failed to set billing provider: %w", err)
 	}
 
 	s.logger.Info("MercadoPago payment verified", map[string]any{

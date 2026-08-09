@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
@@ -14,6 +15,7 @@ import (
 
 type CRMService interface {
 	ProcessInboundMessage(ctx context.Context, event *events.MessageReceived) error
+	ProcessEchoMessage(ctx context.Context, event *events.MessageEcho) error
 }
 
 type crmService struct {
@@ -41,63 +43,72 @@ func NewCRMService(
 }
 
 func (s *crmService) ProcessInboundMessage(ctx context.Context, event *events.MessageReceived) error {
-	phone, err := whatsapp.CanonicalizeE164(event.From)
+	return s.persistMessage(ctx, event.OrganizationID, event.From, event.WhatsAppTimestamp, event.MessageType, event.Content, event.MessageSID, domain.MessageDirectionInbound, map[string]interface{}{})
+}
+
+func (s *crmService) ProcessEchoMessage(ctx context.Context, event *events.MessageEcho) error {
+	return s.persistMessage(ctx, event.OrganizationID, event.From, event.WhatsAppTimestamp, event.MessageType, event.Content, event.MessageSID, domain.MessageDirectionOutbound, map[string]interface{}{"origin": "echo"})
+}
+
+func (s *crmService) persistMessage(ctx context.Context, orgID int32, from string, ts time.Time, messageType, content, messageSID string, direction domain.MessageDirection, messageData map[string]interface{}) error {
+	phone, err := whatsapp.CanonicalizeE164(from)
 	if err != nil {
 		s.logger.Warn("canonicalizacion de telefono", loggerdomain.Fields{
-			"original": event.From, "resultado": phone, "error": err.Error(),
+			"original": from, "resultado": phone, "error": err.Error(),
 		})
 	}
 
 	contact := &domain.Contact{
-		OrganizationID: event.OrganizationID, PhoneNumber: phone,
-		DisplayName: phone, LastMessageAt: &event.WhatsAppTimestamp,
+		OrganizationID: orgID, PhoneNumber: phone,
+		DisplayName: phone, LastMessageAt: &ts,
 	}
 	createdContact, err := s.contactRepo.UpsertByPhone(ctx, contact)
 	if err != nil {
 		return fmt.Errorf("error al crear contacto: %w", err)
 	}
 
-	conv, err := s.conversationRepo.GetActiveByContact(ctx, event.OrganizationID, createdContact.ID)
+	conv := &domain.Conversation{
+		OrganizationID: orgID, ContactID: createdContact.ID,
+		Status: domain.ConversationStatusActive, LastMessageAt: &ts,
+	}
+	conv, err = s.conversationRepo.EnsureActive(ctx, conv)
 	if err != nil {
-		conv = &domain.Conversation{
-			OrganizationID: event.OrganizationID, ContactID: createdContact.ID,
-			Status: domain.ConversationStatusActive, LastMessageAt: &event.WhatsAppTimestamp,
-		}
-		createdConv, createErr := s.conversationRepo.Create(ctx, conv)
-		if createErr != nil { return fmt.Errorf("error al crear conversacion: %w", err) }
-		conv = createdConv
-	} else if conv.LastMessageAt == nil || event.WhatsAppTimestamp.After(*conv.LastMessageAt) {
-		if updatedConv, updateErr := s.conversationRepo.UpdateLastMessageAt(ctx, event.OrganizationID, conv.ID, &event.WhatsAppTimestamp); updateErr == nil {
+		return fmt.Errorf("error al obtener/crear conversacion activa: %w", err)
+	}
+	if conv.LastMessageAt == nil || ts.After(*conv.LastMessageAt) {
+		if updatedConv, updateErr := s.conversationRepo.UpdateLastMessageAt(ctx, orgID, conv.ID, &ts); updateErr == nil {
 			conv = updatedConv
 		}
 	}
 
-	existing, err := s.messageRepo.GetByWhatsAppID(ctx, event.OrganizationID, event.MessageSID)
-	if err == nil && existing != nil {
-		s.logger.Debug("mensaje duplicado ignorado", loggerdomain.Fields{"whatsapp_message_id": event.MessageSID})
+	msg := &domain.Message{
+		OrganizationID: orgID, ConversationID: conv.ID,
+		ContactID: createdContact.ID, WhatsAppMessageID: messageSID,
+		Direction: direction, MessageType: domain.MessageType(messageType),
+		Content: content, Status: "received", ChatTimestamp: &ts,
+		MessageData: messageData,
+	}
+	createdMsg, inserted, err := s.messageRepo.InsertIdempotent(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("error al guardar mensaje: %w", err)
+	}
+	if !inserted {
+		s.logger.Debug("mensaje duplicado ignorado", loggerdomain.Fields{"whatsapp_message_id": messageSID})
 		return nil
 	}
 
-	msg := &domain.Message{
-		OrganizationID: event.OrganizationID, ConversationID: conv.ID,
-		ContactID: createdContact.ID, WhatsAppMessageID: event.MessageSID,
-		Direction: domain.MessageDirectionInbound, MessageType: domain.MessageType(event.MessageType),
-		Content: event.Content, Status: "received", ChatTimestamp: &event.WhatsAppTimestamp,
-	}
-	if _, err = s.messageRepo.Create(ctx, msg); err != nil {
-		return fmt.Errorf("error al guardar mensaje: %w", err)
-	}
-
-	entitlement, _ := s.featureProvider.GetEntitlement(ctx, event.OrganizationID)
+	entitlement, _ := s.featureProvider.GetEntitlement(ctx, orgID)
 	if entitlement != nil && entitlement.Features["crm_activities"] {
-		content := event.Content
-		if len(content) > 500 { content = content[:500] }
+		activityContent := content
+		if len(activityContent) > 500 {
+			activityContent = activityContent[:500]
+		}
 		_, actErr := s.activityRepo.Create(ctx, &domain.Activity{
-			OrganizationID: event.OrganizationID, ContactID: &createdContact.ID,
+			OrganizationID: orgID, ContactID: &createdContact.ID,
 			ConversationID: &conv.ID, Tipo: domain.ActivityTypeWhatsAppMessage,
-			Asunto: fmt.Sprintf("Mensaje de WhatsApp de %s", phone),
-			Contenido: content, RealizadaEn: event.WhatsAppTimestamp,
-			Metadata: map[string]interface{}{"message_id": msg.ID, "direction": "inbound"},
+			Asunto:    fmt.Sprintf("Mensaje de WhatsApp de %s", phone),
+			Contenido: activityContent, RealizadaEn: ts,
+			Metadata: map[string]interface{}{"message_id": createdMsg.ID, "direction": string(direction)},
 		})
 		if actErr != nil {
 			s.logger.Warn("error al crear actividad de WhatsApp", loggerdomain.Fields{"error": actErr.Error()})

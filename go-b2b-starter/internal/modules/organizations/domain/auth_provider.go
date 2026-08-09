@@ -166,6 +166,7 @@ func (r *RemoveAuthMembersRequest) Validate() error {
 type AuthOrganizationRepository interface {
 	CreateOrganization(ctx context.Context, req *CreateAuthOrganizationRequest) (*AuthOrganization, error)
 	GetOrganization(ctx context.Context, organizationID string) (*AuthOrganization, error)
+	UpdateOrganization(ctx context.Context, organizationID, displayName string) (*AuthOrganization, error)
 	DeleteOrganization(ctx context.Context, organizationID string) error
 	CheckEmailExists(ctx context.Context, email string) (bool, error)
 }

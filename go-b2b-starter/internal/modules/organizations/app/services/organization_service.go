@@ -8,14 +8,23 @@ import (
 )
 
 type organizationService struct {
-	orgRepo     domain.OrganizationRepository
-	accountRepo domain.AccountRepository
+	orgRepo       domain.OrganizationRepository
+	accountRepo   domain.AccountRepository
+	authOrgRepo   domain.AuthOrganizationRepository
+	authMemberRepo domain.AuthMemberRepository
 }
 
-func NewOrganizationService(orgRepo domain.OrganizationRepository, accountRepo domain.AccountRepository) OrganizationService {
+func NewOrganizationService(
+	orgRepo domain.OrganizationRepository,
+	accountRepo domain.AccountRepository,
+	authOrgRepo domain.AuthOrganizationRepository,
+	authMemberRepo domain.AuthMemberRepository,
+) OrganizationService {
 	return &organizationService{
-		orgRepo:     orgRepo,
-		accountRepo: accountRepo,
+		orgRepo:        orgRepo,
+		accountRepo:    accountRepo,
+		authOrgRepo:    authOrgRepo,
+		authMemberRepo: authMemberRepo,
 	}
 }
 
@@ -83,6 +92,14 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, orgID int3
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Keep both SSOTs in phase: sync the display name to Stytch BEFORE the local write.
+	// On Stytch failure, reject the update so the local row never drifts from the auth provider.
+	if org.StytchOrgID != "" && req.Name != org.Name {
+		if _, err := s.authOrgRepo.UpdateOrganization(ctx, org.StytchOrgID, req.Name); err != nil {
+			return nil, fmt.Errorf("failed to sync organization display name to auth provider: %w", err)
+		}
 	}
 
 	// Update fields
@@ -170,6 +187,36 @@ func (s *organizationService) UpdateAccount(ctx context.Context, orgID, accountI
 		return nil, err
 	}
 
+	// Last-admin guard: never demote the only remaining admin of the organization.
+	if account.Role == "admin" && req.Role != "admin" {
+		admins, err := s.countAdmins(ctx, orgID)
+		if err != nil {
+			return nil, err
+		}
+		if admins <= 1 {
+			return nil, domain.ErrLastAdminDemotion
+		}
+	}
+
+	// Keep both SSOTs in phase: sync the member role to Stytch BEFORE the local write.
+	// On Stytch failure, reject the update so the local row never drifts from the auth provider.
+	if account.StytchMemberID != "" && orgID > 0 {
+		org, orgErr := s.orgRepo.GetByID(ctx, orgID)
+		if orgErr != nil {
+			return nil, orgErr
+		}
+		if org.StytchOrgID != "" && req.Role != account.Role {
+			if err := s.authMemberRepo.AssignRoles(ctx, &domain.AssignAuthRolesRequest{
+				OrganizationID: org.StytchOrgID,
+				MemberID:       account.StytchMemberID,
+				Roles:          []string{req.Role},
+			}); err != nil {
+				return nil, fmt.Errorf("failed to sync member role to auth provider: %w", err)
+			}
+			account.StytchRoleSlug = req.Role
+		}
+	}
+
 	// Update fields
 	account.FullName = req.FullName
 	account.Role = req.Role
@@ -185,6 +232,20 @@ func (s *organizationService) UpdateAccount(ctx context.Context, orgID, accountI
 	}
 
 	return s.accountRepo.Update(ctx, account)
+}
+
+func (s *organizationService) countAdmins(ctx context.Context, orgID int32) (int, error) {
+	accounts, err := s.accountRepo.ListByOrganization(ctx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, acc := range accounts {
+		if acc.Role == "admin" && acc.Status == "active" {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (s *organizationService) DeleteAccount(ctx context.Context, orgID, accountID int32) error {

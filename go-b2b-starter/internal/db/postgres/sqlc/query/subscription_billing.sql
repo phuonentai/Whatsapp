@@ -136,3 +136,75 @@ WHERE
     s.subscription_status = 'active'
     AND q.invoice_count <= $1
 ORDER BY q.invoice_count ASC;
+
+-- name: UpdateAiCreditsMax :one
+-- Set the period AI credit allowance (meter grant ai.tokens / metadata sync)
+-- Only touches ai_credits_max so invoice counters are never clobbered.
+INSERT INTO subscription_billing.quota_tracking (
+    organization_id,
+    ai_credits_max,
+    period_start,
+    period_end,
+    updated_at
+) VALUES (
+    $1, $2, $3, $4, CURRENT_TIMESTAMP
+)
+ON CONFLICT (organization_id)
+DO UPDATE SET
+    ai_credits_max = EXCLUDED.ai_credits_max,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: UpsertAiUsage :one
+-- Increment AI token/credit totals for an org's billing period (idempotent at the
+-- event layer: callers only invoke this after a successful event insert)
+INSERT INTO subscription_billing.ai_usage (
+    organization_id,
+    period_start,
+    period_end,
+    tokens_input,
+    tokens_output,
+    tokens_embedding,
+    credits_used,
+    updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP
+)
+ON CONFLICT (organization_id, period_start)
+DO UPDATE SET
+    tokens_input = ai_usage.tokens_input + EXCLUDED.tokens_input,
+    tokens_output = ai_usage.tokens_output + EXCLUDED.tokens_output,
+    tokens_embedding = ai_usage.tokens_embedding + EXCLUDED.tokens_embedding,
+    credits_used = ai_usage.credits_used + EXCLUDED.credits_used,
+    updated_at = CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: InsertAiUsageEvent :execrows
+-- Append an immutable AI usage event. ON CONFLICT DO NOTHING keeps recording
+-- idempotent per (organization_id, request_id). Returns rows affected (0 = duplicate).
+INSERT INTO subscription_billing.ai_usage_events (
+    organization_id,
+    feature,
+    model,
+    tokens_input,
+    tokens_output,
+    tokens_embedding,
+    credits_consumed,
+    request_id
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+ON CONFLICT (organization_id, request_id) DO NOTHING;
+
+-- name: GetAiUsageByOrgAndPeriod :one
+-- Get AI usage totals for an org's billing period
+SELECT * FROM subscription_billing.ai_usage
+WHERE organization_id = $1 AND period_start = $2
+LIMIT 1;
+
+-- name: GetAiUsageEventsByOrg :many
+-- Recent AI usage events for an org (paginated audit trail)
+SELECT * FROM subscription_billing.ai_usage_events
+WHERE organization_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT $2 OFFSET $3;

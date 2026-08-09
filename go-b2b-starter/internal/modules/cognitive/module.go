@@ -23,6 +23,11 @@ func NewModule(container *dig.Container) *Module {
 // RegisterDependencies registers all cognitive module dependencies
 // Note: Repository implementations are registered in internal/db/inject.go
 func (m *Module) RegisterDependencies() error {
+	// Register AI credit guard (blocks AI routes when period credits are exhausted)
+	if err := m.container.Provide(NewAiCreditGuard); err != nil {
+		return err
+	}
+
 	// Register AI adapters (infra layer)
 	if err := m.container.Provide(func(
 		llmClient llmdomain.LLMClient,

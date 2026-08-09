@@ -5,13 +5,14 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/events"
+	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 )
 
 type DealService interface {
 	Create(ctx context.Context, orgID int32, req *CreateDealRequest) (*domain.Deal, error)
 	GetByID(ctx context.Context, orgID, dealID int32) (*domain.DealWithRefs, error)
-	List(ctx context.Context, orgID int32, pipelineID, stageID int32, estado string, limit, offset int32) ([]*domain.DealWithRefs, error)
+	List(ctx context.Context, orgID int32, pipelineID, stageID int32, estado string, contactID, limit, offset int32) ([]*domain.DealWithRefs, error)
 	Update(ctx context.Context, orgID int32, req *UpdateDealRequest) (*domain.Deal, error)
 	UpdateStage(ctx context.Context, orgID, dealID, stageID, changedBy int32, oldStageName, newStageName string) (*domain.Deal, error)
 	Delete(ctx context.Context, orgID, dealID int32) error
@@ -48,13 +49,13 @@ type dealService struct {
 	pipelineRepo    domain.PipelineRepository
 	activityRepo    domain.ActivityRepository
 	featureProvider features.FeatureProvider
-	eventBus        interface{ Publish(ctx context.Context, event interface{}) error }
+	eventBus        eventbus.EventBus
 }
 
 func NewDealService(
 	dealRepo domain.DealRepository, pipelineRepo domain.PipelineRepository,
 	activityRepo domain.ActivityRepository, featureProvider features.FeatureProvider,
-	eventBus interface{ Publish(ctx context.Context, event interface{}) error },
+	eventBus eventbus.EventBus,
 ) DealService {
 	return &dealService{dealRepo: dealRepo, pipelineRepo: pipelineRepo, activityRepo: activityRepo, featureProvider: featureProvider, eventBus: eventBus}
 }
@@ -73,8 +74,8 @@ func (s *dealService) Create(ctx context.Context, orgID int32, req *CreateDealRe
 func (s *dealService) GetByID(ctx context.Context, orgID, dealID int32) (*domain.DealWithRefs, error) {
 	return s.dealRepo.GetByID(ctx, orgID, dealID)
 }
-func (s *dealService) List(ctx context.Context, orgID int32, pipelineID, stageID int32, estado string, limit, offset int32) ([]*domain.DealWithRefs, error) {
-	return s.dealRepo.List(ctx, orgID, pipelineID, stageID, estado, limit, offset)
+func (s *dealService) List(ctx context.Context, orgID int32, pipelineID, stageID int32, estado string, contactID, limit, offset int32) ([]*domain.DealWithRefs, error) {
+	return s.dealRepo.List(ctx, orgID, pipelineID, stageID, estado, contactID, limit, offset)
 }
 func (s *dealService) Update(ctx context.Context, orgID int32, req *UpdateDealRequest) (*domain.Deal, error) {
 	deal := &domain.Deal{

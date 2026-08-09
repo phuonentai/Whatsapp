@@ -47,7 +47,12 @@ Archive a completed change in the experimental workflow.
 
    Count tasks marked with `- [ ]` (incomplete) vs `- [x]` (complete).
 
-   **If incomplete tasks found:**
+   **If incomplete verification tasks found:**
+   - A verification task is one whose description names a verification command or check (e.g., "Run ... and verify all pass", "build green", "tests pass")
+   - **BLOCK archive**: explain which verification task is blocking and what verification command must pass first
+   - Do NOT proceed without the user resolving or explicitly overriding the block
+
+   **If incomplete non-verification tasks found (and no verification tasks are incomplete):**
    - Display warning showing count of incomplete tasks
    - Use **AskUserQuestion tool** to confirm user wants to proceed
    - Proceed if user confirms
@@ -111,7 +116,7 @@ All artifacts complete. All tasks complete.
 **Guardrails**
 - Always prompt for change selection if not provided
 - Use artifact graph (openspec status --json) for completion checking
-- Don't block archive on warnings - just inform and confirm
+- BLOCK archive on incomplete verification tasks (explain which task blocks); only inform-and-confirm for non-verification gaps
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)

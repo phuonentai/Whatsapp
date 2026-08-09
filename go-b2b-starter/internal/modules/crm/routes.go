@@ -74,7 +74,9 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 	etiquetas.Use(features.Require(crmDomain.FeatureTags))
 	etiquetas.GET("", auth.RequirePermissionFunc("contact", "view"), r.handler.ListEtiquetas)
 	etiquetas.POST("", auth.RequirePermissionFunc("contact", "manage"), r.handler.CreateEtiqueta)
+	etiquetas.PUT("/:id", auth.RequirePermissionFunc("contact", "manage"), r.handler.UpdateEtiqueta)
 	etiquetas.DELETE("/:id", auth.RequirePermissionFunc("contact", "manage"), r.handler.DeleteEtiqueta)
+	etiquetas.GET("/entity/:entityType/:entityId", auth.RequirePermissionFunc("contact", "view"), r.handler.ListEntityEtiquetas)
 	etiquetas.POST("/entity/:entityType/:entityId", auth.RequirePermissionFunc("contact", "manage"), r.handler.TagEntity)
 	etiquetas.DELETE("/entity/:entityType/:entityId/:tagId", auth.RequirePermissionFunc("contact", "manage"), r.handler.UntagEntity)
 

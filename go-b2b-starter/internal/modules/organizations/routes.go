@@ -61,6 +61,13 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 			resolver.Get("org_context"),
 			auth.RequirePermissionFunc("org", "manage"),
 			r.memberHandler.DeleteMember)
+
+		// Protected endpoint - Change member role (requires JWT authentication and org:manage permission)
+		authGroup.PUT("/members/:member_id/role",
+			resolver.Get("auth"),
+			resolver.Get("org_context"),
+			auth.RequirePermissionFunc("org", "manage"),
+			r.memberHandler.ChangeMemberRole)
 	}
 
 	// Organization routes - require JWT authentication

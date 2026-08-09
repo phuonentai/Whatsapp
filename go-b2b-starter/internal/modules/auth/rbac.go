@@ -37,6 +37,10 @@ var (
 	// Organization permissions
 	PermOrgView   = NewPermission("org", "view")
 	PermOrgManage = NewPermission("org", "manage")
+
+	// Tickets (helpdesk module) permissions
+	PermTicketView   = NewPermission("ticket", "view")
+	PermTicketManage = NewPermission("ticket", "manage")
 )
 
 // AllPermissions is the complete list of all permissions in the system.
@@ -49,6 +53,8 @@ var AllPermissions = []Permission{
 	PermResourceApprove,
 	PermOrgView,
 	PermOrgManage,
+	PermTicketView,
+	PermTicketManage,
 }
 
 // =============================================================================
@@ -90,6 +96,7 @@ var (
 		Permissions: []Permission{
 			PermResourceView,
 			PermResourceCreate,
+			PermTicketView,
 		},
 	}
 
@@ -106,6 +113,8 @@ var (
 			PermResourceDelete,
 			PermResourceApprove,
 			PermOrgView,
+			PermTicketView,
+			PermTicketManage,
 		},
 	}
 
@@ -123,6 +132,8 @@ var (
 			PermResourceApprove,
 			PermOrgView,
 			PermOrgManage,
+			PermTicketView,
+			PermTicketManage,
 		},
 	}
 )

@@ -17,9 +17,40 @@ func (h *Handler) Routes(router *gin.RouterGroup, resolver serverDomain.Middlewa
 		subscriptions.GET("/status",
 			auth.RequirePermissionFunc("resource", "view"),
 			h.GetBillingStatus)
+
+		subscriptions.POST("/create-mp-checkout",
+			auth.RequirePermissionFunc("org", "manage"),
+			h.CreateMPCheckout)
+
+		subscriptions.POST("/verify-mp-payment",
+			h.VerifyMPPayment)
+
+		subscriptions.POST("/mp-cancel",
+			auth.RequirePermissionFunc("org", "manage"),
+			h.CancelMPSubscription)
 	}
 
 	router.POST("/subscriptions/verify-payment",
 		resolver.Get("auth"),
 		h.VerifyPayment)
+
+	// AI usage endpoint (read-only, org-scoped)
+	usage := router.Group("/crm/usage/ai")
+	usage.Use(
+		resolver.Get("auth"),
+		resolver.Get("org_context"),
+	)
+	{
+		usage.GET("",
+			auth.RequirePermissionFunc("resource", "view"),
+			h.GetAiUsage)
+	}
+
+	// Webhook ingress (signature-only, no session required)
+	// Follows the per-provider pattern established by whatsapp (/api/v1/webhooks/whatsapp)
+	webhooks := router.Group("/api/v1/webhooks")
+	{
+		webhooks.POST("/polar", h.ProcessPolarWebhook)
+		webhooks.POST("/mercadopago", h.ProcessMPWebhook)
+	}
 }

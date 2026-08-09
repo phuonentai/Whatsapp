@@ -21,6 +21,7 @@ var (
 	ErrAccountEmailTaken           = errors.New("account email is already taken")
 	ErrAccountInactive             = errors.New("account is inactive")
 	ErrAccountInsufficientRole     = errors.New("account does not have sufficient permissions")
+	ErrLastAdminDemotion           = errors.New("cannot demote the last admin of the organization")
 )
 
 // Permission errors

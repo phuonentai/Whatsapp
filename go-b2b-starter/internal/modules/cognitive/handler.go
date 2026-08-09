@@ -1,14 +1,18 @@
 package cognitive
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	llmdomain "github.com/moasq/go-b2b-starter/internal/platform/llm/domain"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
 
@@ -31,6 +35,7 @@ type ChatRequest struct {
 	UseRAG         bool   `json:"use_rag,omitempty"`
 	MaxDocuments   int    `json:"max_documents,omitempty"`
 	ContextHistory int    `json:"context_history,omitempty"`
+	Stream         bool   `json:"stream,omitempty"` // When true, respond with SSE token stream
 }
 
 // Chat sends a message and gets a response
@@ -74,7 +79,21 @@ func (h *Handler) Chat(c *gin.Context) {
 		ContextHistory: req.ContextHistory,
 	}
 
-	response, err := h.ragService.Chat(c.Request.Context(), reqCtx.OrganizationID, reqCtx.AccountID, chatReq)
+	ctx := llmdomain.WithOrgID(c.Request.Context(), reqCtx.OrganizationID)
+
+	// Streaming path: SSE token stream. The credit guard runs before this
+	// handler (RequireCredits middleware), so a 402 is returned before the
+	// stream opens. Tokens are recorded via the metered LLM client after a
+	// successful stream completes.
+	if req.Stream || isSSE(c.GetHeader("Accept")) {
+		h.streamChat(c, ctx, reqCtx, chatReq)
+		return
+	}
+
+	response, err := h.ragService.Chat(
+		ctx,
+		reqCtx.OrganizationID, reqCtx.AccountID, chatReq,
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
 			http.StatusInternalServerError,
@@ -85,6 +104,56 @@ func (h *Handler) Chat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// streamChat writes an SSE stream for a streaming chat request.
+func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *auth.RequestContext, chatReq *domain.ChatRequest) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+
+	writeEvent := func(name, data string) {
+		if name != "" {
+			c.Writer.WriteString(fmt.Sprintf("event: %s\n", name))
+		}
+		if data != "" {
+			c.Writer.WriteString(fmt.Sprintf("data: %s\n", data))
+		}
+		c.Writer.WriteString("\n")
+		c.Writer.Flush()
+	}
+
+	// Stream tokens; the Done event carries the persisted session/message ids
+	// and is written after ChatStream returns with the final response.
+	response, err := h.ragService.ChatStream(ctx, reqCtx.OrganizationID, reqCtx.AccountID, chatReq, func(ev domain.StreamEvent) error {
+		if ev.Done {
+			return nil
+		}
+		data, _ := json.Marshal(map[string]string{"token": ev.Content})
+		writeEvent("", string(data))
+		return nil
+	})
+	if err != nil {
+		writeEvent("error", fmt.Sprintf(`{"error":"chat_failed","message":%q}`, err.Error()))
+		return
+	}
+
+	// Final done event carrying the persisted message ids.
+	if response != nil {
+		data, _ := json.Marshal(map[string]any{
+			"done":       true,
+			"session_id": response.SessionID,
+			"message_id": response.Message.GetID(),
+		})
+		writeEvent("", string(data))
+	}
+}
+
+// isSSE reports whether the request accepts a text/event-stream response.
+func isSSE(accept string) bool {
+	return strings.Contains(strings.ToLower(accept), "text/event-stream")
 }
 
 // ListSessions lists chat sessions for the current user

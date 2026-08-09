@@ -8,6 +8,7 @@ The CRM module — contacts, companies, deals, pipelines, activities, tags — h
 - Add test environment config (test DB, seeded orgs, mock auth)
 - Create reusable fixtures: mock auth bypass, CRM data seeder, page objects
 - Write E2E specs for all 6 CRM entities covering happy-path CRUD, search/filter, cross-entity workflows, error/edge cases, feature gating, and permission enforcement
+- Simulate inbound WhatsApp Cloud API messages by forging HMAC-SHA256 signatures against the real webhook endpoint, and verify they render in the inbox UI
 - Add GitLab CI job to run Playwright against test infrastructure
 
 ## Capabilities
@@ -21,6 +22,7 @@ The CRM module — contacts, companies, deals, pipelines, activities, tags — h
 - `crm-actividades-e2e`: E2E tests for Activity timeline, creating activities (notes/calls/tasks), and filtering by entity.
 - `crm-etiquetas-e2e`: E2E tests for Tag management, creating/deleting tags, tagging and untagging entities.
 - `crm-feature-gating-e2e`: E2E tests verifying that Pro/Enterprise feature-gated UI elements are properly hidden on lower-tier plans.
+- `crm-whatsapp-e2e`: E2E tests simulating inbound WhatsApp Cloud API webhooks (HMAC-signed payloads) against the real `/api/v1/webhooks/whatsapp` endpoint and verifying the inbox UI renders conversations and messages. Covers signature rejection, unknown `phone_number_id`, duplicate-delivery idempotency, and the `hub.mode=subscribe` verification handshake.
 
 ### Modified Capabilities
 - None
@@ -31,4 +33,4 @@ The CRM module — contacts, companies, deals, pipelines, activities, tags — h
 - **Environment**: Test PostgreSQL DB, 3 seeded orgs (Free/Pro/Enterprise), mock auth middleware
 - **CI**: New `e2e` stage in `.gitlab-ci.yml` — spins up DB, runs migrations, starts Go + Next.js, executes Playwright
 - **Developer workflow**: `pnpm exec playwright test` locally, new `make test-e2e` target
-- **Non-goals**: No backend or frontend application code changes. No visual regression testing.
+- **Non-goals**: No frontend application code changes. No visual regression testing. No real outbound WhatsApp sends (outbound requires a live WhatsApp access token and outbound API call — the test helper asserts on inbound simulation and the disabled/sending UI state only). No modification of the webhook endpoint's request handling — the real endpoint is exercised with forged signatures. Exception: the webhook handler's error-to-HTTP-status mapping is corrected (401 `invalid_signature`, 404 `unknown_phone_number`) to satisfy the existing `whatsapp-webhook-ingress` living spec, which the e2e tests assert against.

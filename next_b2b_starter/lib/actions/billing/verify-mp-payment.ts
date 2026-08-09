@@ -32,7 +32,7 @@ export async function verifyMercadoPagoPayment(
   if (!isMercadoPagoEnabled()) {
     return createActionError(
       "MercadoPago billing is not configured.",
-      "Missing MercadoPago access token"
+      "Missing NEXT_PUBLIC_MERCADOPAGO_PLAN_ID configuration"
     );
   }
 

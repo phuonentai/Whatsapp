@@ -185,42 +185,54 @@ export function AuthProvider({
   });
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // If the server signals a cache clear, mark hydration complete during render
+  // (avoids setState-in-effect for the synchronous path).
+  const [prevShouldClearCache, setPrevShouldClearCache] = useState(false);
+  if (shouldClearCache !== prevShouldClearCache) {
+    setPrevShouldClearCache(shouldClearCache);
+    if (shouldClearCache) {
+      setIsHydrated(true);
+    }
+  }
+
+  // Sync the auth state with server-provided props during render (adjust-state-
+  // during-render pattern; avoids setState-in-effect). Keyed on the identity of
+  // the initial props so it only applies when the server payload changes.
+  const [prevInitialsKey, setPrevInitialsKey] = useState("");
+  const initialsKey = `${initialProfile?.member_id ?? ""}:${initialRoles.join(",")}:${initialPermissions.join(",")}`;
+  if (initialsKey !== prevInitialsKey) {
+    setPrevInitialsKey(initialsKey);
+    if (initialProfile) {
+      setState({
+        profile: initialProfile,
+        roles: sanitizeRoles(initialRoles),
+        permissions: sanitizePermissions(initialPermissions),
+      });
+      setIsHydrated(true);
+    }
+  }
+
   // Sync with server-provided props or fall back to cached client state
   useEffect(() => {
     // If server signals to clear cache, do so immediately
     if (shouldClearCache) {
       console.info("[Auth] Server requested cache clear");
       window.sessionStorage.removeItem(STORAGE_KEY);
-      setIsHydrated(true);
       return;
     }
 
     if (initialProfile) {
-      // Only update state if it's different from initial values
-      setState((prev) => {
-        const needsUpdate =
-          prev.profile?.email !== initialProfile.email ||
-          prev.roles.length !== initialRoles.length ||
-          prev.permissions.length !== initialPermissions.length;
-
-        if (needsUpdate) {
-          return {
-            profile: initialProfile,
-            roles: sanitizeRoles(initialRoles),
-            permissions: sanitizePermissions(initialPermissions),
-          };
-        }
-        return prev;
-      });
-      setIsHydrated(true);
       return;
     }
 
     // No server session - check if cached data is still valid
     const stored = readStoredState();
     if (stored?.profile) {
-      // Validate session token before using cached data
+      // Validate session token before using cached data.
+      // Restoring from sessionStorage is a client-only external-store read that
+      // cannot run during render (SSR purity), so it stays in this effect.
       if (isSessionTokenValid()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setState(stored);
       } else {
         // Token expired or missing - clear cache

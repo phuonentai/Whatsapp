@@ -28,6 +28,9 @@ type Config struct {
 	InviteRedirectURL          string        `mapstructure:"STYTCH_INVITE_REDIRECT_URL"`
 	LoginRedirectURL           string        `mapstructure:"STYTCH_LOGIN_REDIRECT_URL"`
 	APITimeout                 time.Duration `mapstructure:"STYTCH_API_TIMEOUT"`
+	CircuitBreakerThreshold    int           `mapstructure:"STYTCH_CIRCUIT_BREAKER_THRESHOLD"`
+	CircuitBreakerTimeout      time.Duration `mapstructure:"STYTCH_CIRCUIT_BREAKER_TIMEOUT"`
+	CircuitBreakerHalfOpenProbes int         `mapstructure:"STYTCH_CIRCUIT_BREAKER_HALF_OPEN_PROBES"`
 }
 
 // LoadConfig hydrates the Stytch configuration from app.env + process environment.
@@ -43,6 +46,9 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("STYTCH_SESSION_DURATION_MINUTES", 1440) // 24 hours (previously 60 minutes)
 	v.SetDefault("STYTCH_API_TIMEOUT", "15s")
 	v.SetDefault("STYTCH_DISABLE_SESSION_VERIFICATION", false)
+	v.SetDefault("STYTCH_CIRCUIT_BREAKER_THRESHOLD", 5)
+	v.SetDefault("STYTCH_CIRCUIT_BREAKER_TIMEOUT", "10s")
+	v.SetDefault("STYTCH_CIRCUIT_BREAKER_HALF_OPEN_PROBES", 2)
 
 	// Best-effort: ignore missing file, allow env-only usage
 	if err := v.ReadInConfig(); err != nil {
@@ -71,6 +77,17 @@ func LoadConfig() (*Config, error) {
 	// Normalize timeout (viper unmarshals duration strings automatically).
 	if cfg.APITimeout <= 0 {
 		cfg.APITimeout = 15 * time.Second
+	}
+
+	// Normalize circuit breaker parameters (governance default: 5 / 10s / 2).
+	if cfg.CircuitBreakerThreshold <= 0 {
+		cfg.CircuitBreakerThreshold = 5
+	}
+	if cfg.CircuitBreakerTimeout <= 0 {
+		cfg.CircuitBreakerTimeout = 10 * time.Second
+	}
+	if cfg.CircuitBreakerHalfOpenProbes <= 0 {
+		cfg.CircuitBreakerHalfOpenProbes = 2
 	}
 
 	// Derive base URL if none supplied.

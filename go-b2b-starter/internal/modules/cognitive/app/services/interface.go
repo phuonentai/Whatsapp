@@ -29,6 +29,13 @@ type RAGService interface {
 	// Chat sends a message and gets a response, optionally using RAG
 	Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest) (*domain.ChatResponse, error)
 
+	// ChatStream sends a message and streams the response tokens via emit,
+	// optionally using RAG. The final ChatResponse carries the full content
+	// and total tokens used; emit receives incremental StreamEvents (the last
+	// one always has Done=true). Persists the user message and the assistant
+	// message exactly like Chat.
+	ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error) (*domain.ChatResponse, error)
+
 	// GetSession retrieves a chat session
 	GetSession(ctx context.Context, orgID, sessionID int32) (*domain.ChatSession, error)
 

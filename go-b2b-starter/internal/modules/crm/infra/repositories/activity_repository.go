@@ -47,10 +47,12 @@ func (r *activityRepository) GetByID(ctx context.Context, orgID, activityID int3
 	return mapActivityFromDomain(&result), nil
 }
 
-func (r *activityRepository) ListByOrganization(ctx context.Context, orgID int32, tipo string, limit, offset int32) ([]*domain.ActivityWithActor, error) {
+func (r *activityRepository) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
 	results, err := r.store.ListActivitiesByOrganization(ctx, sqlc.ListActivitiesByOrganizationParams{
 		OrganizationID: orgID,
 		Column2:        helpers.ToPgText(tipo),
+		Column3:        helpers.ToPgText(entityType),
+		Column4:        entityID,
 		Limit:          limit,
 		Offset:         offset,
 	})

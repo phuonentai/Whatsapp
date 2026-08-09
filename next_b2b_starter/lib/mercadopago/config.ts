@@ -1,5 +1,5 @@
 export function isMercadoPagoEnabled(): boolean {
-  return Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN);
+  return Boolean(process.env.NEXT_PUBLIC_MERCADOPAGO_PLAN_ID);
 }
 
 export const MERCADOPAGO_PLAN_ID = process.env.NEXT_PUBLIC_MERCADOPAGO_PLAN_ID ?? null;

@@ -86,3 +86,34 @@ WHERE organization_id = $1
   AND status = 'failed'
 ORDER BY created_at DESC
 LIMIT 1;
+
+-- name: UpsertWhatsAppSignupFlow :one
+INSERT INTO whatsapp.signup_flows (
+    organization_id, status, step, error_code, retry_count, metadata
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+ON CONFLICT (organization_id) DO UPDATE SET
+    status = EXCLUDED.status,
+    step = EXCLUDED.step,
+    error_code = COALESCE(EXCLUDED.error_code, whatsapp.signup_flows.error_code),
+    retry_count = EXCLUDED.retry_count,
+    metadata = EXCLUDED.metadata,
+    updated_at = NOW()
+RETURNING *;
+
+-- name: GetWhatsAppSignupFlowByOrganization :one
+SELECT * FROM whatsapp.signup_flows
+WHERE organization_id = $1;
+
+-- name: UpdateWhatsAppSignupFlowStatus :one
+UPDATE whatsapp.signup_flows
+SET
+    status = COALESCE($2, status),
+    step = COALESCE($3, step),
+    error_code = COALESCE($4, error_code),
+    retry_count = COALESCE($5, retry_count),
+    metadata = COALESCE($6, metadata),
+    updated_at = NOW()
+WHERE organization_id = $1
+RETURNING *;

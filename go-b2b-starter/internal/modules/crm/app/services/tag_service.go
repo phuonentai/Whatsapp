@@ -32,7 +32,14 @@ func (s *tagService) Create(ctx context.Context, orgID int32, nombre, color stri
 }
 func (s *tagService) List(ctx context.Context, orgID int32) ([]*domain.Tag, error) { return s.tagRepo.List(ctx, orgID) }
 func (s *tagService) Update(ctx context.Context, orgID, tagID int32, nombre, color string) (*domain.Tag, error) {
-	return s.tagRepo.Update(ctx, &domain.Tag{ID: tagID, OrganizationID: orgID, Nombre: nombre, Color: color})
+	updated, err := s.tagRepo.Update(ctx, &domain.Tag{ID: tagID, OrganizationID: orgID, Nombre: nombre, Color: color})
+	if err != nil {
+		if isUniqueViolationOn(err, "tags_organization_id_nombre_key") {
+			return nil, domain.ErrTagDuplicateName
+		}
+		return nil, err
+	}
+	return updated, nil
 }
 func (s *tagService) Delete(ctx context.Context, orgID, tagID int32) error { return s.tagRepo.Delete(ctx, orgID, tagID) }
 func (s *tagService) AttachToEntity(ctx context.Context, tagID int32, entityType domain.EntityType, entityID int32) (*domain.EntityTag, error) {

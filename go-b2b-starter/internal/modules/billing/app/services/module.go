@@ -3,11 +3,16 @@ package services
 import (
 	"go.uber.org/dig"
 
+	"github.com/moasq/go-b2b-starter/internal/db/adapters"
+	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/mercadopago"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/polar"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/repositories"
-	"github.com/moasq/go-b2b-starter/internal/db/adapters"
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/routing"
+	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
+	mercadopagopkg "github.com/moasq/go-b2b-starter/internal/platform/mercadopago"
 	polarpkg "github.com/moasq/go-b2b-starter/internal/platform/polar"
 )
 
@@ -19,6 +24,33 @@ func NewModule() *Module {
 	return &Module{}
 }
 
+// providerRouterParams collects the named adapter bindings plus shared
+// dependencies for constructing the ProviderRouter.
+type providerRouterParams struct {
+	dig.In
+
+	PolarAdapter domain.BillingProvider `name:"polar"`
+	MPAdapter    domain.BillingProvider `name:"mercadopago"`
+	Resolver     routing.BillingProviderResolver
+	OrgAdapter   domain.OrganizationAdapter
+}
+
+// billingServiceParams collects the dependencies for constructing the
+// BillingService, including the named MercadoPago adapter used by the
+// MP-specific verify flow.
+type billingServiceParams struct {
+	dig.In
+
+	Repo            domain.SubscriptionRepository
+	AiRepo          domain.AiUsageRepository
+	OrgAdapter      domain.OrganizationAdapter
+	BillingProvider domain.BillingProvider
+	MPProvider      domain.BillingProvider `name:"mercadopago"`
+	Resolver        routing.BillingProviderResolver
+	ModuleService   registryServices.ModuleService
+	Logger          logger.Logger
+}
+
 // Configure registers all services in the dependency container
 func (m *Module) Configure(container *dig.Container) error {
 	// Register OrganizationAdapter (uses legacy adapter store for now)
@@ -28,21 +60,38 @@ func (m *Module) Configure(container *dig.Container) error {
 		return err
 	}
 
-	// Register BillingProvider (Polar implementation)
+	// Register PolarAdapter (named so the router can consume it)
 	if err := container.Provide(func(client *polarpkg.Client, log logger.Logger) domain.BillingProvider {
 		return polar.NewPolarAdapter(client, log)
+	}, dig.Name("polar")); err != nil {
+		return err
+	}
+
+	// Register MPAdapter (named so the router and MP-specific services can consume it)
+	if err := container.Provide(func(client *mercadopagopkg.Client, cfg *mercadopagopkg.Config, log logger.Logger) domain.BillingProvider {
+		return mercadopago.NewMPAdapter(client, log, cfg.BackURL)
+	}, dig.Name("mercadopago")); err != nil {
+		return err
+	}
+
+	// Register BillingProviderResolver (reads organizations.billing_provider)
+	if err := container.Provide(func(store sqlc.Store) routing.BillingProviderResolver {
+		return repositories.NewBillingProviderResolver(store)
+	}); err != nil {
+		return err
+	}
+
+	// Register ProviderRouter as the single unnamed domain.BillingProvider
+	// binding, delegating per-organization to PolarAdapter or MPAdapter
+	if err := container.Provide(func(p providerRouterParams) domain.BillingProvider {
+		return routing.NewProviderRouter(p.PolarAdapter, p.MPAdapter, p.Resolver, p.OrgAdapter)
 	}); err != nil {
 		return err
 	}
 
 	// Register BillingService
-	if err := container.Provide(func(
-		repo domain.SubscriptionRepository,
-		orgAdapter domain.OrganizationAdapter,
-		billingProvider domain.BillingProvider,
-		logger logger.Logger,
-	) BillingService {
-		return NewBillingService(repo, orgAdapter, billingProvider, logger)
+	if err := container.Provide(func(p billingServiceParams) BillingService {
+		return NewBillingService(p.Repo, p.AiRepo, p.OrgAdapter, p.BillingProvider, p.MPProvider, p.Resolver, p.ModuleService, p.Logger)
 	}); err != nil {
 		return err
 	}

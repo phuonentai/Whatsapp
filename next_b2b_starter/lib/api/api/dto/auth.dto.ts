@@ -1,7 +1,6 @@
 export interface BootstrapOrganizationRequestDto {
   org_display_name: string;
   owner_email: string;
-  owner_password: string;
   owner_name: string;
 }
 
@@ -10,7 +9,6 @@ export interface SignupMagicLinkRequestDto {
   org_display_name: string;
   owner_email: string;
   owner_name: string;
-  owner_password: string; // Auto-generated secure password for backend compatibility
   industry?: string;
 }
 

@@ -191,6 +191,15 @@ class MemberRepository {
   }
 
   /**
+   * Change a member's role via PUT /auth/members/:member_id/role.
+   * Syncs the role in Stytch and the local database; rejects last-admin demotion.
+   */
+  async updateMemberRole(member: OrganizationMember, role: MemberRole): Promise<boolean> {
+    await apiClient.put(`/auth/members/${member.id}/role`, { role });
+    return true;
+  }
+
+  /**
    * Transform DTO to UserProfile model
    * Extracts first non-Stytch role from roles array as the primary role
    */
@@ -208,7 +217,7 @@ class MemberRepository {
     const roles = dto.roles || [];
     const primaryRole =
       roles.find((r) => !r.startsWith("stytch_")) || roles[0] || "member";
-    const normalizedRole: MemberRole = ["admin", "manager", "member"].includes(
+    const normalizedRole: MemberRole = ["admin", "approver", "member"].includes(
       primaryRole
     )
       ? (primaryRole as MemberRole)
@@ -222,6 +231,7 @@ class MemberRepository {
       role: normalizedRole,
       organizationId: dto.organization?.organization_id || "",
       organizationName: dto.organization?.name || "",
+      organizationStatus: dto.organization?.status,
     };
   }
 
@@ -234,7 +244,7 @@ class MemberRepository {
     const roles = dto.roles || [];
     const primaryRole =
       roles.find((r) => !r.startsWith("stytch_")) || roles[0] || "member";
-    const normalizedRole: MemberRole = ["admin", "manager", "member"].includes(
+    const normalizedRole: MemberRole = ["admin", "approver", "member"].includes(
       primaryRole
     )
       ? (primaryRole as MemberRole)

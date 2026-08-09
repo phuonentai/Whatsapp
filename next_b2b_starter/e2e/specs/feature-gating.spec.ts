@@ -40,7 +40,7 @@ test.describe("Feature Gating", () => {
   test("Free plan API returns 403 for Pro endpoint", async ({ page }) => {
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-free:admin-free@test.com" });
 
-    const response = await page.request.post("http://localhost:8081/api/v1/crm/empresas", {
+    const response = await page.request.post("http://localhost:3001/api/crm/empresas", {
       data: { name: "Test", nit: "123" },
       headers: { "X-Test-Org-ID": "test-org-free:admin-free@test.com" },
     });

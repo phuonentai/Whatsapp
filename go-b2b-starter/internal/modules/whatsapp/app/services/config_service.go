@@ -29,9 +29,9 @@ func (s *configService) GetConfig(ctx context.Context, orgID int32) (*domain.Wha
 		return nil, fmt.Errorf("%w: %w", domain.ErrConfigNotFound, err)
 	}
 
-	config.WebhookSecret = maskSecret(config.WebhookSecret)
-	config.VerifyToken = maskSecret(config.VerifyToken)
-	config.AccessToken = maskSecret(config.AccessToken)
+	config.WebhookSecret = MaskSecret(config.WebhookSecret)
+	config.VerifyToken = MaskSecret(config.VerifyToken)
+	config.AccessToken = MaskSecret(config.AccessToken)
 
 	return config, nil
 }
@@ -61,9 +61,9 @@ func (s *configService) ToggleConfig(ctx context.Context, orgID int32) (*domain.
 		return nil, fmt.Errorf("failed to toggle config: %w", err)
 	}
 
-	updated.WebhookSecret = maskSecret(updated.WebhookSecret)
-	updated.VerifyToken = maskSecret(updated.VerifyToken)
-	updated.AccessToken = maskSecret(updated.AccessToken)
+	updated.WebhookSecret = MaskSecret(updated.WebhookSecret)
+	updated.VerifyToken = MaskSecret(updated.VerifyToken)
+	updated.AccessToken = MaskSecret(updated.AccessToken)
 
 	return updated, nil
 }
@@ -94,9 +94,9 @@ func (s *configService) createConfig(ctx context.Context, orgID int32, input *do
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.WebhookSecret = maskSecret(config.WebhookSecret)
-	config.VerifyToken = maskSecret(config.VerifyToken)
-	config.AccessToken = maskSecret(config.AccessToken)
+	config.WebhookSecret = MaskSecret(config.WebhookSecret)
+	config.VerifyToken = MaskSecret(config.VerifyToken)
+	config.AccessToken = MaskSecret(config.AccessToken)
 
 	return config, nil
 }
@@ -140,14 +140,14 @@ func (s *configService) updateConfig(ctx context.Context, existing *domain.Whats
 		return nil, fmt.Errorf("failed to update config: %w", err)
 	}
 
-	updated.WebhookSecret = maskSecret(updated.WebhookSecret)
-	updated.VerifyToken = maskSecret(updated.VerifyToken)
-	updated.AccessToken = maskSecret(updated.AccessToken)
+	updated.WebhookSecret = MaskSecret(updated.WebhookSecret)
+	updated.VerifyToken = MaskSecret(updated.VerifyToken)
+	updated.AccessToken = MaskSecret(updated.AccessToken)
 
 	return updated, nil
 }
 
-func maskSecret(s string) string {
+func MaskSecret(s string) string {
 	if len(s) <= 6 {
 		return "****"
 	}

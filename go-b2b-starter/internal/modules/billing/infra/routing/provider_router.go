@@ -9,6 +9,7 @@ import (
 
 type BillingProviderResolver interface {
 	GetBillingProvider(ctx context.Context, organizationID int32) (string, error)
+	SetBillingProvider(ctx context.Context, organizationID int32, provider string) error
 }
 
 type ProviderRouter struct {

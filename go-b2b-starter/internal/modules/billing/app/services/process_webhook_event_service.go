@@ -12,7 +12,47 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 )
 
-const invoicesProcessedMeterSlug = "invoice.processed"
+const (
+	invoicesProcessedMeterSlug = "invoice.processed"
+	aiTokensMeterSlug          = "ai.tokens"
+)
+
+// moduleKeysFromMetadata extracts namespaced module keys (e.g., "module_tickets")
+// from a subscription's metadata, checking both the top level and the nested
+// "product_metadata" map used by the Polar adapter.
+func moduleKeysFromMetadata(metadata map[string]any) []string {
+	seen := make(map[string]bool)
+	var keys []string
+	add := func(k string) {
+		if seen[k] {
+			return
+		}
+		seen[k] = true
+		keys = append(keys, k)
+	}
+	for k := range metadata {
+		if strings.HasPrefix(k, "module_") {
+			add(strings.TrimPrefix(k, "module_"))
+		}
+	}
+	if raw, ok := metadata["product_metadata"]; ok {
+		switch m := raw.(type) {
+		case map[string]any:
+			for k := range m {
+				if strings.HasPrefix(k, "module_") {
+					add(strings.TrimPrefix(k, "module_"))
+				}
+			}
+		case map[string]string:
+			for k := range m {
+				if strings.HasPrefix(k, "module_") {
+					add(strings.TrimPrefix(k, "module_"))
+				}
+			}
+		}
+	}
+	return keys
+}
 
 func (s *billingService) ProcessWebhookEvent(ctx context.Context, eventType string, payload map[string]any) error {
 	s.logger.Info("Processing webhook event", map[string]any{
@@ -275,6 +315,17 @@ func (s *billingService) handleSubscriptionUpsert(ctx context.Context, eventData
 		"status":          eventData.Status,
 	})
 
+	// Step 5b: Reconcile per-org module state from subscription metadata.
+	if s.moduleService != nil {
+		moduleKeys := moduleKeysFromMetadata(subscription.Metadata)
+		if err := s.moduleService.SyncModulesFromMetadata(ctx, organizationID, moduleKeys); err != nil {
+			s.logger.Error("failed to sync modules from subscription metadata", map[string]any{
+				"organization_id": organizationID,
+				"error":           err.Error(),
+			})
+		}
+	}
+
 	// Step 6: Create quota tracking domain object
 	now := time.Now()
 	quota := &domain.QuotaTracking{
@@ -424,13 +475,22 @@ func (s *billingService) handleMeterGrantEvent(ctx context.Context, payload map[
 		return fmt.Errorf("failed to parse meter grant payload: %w", err)
 	}
 
-	if !strings.EqualFold(eventData.MeterSlug, invoicesProcessedMeterSlug) {
+	// Dispatch by meter slug: invoice.processed refreshes invoice counters,
+	// ai.tokens refreshes the AI credit allowance.
+	switch {
+	case strings.EqualFold(eventData.MeterSlug, invoicesProcessedMeterSlug):
+		return s.handleInvoiceMeterGrant(ctx, eventData)
+	case strings.EqualFold(eventData.MeterSlug, aiTokensMeterSlug):
+		return s.handleAiTokensGrant(ctx, eventData)
+	default:
 		s.logger.Info("Ignoring meter grant event for unrelated meter", map[string]any{
 			"meter_slug": eventData.MeterSlug,
 		})
 		return nil
 	}
+}
 
+func (s *billingService) handleInvoiceMeterGrant(ctx context.Context, eventData *domain.MeterGrantEventData) error {
 	organizationID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, eventData.ExternalCustomerID)
 	if err != nil {
 		return fmt.Errorf("failed to map organization for meter grant: %w", err)
@@ -478,6 +538,29 @@ func (s *billingService) handleMeterGrantEvent(ctx context.Context, payload map[
 		"meter_slug":      eventData.MeterSlug,
 		"invoice_count":   quota.InvoiceCount,
 		"previous_count":  previous,
+	})
+
+	return nil
+}
+
+// handleAiTokensGrant refreshes the org's period AI credit allowance from an
+// ai.tokens meter grant. Idempotent: re-applying the same grant overwrites the
+// allowance with the same value.
+func (s *billingService) handleAiTokensGrant(ctx context.Context, eventData *domain.MeterGrantEventData) error {
+	organizationID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, eventData.ExternalCustomerID)
+	if err != nil {
+		return fmt.Errorf("failed to map organization for ai tokens grant: %w", err)
+	}
+
+	now := time.Now()
+	if err := s.aiRepo.UpdateAiCreditsMax(ctx, organizationID, eventData.AvailableCredits, now, now); err != nil {
+		return fmt.Errorf("failed to update ai credits max from meter grant: %w", err)
+	}
+
+	s.logger.Info("Updated AI credits allowance from meter grant event", map[string]any{
+		"organization_id": organizationID,
+		"meter_slug":      eventData.MeterSlug,
+		"ai_credits_max":  eventData.AvailableCredits,
 	})
 
 	return nil

@@ -12,6 +12,7 @@ type Config struct {
 	WebhookSecret  string `mapstructure:"MERCADOPAGO_WEBHOOK_SECRET"`
 	CheckoutPlanID string `mapstructure:"MERCADOPAGO_CHECKOUT_PLAN_ID"`
 	BusinessPlanID string `mapstructure:"MERCADOPAGO_BUSINESS_PLAN_ID"`
+	BackURL        string `mapstructure:"MERCADOPAGO_BACK_URL"`
 	Debug          bool   `mapstructure:"MERCADOPAGO_DEBUG"`
 }
 
@@ -24,6 +25,7 @@ func LoadConfig() (Config, error) {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("MERCADOPAGO_BASE_URL", "https://api.mercadopago.com")
+	viper.SetDefault("MERCADOPAGO_BACK_URL", "http://localhost:3000/dashboard")
 	viper.SetDefault("MERCADOPAGO_DEBUG", false)
 
 	if err := viper.ReadInConfig(); err == nil {

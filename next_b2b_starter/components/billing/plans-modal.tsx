@@ -30,9 +30,14 @@ export function PlansModal({
 
   const currentProductId = subscriptionState?.subscription?.productId ?? null;
 
+  const handleClose = () => {
+    setSelectedPlanId(null);
+    setCheckoutError(null);
+    onOpenChange(false);
+  };
+
   useEffect(() => {
     if (!open) {
-      setSelectedPlanId(null);
       document.body.style.removeProperty("overflow");
       return;
     }
@@ -102,10 +107,14 @@ export function PlansModal({
     startTransition(async () => {
       try {
         const result = await createMercadoPagoCheckout({ planId: plan.id });
-        if (result.success && result.data.checkoutUrl) {
+        if (!result.success) {
+          setCheckoutError(result.error || "Failed to create MercadoPago checkout.");
+          setSelectedPlanId(null);
+          onPlanChangePending?.(false);
+        } else if (result.data.checkoutUrl) {
           window.location.href = result.data.checkoutUrl;
         } else {
-          setCheckoutError(result.error || "Failed to create MercadoPago checkout.");
+          setCheckoutError("Failed to create MercadoPago checkout.");
           setSelectedPlanId(null);
           onPlanChangePending?.(false);
         }
@@ -123,7 +132,7 @@ export function PlansModal({
       <div className="relative w-full max-w-4xl rounded-3xl bg-white p-8 shadow-2xl ring-1 ring-gray-200">
         <button
           type="button"
-          onClick={() => onOpenChange(false)}
+          onClick={handleClose}
           className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-200"
           aria-label="Close plans modal"
         >

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	loggerdomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
-	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/pkg/whatsapp"
 )
 
@@ -48,11 +48,11 @@ func (s *webhookService) ProcessWebhook(ctx context.Context, rawBody []byte, par
 
 	config, err := s.configRepo.GetByPhoneNumberID(ctx, phoneNumberID)
 	if err != nil {
-		return fmt.Errorf("config not found for phone_number_id %s: %w", phoneNumberID, err)
+		return fmt.Errorf("%w: config not found for phone_number_id %s", whatsappDomain.ErrUnknownPhoneNumber, phoneNumberID)
 	}
 
 	if err := whatsapp.VerifySignature(config.WebhookSecret, rawBody, signatureHeader); err != nil {
-		return fmt.Errorf("signature verification failed: %w", err)
+		return fmt.Errorf("%w: %v", whatsappDomain.ErrInvalidSignature, err)
 	}
 
 	webhookLog := &whatsappDomain.WebhookLog{
@@ -69,6 +69,27 @@ func (s *webhookService) ProcessWebhook(ctx context.Context, rawBody []byte, par
 
 	messages := extractMessagesFromPayload(parsedPayload)
 	for _, msg := range messages {
+		if msg.IsEcho {
+			echo := events.NewMessageEcho(
+				config.OrganizationID,
+				msg.MessageSID,
+				msg.From,
+				config.BusinessPhone,
+				msg.MessageType,
+				msg.Content,
+				msg.MediaURL,
+				msg.Timestamp,
+				rawBody,
+			)
+			if err := s.eventBus.Publish(ctx, echo); err != nil {
+				s.logger.Error("failed to publish echo event", loggerdomain.Fields{
+					"error":  err.Error(),
+					"msg_id": msg.MessageSID,
+				})
+			}
+			continue
+		}
+
 		event := events.NewMessageReceived(
 			config.OrganizationID,
 			msg.MessageSID,
@@ -121,6 +142,7 @@ type parsedMessage struct {
 	Content     string
 	MediaURL    string
 	Timestamp   time.Time
+	IsEcho      bool
 }
 
 func extractMetadataPhoneNumberID(payload map[string]any) string {
@@ -181,6 +203,7 @@ func extractMessagesFromPayload(payload map[string]any) []parsedMessage {
 			MessageSID:  stringField(msg, "id"),
 			From:        stringField(msg, "from"),
 			MessageType: stringField(msg, "type"),
+			IsEcho:      isEchoMessage(msg),
 		}
 
 		if ts := stringField(msg, "timestamp"); ts != "" {
@@ -245,6 +268,16 @@ func changeValue(change map[string]any) map[string]any {
 		return v
 	}
 	return nil
+}
+
+// isEchoMessage reports whether a message entry is a coexistence echo
+// (sent from the organization's phone WhatsApp Business app).
+func isEchoMessage(msg map[string]any) bool {
+	origin, ok := msg["origin"].(map[string]any)
+	if !ok {
+		return false
+	}
+	return stringField(origin, "type") == "echo"
 }
 
 func stringField(m map[string]any, key string) string {

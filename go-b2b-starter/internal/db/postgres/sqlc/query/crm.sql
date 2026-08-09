@@ -46,8 +46,7 @@ SELECT * FROM crm.conversations
 WHERE contact_id = $1
   AND organization_id = $2
   AND status = 'active'
-  AND last_message_at > NOW() - INTERVAL '24 hours'
-ORDER BY last_message_at DESC
+ORDER BY last_message_at DESC NULLS LAST
 LIMIT 1;
 
 -- name: CreateConversation :one
@@ -60,6 +59,18 @@ INSERT INTO crm.conversations (
 ) VALUES (
     $1, $2, $3, $4, $5
 ) RETURNING *;
+
+-- name: InsertActiveConversationIdempotent :one
+INSERT INTO crm.conversations (
+    organization_id,
+    contact_id,
+    status,
+    last_message_at,
+    metadata
+) VALUES (
+    $1, $2, 'active', $3, $4
+) ON CONFLICT (organization_id, contact_id) WHERE status = 'active' DO NOTHING
+RETURNING *;
 
 -- name: UpdateConversationLastMessageAt :one
 UPDATE crm.conversations
@@ -103,6 +114,23 @@ INSERT INTO crm.messages (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 ) RETURNING *;
+
+-- name: InsertMessageIdempotent :one
+INSERT INTO crm.messages (
+    organization_id,
+    conversation_id,
+    contact_id,
+    whatsapp_message_id,
+    direction,
+    message_type,
+    content,
+    status,
+    message_data,
+    chat_timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) ON CONFLICT (organization_id, whatsapp_message_id) DO NOTHING
+RETURNING *;
 
 -- name: GetMessageByWhatsAppID :one
 SELECT * FROM crm.messages

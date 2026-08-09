@@ -8,6 +8,7 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/crm"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
+	crmEvents "github.com/moasq/go-b2b-starter/internal/modules/crm/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 )
@@ -31,6 +32,36 @@ func Init(container *dig.Container) error {
 		})
 	}); err != nil {
 		return fmt.Errorf("failed to subscribe to whatsapp events: %w", err)
+	}
+
+	if err := container.Invoke(func(
+		bus eventbus.EventBus,
+		listener services.EchoListener,
+	) error {
+		return bus.Subscribe(whatsappEvents.MessageEchoEventType, func(ctx context.Context, event eventbus.Event) error {
+			echoEvent, ok := event.(*whatsappEvents.MessageEcho)
+			if !ok {
+				return fmt.Errorf("unexpected event type: %T", event)
+			}
+			return listener.HandleMessageEcho(ctx, echoEvent)
+		})
+	}); err != nil {
+		return fmt.Errorf("failed to subscribe to whatsapp echo events: %w", err)
+	}
+
+	if err := container.Invoke(func(
+		bus eventbus.EventBus,
+		listener services.DealStageListener,
+	) error {
+		return bus.Subscribe(crmEvents.DealStageChangedEventType, func(ctx context.Context, event eventbus.Event) error {
+			stageEvent, ok := event.(*crmEvents.DealStageChanged)
+			if !ok {
+				return fmt.Errorf("unexpected event type: %T", event)
+			}
+			return listener.HandleStageChanged(ctx, stageEvent)
+		})
+	}); err != nil {
+		return fmt.Errorf("failed to subscribe to deal stage events: %w", err)
 	}
 
 	return nil

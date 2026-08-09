@@ -16,13 +16,13 @@ func NewRoutes(handler *Handler) *Routes {
 }
 
 func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.MiddlewareResolver) {
-	webhooks := router.Group("/api/v1/webhooks")
+	webhooks := router.Group("/v1/webhooks")
 	{
 		webhooks.GET("/whatsapp", r.handler.HandleVerification)
 		webhooks.POST("/whatsapp", r.handler.HandleWebhook)
 	}
 
-	mgmt := router.Group("/api/v1/whatsapp")
+	mgmt := router.Group("/v1/whatsapp")
 	mgmt.Use(
 		resolver.Get("auth"),
 		resolver.Get("org_context"),
@@ -44,6 +44,18 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		mgmt.PATCH("/config/toggle",
 			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.HandleToggleConfig)
+
+		mgmt.GET("/signup/meta-config",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleMetaConfig)
+
+		mgmt.POST("/signup/exchange",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleExchangeSignup)
+
+		mgmt.GET("/signup/status",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleSignupStatus)
 	}
 }
 

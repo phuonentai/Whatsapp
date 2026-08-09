@@ -20,6 +20,7 @@ export interface ApiClientConfig {
 export interface RequestOptions {
   headers?: Record<string, string>;
   skipAuth?: boolean;
+  params?: Record<string, string | number | undefined>;
 }
 
 export class ApiClient {
@@ -71,6 +72,17 @@ export class ApiClient {
     });
   }
 
+  async patch<T>(
+    endpoint: string,
+    body?: any,
+    options?: RequestOptions
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "PATCH",
+      ...this.applyOptions(body, options),
+    });
+  }
+
   async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
     return this.request<T>(endpoint, {
       method: "DELETE",
@@ -84,9 +96,9 @@ export class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit & { skipAuth?: boolean }
+    options: RequestInit & { skipAuth?: boolean; params?: Record<string, string | number | undefined> }
   ): Promise<T> {
-    const url = `${this.config.baseUrl}${endpoint}`;
+    const url = `${this.config.baseUrl}${this.buildUrl(endpoint, options.params)}`;
     const requestId = apiLogger.generateRequestId();
     const requestStartTime = Date.now();
 
@@ -96,6 +108,7 @@ export class ApiClient {
     };
 
     const { skipAuth, ...restOptions } = options;
+    const { params: _params, ...fetchOptions } = restOptions;
     const shouldAttachAuth = !skipAuth && !headers["Authorization"];
     let attachedAccessToken: string | null = null;
 
@@ -114,7 +127,7 @@ export class ApiClient {
     }
 
     const requestInit: RequestInit = {
-      ...restOptions,
+      ...fetchOptions,
       headers,
       credentials: "include",
     };
@@ -196,6 +209,27 @@ export class ApiClient {
     }
   }
 
+  private buildUrl(
+    endpoint: string,
+    params?: Record<string, string | number | undefined>
+  ): string {
+    if (!params) return endpoint;
+
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) {
+        searchParams.set(key, String(value));
+      }
+    }
+
+    const queryString = searchParams.toString();
+    if (!queryString) return endpoint;
+
+    return endpoint.includes("?")
+      ? `${endpoint}&${queryString}`
+      : `${endpoint}?${queryString}`;
+  }
+
   private prepareBody(body: any): BodyInit | undefined {
     if (!body) return undefined;
     if (body instanceof FormData) return body;
@@ -205,13 +239,14 @@ export class ApiClient {
   private applyOptions(
     body: any,
     options?: RequestOptions
-  ): RequestInit & { skipAuth?: boolean } {
+  ): RequestInit & { skipAuth?: boolean; params?: Record<string, string | number | undefined> } {
     const headers = this.prepareHeaders(body, options?.headers);
 
     return {
       body: this.prepareBody(body),
       headers,
       skipAuth: options?.skipAuth,
+      params: options?.params,
     };
   }
 

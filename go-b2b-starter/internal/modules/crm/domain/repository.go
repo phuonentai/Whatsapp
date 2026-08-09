@@ -20,6 +20,7 @@ type ConversationRepository interface {
 	GetByID(ctx context.Context, orgID, convID int32) (*Conversation, error)
 	GetActiveByContact(ctx context.Context, orgID, contactID int32) (*Conversation, error)
 	Create(ctx context.Context, conv *Conversation) (*Conversation, error)
+	EnsureActive(ctx context.Context, conv *Conversation) (*Conversation, error)
 	UpdateLastMessageAt(ctx context.Context, orgID, convID int32, lastMessageAt *time.Time) (*Conversation, error)
 	UpdateStatus(ctx context.Context, orgID, convID int32, status ConversationStatus) (*Conversation, error)
 	ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*ConversationWithContact, error)
@@ -27,6 +28,7 @@ type ConversationRepository interface {
 
 type MessageRepository interface {
 	Create(ctx context.Context, msg *Message) (*Message, error)
+	InsertIdempotent(ctx context.Context, msg *Message) (*Message, bool, error)
 	GetByWhatsAppID(ctx context.Context, orgID int32, whatsappMessageID string) (*Message, error)
 	ListByConversation(ctx context.Context, orgID, convID int32, limit, offset int32) ([]*Message, error)
 }
@@ -43,7 +45,7 @@ type CompanyRepository interface {
 type DealRepository interface {
 	Create(ctx context.Context, deal *Deal) (*Deal, error)
 	GetByID(ctx context.Context, orgID, dealID int32) (*DealWithRefs, error)
-	List(ctx context.Context, orgID int32, pipelineID, stageID int32, status string, limit, offset int32) ([]*DealWithRefs, error)
+	List(ctx context.Context, orgID int32, pipelineID, stageID int32, status string, contactID, limit, offset int32) ([]*DealWithRefs, error)
 	Update(ctx context.Context, deal *Deal) (*Deal, error)
 	UpdateStage(ctx context.Context, orgID, dealID, stageID int32) (*Deal, error)
 	Delete(ctx context.Context, orgID, dealID int32) error
@@ -69,7 +71,7 @@ type PipelineStageRepository interface {
 type ActivityRepository interface {
 	Create(ctx context.Context, activity *Activity) (*Activity, error)
 	GetByID(ctx context.Context, orgID, activityID int32) (*Activity, error)
-	ListByOrganization(ctx context.Context, orgID int32, tipo string, limit, offset int32) ([]*ActivityWithActor, error)
+	ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*ActivityWithActor, error)
 	ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)
 	ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)
 	ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)

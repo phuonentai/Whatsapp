@@ -3,6 +3,7 @@ package whatsapp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -17,12 +18,14 @@ import (
 type Handler struct {
 	webhookService services.WebhookService
 	configService  services.ConfigService
+	signupService  services.SignupService
 }
 
-func NewHandler(webhookService services.WebhookService, configService services.ConfigService) *Handler {
+func NewHandler(webhookService services.WebhookService, configService services.ConfigService, signupService services.SignupService) *Handler {
 	return &Handler{
 		webhookService: webhookService,
 		configService:  configService,
+		signupService:  signupService,
 	}
 }
 
@@ -55,6 +58,23 @@ func (h *Handler) HandleWebhook(c *gin.Context) {
 		payload,
 		signatureHeader,
 	); err != nil {
+		if errors.Is(err, whatsappDomain.ErrInvalidSignature) {
+			c.JSON(http.StatusUnauthorized, httperr.NewHTTPError(
+				http.StatusUnauthorized,
+				"invalid_signature",
+				err.Error(),
+			))
+			return
+		}
+		if errors.Is(err, whatsappDomain.ErrUnknownPhoneNumber) {
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"unknown_phone_number",
+				err.Error(),
+			))
+			return
+		}
+
 		status := http.StatusInternalServerError
 		code := "webhook_processing_failed"
 
@@ -195,6 +215,108 @@ func (h *Handler) HandleUpsertConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, config)
+}
+
+func (h *Handler) HandleMetaConfig(c *gin.Context) {
+	metaConfig, err := h.signupService.MetaConfig(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError,
+			"meta_config_failed",
+			err.Error(),
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, metaConfig)
+}
+
+type ExchangeSignupRequest struct {
+	Code string `json:"code"`
+}
+
+func (h *Handler) HandleExchangeSignup(c *gin.Context) {
+	reqCtx := auth.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+	actorMemberID := ""
+	if reqCtx.Identity != nil {
+		actorMemberID = reqCtx.Identity.UserID
+	}
+
+	var req ExchangeSignupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_request",
+			"Invalid request body: "+err.Error(),
+		))
+		return
+	}
+
+	result, err := h.signupService.Exchange(c.Request.Context(), orgID, req.Code, actorMemberID)
+	if err != nil {
+		var failedErr *whatsappDomain.SignupFailedError
+		switch {
+		case errors.Is(err, whatsappDomain.ErrSignupCodeRequired):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"validation_error",
+				"Authorization code is required",
+			))
+		case errors.Is(err, whatsappDomain.ErrSignupInProgress):
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"signup_in_progress",
+				"A signup is already in progress for this organization",
+			))
+		case errors.Is(err, whatsappDomain.ErrSignupAlreadyConnected):
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"signup_already_connected",
+				"This organization is already connected",
+			))
+		case errors.As(err, &failedErr):
+			c.JSON(http.StatusBadGateway, httperr.NewHTTPError(
+				http.StatusBadGateway,
+				"signup_failed",
+				fmt.Sprintf("Signup failed with error %s", failedErr.Code),
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"signup_exchange_failed",
+				err.Error(),
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HandleSignupStatus(c *gin.Context) {
+	reqCtx := auth.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	flow, err := h.signupService.Status(c.Request.Context(), orgID)
+	if err != nil {
+		if errors.Is(err, whatsappDomain.ErrSignupNotFound) {
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"signup_not_found",
+				"No signup flow found for this organization",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError,
+			"signup_status_failed",
+			err.Error(),
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, flow)
 }
 
 func (h *Handler) HandleToggleConfig(c *gin.Context) {

@@ -1,10 +1,12 @@
 stages:
   - test
+  - frontend
+  - e2e
   - build
 
 run-tests:
   stage: test
-  image: golang:1.22.4
+  image: golang:1.25
   script:
     - mkdir -p coverage
     - bash scripts/run_tests_with_coverage.sh
@@ -16,6 +18,63 @@ run-tests:
         coverage_format: cobertura
         path: coverage/coverage.xml
   coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+
+run-frontend:
+  stage: frontend
+  image: node:20
+  script:
+    - cd next_b2b_starter
+    - corepack enable
+    - corepack pnpm install --frozen-lockfile --ignore-scripts
+    - pnpm lint
+    - pnpm build
+  artifacts:
+    when: always
+    paths:
+      - next_b2b_starter/.next/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+    - when: manual
+
+run-e2e:
+  stage: e2e
+  image: mcr.microsoft.com/playwright:v1.62.1-focal
+  services:
+    - name: pgvector/pgvector:pg16
+      alias: postgres
+  variables:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_DB: saas_db_test
+    DATABASE_URL: postgresql://postgres:postgres@postgres:5432/saas_db_test?sslmode=disable
+    AUTH_MOCK_ENABLED: "true"
+    NEXT_PUBLIC_API_URL: http://backend:8080/api
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+    - curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs
+    - corepack enable
+    - cd ../next_b2b_starter && corepack pnpm install --frozen-lockfile --ignore-scripts
+    - corepack pnpm exec playwright install --with-deps chromium
+  script:
+    - cd ../go-b2b-starter
+    - curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xz
+    - ./migrate -path internal/db/postgres/sqlc/migrations -database "$DATABASE_URL" up
+    - AUTH_MOCK_ENABLED=true DATABASE_URL="$DATABASE_URL" go run ./cmd/api/main.go &
+    - cd ../next_b2b_starter && pnpm dev -p 3001 &
+    - sleep 10
+    - cd ../next_b2b_starter && pnpm test:e2e
+  artifacts:
+    when: always
+    paths:
+      - ../next_b2b_starter/test-results/
+      - ../next_b2b_starter/playwright-report/
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+    - when: manual
 
 build-image:
   stage: build

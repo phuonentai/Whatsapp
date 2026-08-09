@@ -111,9 +111,42 @@ func (r *stytchOrganizationRepository) GetOrganization(ctx context.Context, orga
 		return nil, domain.ErrAuthOrganizationIDRequired
 	}
 
+	if r.client == nil {
+		// Development mode: placeholder credentials mean no Stytch client.
+		// Fail cleanly instead of nil-pointer dereferencing.
+		return nil, domain.ErrAuthConnection
+	}
+
 	resp, err := r.client.API().Organizations.Get(ctx, &organizations.GetParams{OrganizationID: organizationID})
 	if err != nil {
 		return nil, fmt.Errorf("stytch get organization: %w", stytchcfg.MapError(err))
+	}
+
+	return mapToAuthOrganization(resp.Organization), nil
+}
+
+func (r *stytchOrganizationRepository) UpdateOrganization(ctx context.Context, organizationID, displayName string) (*domain.AuthOrganization, error) {
+	if organizationID == "" {
+		return nil, domain.ErrAuthOrganizationIDRequired
+	}
+	if displayName == "" {
+		return nil, domain.ErrAuthOrganizationDisplayNameRequired
+	}
+
+	var resp *organizations.UpdateResponse
+	err := r.client.Run(ctx, func() error {
+		var callErr error
+		resp, callErr = r.client.API().Organizations.Update(ctx, &organizations.UpdateParams{
+			OrganizationID:   organizationID,
+			OrganizationName: displayName,
+		})
+		if callErr != nil {
+			return fmt.Errorf("stytch update organization: %w", stytchcfg.MapError(callErr))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return mapToAuthOrganization(resp.Organization), nil

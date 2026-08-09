@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   Loader2,
   RefreshCcw,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,7 +39,9 @@ import { Input } from "@/components/ui/input";
 import type { SubscriptionGateState } from "@/lib/polar/current-subscription";
 import { getPlanById, getPlanByProductId } from "@/lib/polar/plans";
 import { useProductsQuery } from "@/lib/hooks/queries/use-products-query";
+import { useAiUsageQuery } from "@/lib/hooks/queries/use-ai-usage-query";
 import { cancelSubscription } from "@/lib/actions/billing/cancel-subscription";
+import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
 
 interface SubscriptionTabProps {
   state: SubscriptionGateState | null;
@@ -63,12 +66,17 @@ export function SubscriptionTab({
   const [cancelInput, setCancelInput] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const { data: products } = useProductsQuery();
-
   const billingConfigured = state?.reason !== "POLAR_UNCONFIGURED" && state?.reason !== "MP_UNCONFIGURED";
   const isActive = Boolean(state?.isActive);
   const showInactive = !isActive || state?.reason === "NO_ACTIVE_SUBSCRIPTION";
   const canInteract = billingConfigured && !isPlanChangePending && actionState === "idle";
+
+  const { data: products } = useProductsQuery();
+  const { data: aiUsage } = useAiUsageQuery(!showInactive);
+
+  const aiCreditsPercent = aiUsage && aiUsage.credits_max > 0
+    ? Math.min(100, Math.round((aiUsage.credits_used / aiUsage.credits_max) * 100))
+    : 0;
 
   const plan = useMemo(() => {
     if (!state || !products) return null;
@@ -325,6 +333,42 @@ export function SubscriptionTab({
       </section>
     ) : null;
 
+  const aiUsageSection =
+    !showInactive && aiUsage && aiUsage.credits_max > 0 ? (
+      <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-lg font-semibold text-gray-900">AI credits</h4>
+            <p className="text-sm text-gray-600">
+              Credits available for AI features this period.{" "}
+              {aiUsage.period_end
+                ? `Resets on ${format(new Date(aiUsage.period_end), "MMM d, yyyy")}.`
+                : null}
+            </p>
+          </div>
+          <Badge className="bg-gray-100 text-gray-700">
+            {aiUsage.credits_used.toLocaleString()} / {aiUsage.credits_max.toLocaleString()}
+          </Badge>
+        </div>
+        <div className="mt-6 space-y-3">
+          <Progress value={aiCreditsPercent} className="h-2" />
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+            <span>
+              <span className="font-semibold text-gray-900">
+                {aiUsage.credits_remaining.toLocaleString()}
+              </span>{" "}
+              credits remaining
+            </span>
+            <span className="flex items-center gap-2 text-xs text-gray-500">
+              <Sparkles className="h-4 w-4" />
+              {aiUsage.tokens_input.toLocaleString()} in / {aiUsage.tokens_output.toLocaleString()}{" "}
+              out tokens
+            </span>
+          </div>
+        </div>
+      </section>
+    ) : null;
+
   return (
     <>
       <div className="relative">
@@ -354,6 +398,7 @@ export function SubscriptionTab({
 
           {summarySection}
           {usageSection}
+          {aiUsageSection}
         </div>
       </div>
 
@@ -367,6 +412,7 @@ export function SubscriptionTab({
         }}
         subscriptionState={state}
         onPlanChangePending={(pending) => setPlanChangePending(pending)}
+        mercadopagoEnabled={isMercadoPagoEnabled()}
       />
 
       <Dialog

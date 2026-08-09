@@ -95,6 +95,12 @@ func (r *stytchMemberRepository) GetMember(ctx context.Context, organizationID, 
 		return nil, domain.ErrAuthMemberIDRequired
 	}
 
+	if r.client == nil {
+		// Development mode: placeholder credentials mean no Stytch client.
+		// Fail cleanly instead of nil-pointer dereferencing.
+		return nil, domain.ErrAuthConnection
+	}
+
 	resp, err := r.client.API().Organizations.Members.Get(ctx, &members.GetParams{
 		OrganizationID: organizationID,
 		MemberID:       memberID,
@@ -202,9 +208,15 @@ func (r *stytchMemberRepository) AssignRoles(ctx context.Context, req *domain.As
 		updateParams.Roles = &rolesCopy
 	}
 
-	_, err := r.client.API().Organizations.Members.Update(ctx, updateParams)
+	err := r.client.Run(ctx, func() error {
+		_, callErr := r.client.API().Organizations.Members.Update(ctx, updateParams)
+		if callErr != nil {
+			return fmt.Errorf("stytch update member roles: %w", stytchcfg.MapError(callErr))
+		}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("stytch update member roles: %w", stytchcfg.MapError(err))
+		return err
 	}
 	return nil
 }

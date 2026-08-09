@@ -2,9 +2,11 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
@@ -58,6 +60,29 @@ func (r *conversationRepository) Create(ctx context.Context, conv *domain.Conver
 	result, err := r.store.CreateConversation(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create conversation: %w", err)
+	}
+
+	return r.mapToDomain(&result), nil
+}
+
+func (r *conversationRepository) EnsureActive(ctx context.Context, conv *domain.Conversation) (*domain.Conversation, error) {
+	params := sqlc.InsertActiveConversationIdempotentParams{
+		OrganizationID: conv.OrganizationID,
+		ContactID:      conv.ContactID,
+		LastMessageAt:  helpers.ToPgTimestampPtr(conv.LastMessageAt),
+		Metadata:       helpers.ToJSONB(conv.Metadata),
+	}
+
+	result, err := r.store.InsertActiveConversationIdempotent(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			existing, getErr := r.GetActiveByContact(ctx, conv.OrganizationID, conv.ContactID)
+			if getErr != nil {
+				return nil, fmt.Errorf("failed to fetch active conversation after idempotent insert: %w", getErr)
+			}
+			return existing, nil
+		}
+		return nil, fmt.Errorf("failed to ensure active conversation: %w", err)
 	}
 
 	return r.mapToDomain(&result), nil

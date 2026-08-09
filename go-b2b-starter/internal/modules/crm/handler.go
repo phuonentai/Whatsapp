@@ -1,6 +1,7 @@
 package crm
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -50,6 +51,7 @@ func (h *CRMHandler) GetEntitlement(c *gin.Context) {
 	response.Success(c, http.StatusOK, map[string]interface{}{
 		"funcionalidades": e.Features, "cuotas": e.Quotas, "uso": e.Usage,
 		"solo_lectura": e.IsReadOnly, "periodo_gracia": e.IsGracePeriod, "plan": e.PlanName,
+		"modulos": e.Modules,
 	})
 }
 
@@ -80,7 +82,12 @@ func (h *CRMHandler) CreateContacto(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
 	req.OrganizationID = ctx.OrganizationID
 	r, err := h.contactService.Create(c.Request.Context(), ctx.OrganizationID, &req)
-	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al crear contacto", err); return }
+	if err != nil {
+		if errors.Is(err, domain.ErrContactDuplicateEmail) {
+			response.Error(c, http.StatusConflict, domain.ErrContactDuplicateEmail.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al crear contacto", err); return
+	}
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateContacto(c *gin.Context) {
@@ -89,7 +96,12 @@ func (h *CRMHandler) UpdateContacto(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
 	req.ID = parseID(c); req.OrganizationID = ctx.OrganizationID
 	r, err := h.contactService.Update(c.Request.Context(), ctx.OrganizationID, &req)
-	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al actualizar contacto", err); return }
+	if err != nil {
+		if errors.Is(err, domain.ErrContactDuplicateEmail) {
+			response.Error(c, http.StatusConflict, domain.ErrContactDuplicateEmail.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al actualizar contacto", err); return
+	}
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteContacto(c *gin.Context) {
@@ -125,7 +137,12 @@ func (h *CRMHandler) CreateEmpresa(c *gin.Context) {
 	var req services.CreateCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
 	r, err := h.companyService.Create(c.Request.Context(), ctx.OrganizationID, &req)
-	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al crear empresa", err); return }
+	if err != nil {
+		if errors.Is(err, domain.ErrCompanyDuplicateName) {
+			response.Error(c, http.StatusConflict, domain.ErrCompanyDuplicateName.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al crear empresa", err); return
+	}
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateEmpresa(c *gin.Context) {
@@ -134,7 +151,12 @@ func (h *CRMHandler) UpdateEmpresa(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
 	req.ID = parseID(c)
 	r, err := h.companyService.Update(c.Request.Context(), ctx.OrganizationID, &req)
-	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al actualizar empresa", err); return }
+	if err != nil {
+		if errors.Is(err, domain.ErrCompanyDuplicateName) {
+			response.Error(c, http.StatusConflict, domain.ErrCompanyDuplicateName.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al actualizar empresa", err); return
+	}
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteEmpresa(c *gin.Context) {
@@ -150,7 +172,8 @@ func (h *CRMHandler) DeleteEmpresa(c *gin.Context) {
 func (h *CRMHandler) ListNegocios(c *gin.Context) {
 	ctx := auth.GetRequestContext(c); limit, offset := parsePagination(c)
 	r, err := h.dealService.List(c.Request.Context(), ctx.OrganizationID,
-		parseInt(c.Query("pipeline_id")), parseInt(c.Query("stage_id")), c.Query("estado"), limit, offset)
+		parseInt(c.Query("pipeline_id")), parseInt(c.Query("stage_id")), c.Query("estado"),
+		parseInt(c.Query("contact_id")), limit, offset)
 	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al listar negocios", err); return }
 	response.Success(c, http.StatusOK, r)
 }
@@ -239,7 +262,8 @@ func (h *CRMHandler) UpdateEtapa(c *gin.Context) {
 
 func (h *CRMHandler) ListActividades(c *gin.Context) {
 	ctx := auth.GetRequestContext(c); limit, offset := parsePagination(c)
-	r, err := h.activityService.ListByOrganization(c.Request.Context(), ctx.OrganizationID, c.Query("tipo"), limit, offset)
+	r, err := h.activityService.ListByOrganization(c.Request.Context(), ctx.OrganizationID,
+		c.Query("tipo"), c.Query("entity_type"), parseInt(c.Query("entity_id")), limit, offset)
 	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al listar actividades", err); return }
 	response.Success(c, http.StatusOK, r)
 }
@@ -284,8 +308,39 @@ func (h *CRMHandler) CreateEtiqueta(c *gin.Context) {
 	var req struct{ Nombre string `json:"nombre"`; Color string `json:"color"` }
 	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
 	r, err := h.tagService.Create(c.Request.Context(), ctx.OrganizationID, req.Nombre, req.Color)
-	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al crear etiqueta", err); return }
+	if err != nil {
+		if errors.Is(err, domain.ErrTagDuplicateName) {
+			response.Error(c, http.StatusConflict, domain.ErrTagDuplicateName.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al crear etiqueta", err); return
+	}
 	response.Success(c, http.StatusCreated, r)
+}
+func (h *CRMHandler) UpdateEtiqueta(c *gin.Context) {
+	ctx := auth.GetRequestContext(c)
+	var req struct{ Nombre string `json:"nombre"`; Color string `json:"color"` }
+	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Solicitud inválida", err); return }
+	r, err := h.tagService.Update(c.Request.Context(), ctx.OrganizationID, parseID(c), req.Nombre, req.Color)
+	if err != nil {
+		if errors.Is(err, domain.ErrTagDuplicateName) {
+			response.Error(c, http.StatusConflict, domain.ErrTagDuplicateName.Error(), err); return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al actualizar etiqueta", err); return
+	}
+	response.Success(c, http.StatusOK, r)
+}
+func (h *CRMHandler) ListEntityEtiquetas(c *gin.Context) {
+	entityType := domain.EntityType(c.Param("entityType"))
+	switch entityType {
+	case domain.EntityTypeContact, domain.EntityTypeCompany, domain.EntityTypeDeal:
+	default:
+		response.Error(c, http.StatusBadRequest, "Tipo de entidad inválido. Valores: contact, company, deal", nil)
+		return
+	}
+	entityID := parseIDGiven(c.Param("entityId"))
+	r, err := h.tagService.ListByEntity(c.Request.Context(), entityType, entityID)
+	if err != nil { response.Error(c, http.StatusInternalServerError, "Error al listar etiquetas", err); return }
+	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteEtiqueta(c *gin.Context) {
 	ctx := auth.GetRequestContext(c)

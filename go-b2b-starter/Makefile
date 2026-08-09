@@ -66,6 +66,10 @@ reload-profile:
 test:
 	@bash scripts/run_tests_with_coverage.sh
 
+# Run DB integration tests (requires Docker; spins up pgvector/pg16 via testcontainers)
+test-integration:
+	go test -count=1 -tags integration ./internal/db/postgres/sqlc/integration/...
+
 # Clear RBAC and JWKS caches from Redis
 clear-rbac-cache:
 	@echo "Clearing RBAC and JWKS Redis caches..."

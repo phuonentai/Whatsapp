@@ -165,6 +165,7 @@ func (r *subscriptionRepository) mapToDomainQuota(q *sqlc.SubscriptionBillingQuo
 		OrganizationID: q.OrganizationID,
 		InvoiceCount:   q.InvoiceCount,
 		MaxSeats:       helpers.FromPgInt4(q.MaxSeats),
+		AiCreditsMax:   q.AiCreditsMax,
 		PeriodStart:    q.PeriodStart.Time,
 		PeriodEnd:      q.PeriodEnd.Time,
 		CreatedAt:      q.CreatedAt.Time,

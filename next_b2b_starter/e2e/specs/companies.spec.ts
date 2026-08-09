@@ -19,6 +19,7 @@ test.describe("Empresas", () => {
     const row = await companiesPage.getRow(name);
     expect(row).not.toBeNull();
 
+    await row!.locator('button:has-text("Editar"), button[aria-label="Editar"]').click();
     await page.fill('input[name="name"]', `${name} Updated`);
     await page.getByRole("button", { name: /guardar/i }).click();
     await page.waitForTimeout(300);
@@ -45,5 +46,22 @@ test.describe("Empresas", () => {
     await page.getByRole("button", { name: /guardar|crear/i }).click();
     const error = page.locator("text=ya existe,text=duplicado");
     await expect(error).toBeVisible();
+  });
+
+  test("row click opens company detail view", async ({ page }) => {
+    await companiesPage.goto();
+
+    const name = `Detail Company ${Date.now()}`;
+    await companiesPage.create({ name, nit: `${Date.now()}` });
+
+    const row = await companiesPage.getRow(name);
+    await row!.click();
+    await page.waitForURL(/view=empresas&id=\d+/);
+
+    await expect(page.locator(`text=${name}`)).toBeVisible();
+    await expect(page.getByRole("button", { name: /volver/i })).toBeVisible();
+
+    await page.getByRole("button", { name: /volver/i }).click();
+    await page.waitForURL(/view=empresas$/);
   });
 });

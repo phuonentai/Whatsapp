@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/dig"
@@ -72,7 +73,11 @@ func SetupMiddleware(container *dig.Container) error {
 		orgResolver OrganizationResolver,
 		accResolver AccountResolver,
 	) *Middleware {
-		return NewMiddleware(provider, orgResolver, accResolver, nil)
+		config := DefaultMiddlewareConfig()
+		if os.Getenv("AUTH_MOCK_ENABLED") == "true" {
+			config.EnableMockAuth = true
+		}
+		return NewMiddleware(provider, orgResolver, accResolver, config)
 	}); err != nil {
 		return fmt.Errorf("failed to provide auth middleware: %w", err)
 	}

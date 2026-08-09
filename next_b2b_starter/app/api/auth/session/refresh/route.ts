@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { getStytchB2BClient } from "@/lib/auth/stytch/server";
 import {
@@ -15,6 +15,28 @@ import { isTokenExpired } from "@/lib/auth/token-utils";
 export async function POST() {
   try {
     const cookieStore = await cookies();
+
+    // Mock auth (E2E only): mint a mock session JWT so the client-side token
+    // resolution short-circuits instead of running the refresh retry dance.
+    // Mirrors the mock session support in lib/auth/stytch/server.ts.
+    if (process.env.AUTH_MOCK_ENABLED === "true") {
+      const headerStore = await headers();
+      const mockOrgId =
+        headerStore.get("x-test-org-id") ||
+        cookieStore.get("X-Test-Org-ID")?.value;
+      if (mockOrgId) {
+        const [orgSlug, email] = mockOrgId.split(":", 2);
+        const now = Math.floor(Date.now() / 1000);
+        const mockPayload = {
+          org: orgSlug,
+          email,
+          iat: now,
+          exp: now + 86400,
+        };
+        const mockJwt = `mock.${Buffer.from(JSON.stringify(mockPayload)).toString("base64url")}.sig`;
+        return NextResponse.json({ sessionJwt: mockJwt });
+      }
+    }
 
     // First, check if we already have a valid JWT
     const existingJwt = cookieStore.get(SESSION_JWT_COOKIE_NAME)?.value ?? null;

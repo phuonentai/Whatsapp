@@ -656,9 +656,9 @@ func supportsStop(model string) bool {
 }
 
 // GenerateEmbedding generates a vector embedding for the given text using OpenAI embeddings API
-func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model string) ([]float64, error) {
+func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model string) ([]float64, int, error) {
 	if text == "" {
-		return nil, fmt.Errorf("text cannot be empty")
+		return nil, 0, fmt.Errorf("text cannot be empty")
 	}
 
 	if model == "" {
@@ -672,12 +672,12 @@ func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model
 
 	jsonData, err := json.Marshal(embeddingReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal embedding request: %w", err)
+		return nil, 0, fmt.Errorf("failed to marshal embedding request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create embedding request: %w", err)
+		return nil, 0, fmt.Errorf("failed to create embedding request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -685,7 +685,7 @@ func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make embedding request: %w", err)
+		return nil, 0, fmt.Errorf("failed to make embedding request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -696,7 +696,7 @@ func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model
 			"response_body": string(body),
 			"model":         model,
 		})
-		return nil, fmt.Errorf("OpenAI embeddings API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, 0, fmt.Errorf("OpenAI embeddings API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var embeddingResp struct {
@@ -710,20 +710,20 @@ func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&embeddingResp); err != nil {
-		return nil, fmt.Errorf("failed to decode embedding response: %w", err)
+		return nil, 0, fmt.Errorf("failed to decode embedding response: %w", err)
 	}
 
 	if embeddingResp.Error != nil {
-		return nil, fmt.Errorf("OpenAI embeddings API error: %s", embeddingResp.Error.Message)
+		return nil, 0, fmt.Errorf("OpenAI embeddings API error: %s", embeddingResp.Error.Message)
 	}
 
 	if len(embeddingResp.Data) == 0 {
-		return nil, fmt.Errorf("no embedding data returned from OpenAI")
+		return nil, 0, fmt.Errorf("no embedding data returned from OpenAI")
 	}
 
 	embedding := embeddingResp.Data[0].Embedding
 	if len(embedding) == 0 {
-		return nil, fmt.Errorf("empty embedding returned from OpenAI")
+		return nil, 0, fmt.Errorf("empty embedding returned from OpenAI")
 	}
 
 	if c.config.DebugMode {
@@ -735,7 +735,7 @@ func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string, model
 		})
 	}
 
-	return embedding, nil
+	return embedding, embeddingResp.Usage.TotalTokens, nil
 }
 
 type streamResponse struct {

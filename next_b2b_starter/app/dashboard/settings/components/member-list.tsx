@@ -16,10 +16,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MoreVertical, Mail, UserMinus } from "lucide-react";
 import {
   OrganizationMember,
   MemberHelpers,
+  MemberRole,
 } from "@/lib/models/member.model";
 import { memberRepository } from "@/lib/api/api/repositories/member-repository";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +41,8 @@ interface MemberListProps {
   onMemberUpdate?: () => void;
 }
 
+const ROLE_OPTIONS: MemberRole[] = ["admin", "approver", "member"];
+
 export function MemberList({
   members,
   canManage,
@@ -42,6 +52,9 @@ export function MemberList({
   onMemberUpdate,
 }: MemberListProps) {
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
+  const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
+  const [roleErrorMemberId, setRoleErrorMemberId] = useState<string | null>(null);
+  const [roleErrorMessage, setRoleErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleRemoveMember = async (member: OrganizationMember) => {
@@ -97,6 +110,44 @@ export function MemberList({
     }
   };
 
+  const handleRoleChange = async (member: OrganizationMember, newRole: MemberRole) => {
+    if (newRole === member.role) return;
+
+    const memberName = member.name || member.email;
+    const currentLabel = MemberHelpers.getRoleConfig(member.role).label;
+    const targetLabel = MemberHelpers.getRoleConfig(newRole).label;
+    if (!confirm(`Change ${memberName}'s role from ${currentLabel} to ${targetLabel}?`)) {
+      return;
+    }
+
+    setRoleErrorMemberId(null);
+    setRoleErrorMessage(null);
+    setRoleChangingId(member.id);
+    try {
+      await memberRepository.updateMemberRole(member, newRole);
+      toast({
+        title: "Role updated",
+        description: `${memberName} is now ${targetLabel}`,
+      });
+      onMemberUpdate?.();
+    } catch (error) {
+      console.error("[MemberList] Role change error:", error);
+      const message = error instanceof Error ? error.message : "Failed to update role";
+      if (/last admin|admin.*remain|demote/i.test(message)) {
+        setRoleErrorMemberId(member.id);
+        setRoleErrorMessage("At least one admin must remain in the organization.");
+      } else {
+        toast({
+          title: "Error",
+          description: message || "Failed to update role. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setRoleChangingId(null);
+    }
+  };
+
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
       <Table>
@@ -125,6 +176,9 @@ export function MemberList({
             const statusConfig = MemberHelpers.getStatusConfig(member.status);
             const joinedDate = MemberHelpers.formatJoinedDate(member.joinedAt);
             const isCurrentUser = member.id === currentUserId;
+            const canEditRole = canManage && !isCurrentUser;
+            const isRoleChanging = roleChangingId === member.id;
+            const showRoleError = roleErrorMemberId === member.id && roleErrorMessage;
 
             return (
               <TableRow key={member.id} className="border-gray-100 hover:bg-gray-50/50 transition-colors">
@@ -144,11 +198,48 @@ export function MemberList({
                   </div>
                 </TableCell>
                 <TableCell className="py-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${roleConfig.color}`}
-                  >
-                    {roleConfig.label}
-                  </span>
+                  {canEditRole ? (
+                    <div className="w-40">
+                      <Select
+                        value={member.role}
+                        onValueChange={(value) =>
+                          handleRoleChange(member, value as MemberRole)
+                        }
+                        disabled={isRoleChanging || isFetching}
+                      >
+                        <SelectTrigger
+                          className="h-8 w-full justify-between text-left text-sm"
+                          aria-label={`Change role for ${member.name || member.email}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLE_OPTIONS.map((role) => {
+                            const cfg = MemberHelpers.getRoleConfig(role);
+                            return (
+                              <SelectItem key={role} value={role}>
+                                {cfg.label}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {showRoleError && (
+                        <p className="mt-1 text-xs text-red-600">{roleErrorMessage}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${roleConfig.color}`}
+                      >
+                        {roleConfig.label}
+                      </span>
+                      {showRoleError && (
+                        <p className="mt-1 text-xs text-red-600">{roleErrorMessage}</p>
+                      )}
+                    </>
+                  )}
                 </TableCell>
                 <TableCell className="py-4">
                   <span className="text-sm font-medium text-gray-700">{statusConfig.label}</span>

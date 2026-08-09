@@ -190,6 +190,23 @@ const nextConfig: NextConfig = {
       // Redirects have been removed for the starter kit
     ];
   },
+
+  async rewrites() {
+    // E2E/dev proxy: route browser API calls to the Go backend.
+    // CRM lives at /api/crm on the backend (no /v1); the WhatsApp module and
+    // webhooks mount under /api/v1. The frontend's own /api/auth and
+    // /api/session route handlers are intentionally NOT rewritten.
+    return [
+      {
+        source: "/api/crm/:path*",
+        destination: `${process.env.API_REWRITE_TARGET || "http://localhost:8080"}/api/crm/:path*`,
+      },
+      {
+        source: "/api/v1/:path*",
+        destination: `${process.env.API_REWRITE_TARGET || "http://localhost:8080"}/api/v1/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

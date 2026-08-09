@@ -152,6 +152,107 @@ func (s *ragService) Chat(ctx context.Context, orgID, accountID int32, req *doma
 	}, nil
 }
 
+func (s *ragService) ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error) (*domain.ChatResponse, error) {
+	var session *domain.ChatSession
+	var err error
+
+	// Get or create session (mirrors Chat).
+	if req.SessionID > 0 {
+		session, err = s.chatRepo.GetSessionByID(ctx, orgID, req.SessionID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get session: %w", err)
+		}
+	} else {
+		session = &domain.ChatSession{
+			OrganizationID: orgID,
+			AccountID:      accountID,
+			Title:          generateSessionTitle(req.Message),
+		}
+		session, err = s.chatRepo.CreateSession(ctx, session)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create session: %w", err)
+		}
+	}
+
+	// Save user message (mirrors Chat).
+	userMessage := &domain.ChatMessage{
+		SessionID: session.ID,
+		Role:      domain.ChatRoleUser,
+		Content:   req.Message,
+	}
+	userMessage, err = s.chatRepo.CreateMessage(ctx, userMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save user message: %w", err)
+	}
+
+	// Build context and prompt (mirrors Chat).
+	var referencedDocs []*domain.SimilarDocument
+	var prompt string
+
+	if req.UseRAG {
+		maxDocs := req.MaxDocuments
+		if maxDocs <= 0 {
+			maxDocs = DefaultMaxDocuments
+		}
+		embedding, err := s.textVectorizer.Vectorize(ctx, req.Message)
+		if err == nil {
+			docs, err := s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, int32(maxDocs))
+			if err == nil {
+				referencedDocs = docs
+			}
+		}
+		prompt = s.buildRAGPrompt(req.Message, referencedDocs)
+	} else {
+		prompt = req.Message
+	}
+
+	contextHistory := req.ContextHistory
+	if contextHistory <= 0 {
+		contextHistory = DefaultContextHistory
+	}
+	history, _ := s.chatRepo.GetRecentMessages(ctx, session.ID, int32(contextHistory))
+	fullPrompt := s.buildPromptWithHistory(prompt, history)
+
+	// Stream the assistant response.
+	response, err := s.assistantProvider.GenerateResponseStream(ctx, fullPrompt, emit)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrRAGCompletionFailed, err)
+	}
+
+	// Extract document IDs from referenced docs.
+	var docIDs []int32
+	for _, doc := range referencedDocs {
+		docIDs = append(docIDs, doc.DocumentID)
+	}
+
+	// Persist the assistant message with the final content + tokens.
+	assistantMessage := &domain.ChatMessage{
+		SessionID:      session.ID,
+		Role:           domain.ChatRoleAssistant,
+		Content:        response.Content,
+		ReferencedDocs: docIDs,
+		TokensUsed:     int32(response.TokensUsed),
+	}
+	assistantMessage, err = s.chatRepo.CreateMessage(ctx, assistantMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save assistant message: %w", err)
+	}
+
+	var docs []domain.SimilarDocument
+	for _, doc := range referencedDocs {
+		if doc != nil {
+			docs = append(docs, *doc)
+		}
+	}
+
+	return &domain.ChatResponse{
+		SessionID:      session.ID,
+		Message:        assistantMessage,
+		ReferencedDocs: docs,
+		TokensUsed:     int32(response.TokensUsed),
+	}, nil
+}
+
 func (s *ragService) GetSession(ctx context.Context, orgID, sessionID int32) (*domain.ChatSession, error) {
 	return s.chatRepo.GetSessionByID(ctx, orgID, sessionID)
 }

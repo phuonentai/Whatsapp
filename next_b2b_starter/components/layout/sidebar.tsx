@@ -14,9 +14,12 @@ import {
   Menu,
   X,
   BookOpen,
+  Inbox,
+  Contact,
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import type { ServerPermissions } from "@/lib/auth/server-permissions";
+import { useEntitlementQuery } from "@/lib/hooks/use-entitlement";
 import type { LucideIcon } from "lucide-react";
 
 interface NavigationItem {
@@ -25,6 +28,7 @@ interface NavigationItem {
   icon: LucideIcon;
   permission?: string;
   anyPermissions?: string[];
+  entitlementKeys?: string[];
 }
 
 const mainNavigation: NavigationItem[] = [
@@ -33,6 +37,26 @@ const mainNavigation: NavigationItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     // No permission required - everyone can see dashboard
+  },
+  {
+    name: "Inbox",
+    href: "/dashboard/inbox",
+    icon: Inbox,
+    // Page enforces org:manage; keep the entry aligned with that gate.
+    permission: "org:manage",
+  },
+  {
+    name: "CRM",
+    href: "/dashboard/crm",
+    icon: Contact,
+    // Show only when at least one CRM feature is entitled.
+    entitlementKeys: [
+      "crm_contacts_manage",
+      "crm_companies",
+      "crm_deals",
+      "crm_activities",
+      "crm_tags",
+    ],
   },
   {
     name: "Knowledge Base",
@@ -54,12 +78,20 @@ export function Sidebar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const isCollapsed = useSidebarStore((state) => state.isCollapsed);
+  const entitlement = useEntitlementQuery().data;
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   // Filter navigation items based on permissions
   const visibleNavigation = useMemo(() => {
     return mainNavigation.filter((item) => {
+      // Entitlement-gated items: hide when the entitlement payload is loaded and
+      // no feature key is enabled. While entitlements load, default to visible.
+      if (item.entitlementKeys) {
+        if (!entitlement) return true;
+        return item.entitlementKeys.some((key) => entitlement.funcionalidades?.[key] === true);
+      }
+
       // If no permission required, always show
       if (!item.permission && !("anyPermissions" in item)) return true;
 
@@ -78,7 +110,7 @@ export function Sidebar({
 
       return true;
     });
-  }, [permissions.permissions]);
+  }, [permissions.permissions, entitlement]);
 
   return (
     <>

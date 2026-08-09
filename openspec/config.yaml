@@ -122,5 +122,6 @@ rules:
 
   tasks:
     - "Cap execution tasks at a maximum duration of 2 hours per task unit."
-    - "Tag tasks with explicit domain prefixes: [BE-DOMAIN], [BE-INFRA], [DB-SQLC], or [FE-NEXT]."
+    - "Tag tasks with explicit domain prefixes: [BE-DOMAIN], [BE-INFRA], [DB-SQLC], [FE-NEXT], or [OPS-GOV] (workflow/tooling tasks)."
     - "Require verification criteria involving signature validation tests and mock fallback execution for all integration tasks."
+    - "Every task with verification criteria MUST name the exact verification command to run; the apply workflow runs these commands before reporting completion."

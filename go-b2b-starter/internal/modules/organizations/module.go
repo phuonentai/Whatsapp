@@ -58,8 +58,10 @@ func (m *Module) RegisterDependencies() error {
 	if err := m.container.Provide(func(
 		orgRepo domain.OrganizationRepository,
 		accountRepo domain.AccountRepository,
+		authOrgRepo domain.AuthOrganizationRepository,
+		authMemberRepo domain.AuthMemberRepository,
 	) services.OrganizationService {
-		return services.NewOrganizationService(orgRepo, accountRepo)
+		return services.NewOrganizationService(orgRepo, accountRepo, authOrgRepo, authMemberRepo)
 	}); err != nil {
 		return err
 	}

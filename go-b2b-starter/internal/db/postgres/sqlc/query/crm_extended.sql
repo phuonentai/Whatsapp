@@ -218,8 +218,9 @@ WHERE d.organization_id = $1
   AND ($2::int = 0 OR d.pipeline_id = $2)
   AND ($3::int = 0 OR d.stage_id = $3)
   AND (NULLIF($4, '') IS NULL OR d.estado = $4)
+  AND ($5::int = 0 OR d.contact_id = $5)
 ORDER BY d.created_at DESC
-LIMIT $5 OFFSET $6;
+LIMIT $6 OFFSET $7;
 
 -- name: UpdateDeal :one
 UPDATE crm.deals
@@ -272,8 +273,11 @@ FROM crm.activities a
 LEFT JOIN organizations.accounts acc ON acc.id = a.realizada_por
 WHERE a.organization_id = $1
   AND (NULLIF($2, '') IS NULL OR a.tipo = $2)
+  AND (NULLIF($3, '') IS NULL OR ($3 = 'contact' AND a.contact_id = $4::int)
+    OR ($3 = 'company' AND a.company_id = $4::int)
+    OR ($3 = 'deal' AND a.deal_id = $4::int))
 ORDER BY a.realizada_en DESC
-LIMIT $3 OFFSET $4;
+LIMIT $5 OFFSET $6;
 
 -- name: ListActivitiesByContact :many
 SELECT a.*,

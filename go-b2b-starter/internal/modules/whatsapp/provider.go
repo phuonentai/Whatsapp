@@ -18,8 +18,9 @@ func (p *Provider) RegisterDependencies() error {
 	if err := p.container.Provide(func(
 		webhookService services.WebhookService,
 		configService services.ConfigService,
+		signupService services.SignupService,
 	) *Handler {
-		return NewHandler(webhookService, configService)
+		return NewHandler(webhookService, configService, signupService)
 	}); err != nil {
 		return err
 	}

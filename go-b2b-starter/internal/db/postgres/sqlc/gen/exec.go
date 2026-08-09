@@ -23,3 +23,11 @@ func (store *SQLStore) execTx(ctx context.Context, fn func(*Queries) error) erro
 
 	return tx.Commit(ctx)
 }
+
+// Transaction executes fn within a database transaction, exposing a Store
+// bound to the transaction so callers can compose queries atomically.
+func (store *SQLStore) Transaction(ctx context.Context, fn func(Store) error) error {
+	return store.execTx(ctx, func(q *Queries) error {
+		return fn(&SQLStore{Queries: q})
+	})
+}

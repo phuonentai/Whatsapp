@@ -18,5 +18,6 @@ func NewTextVectorizer(llmClient llmdomain.LLMClient) domain.TextVectorizer {
 }
 
 func (v *openAITextVectorizer) Vectorize(ctx context.Context, text string) ([]float64, error) {
-	return v.llmClient.GenerateEmbedding(ctx, text, embeddingModel)
+	embedding, _, err := v.llmClient.GenerateEmbedding(ctx, text, embeddingModel)
+	return embedding, err
 }

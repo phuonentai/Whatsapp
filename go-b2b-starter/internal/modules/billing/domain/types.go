@@ -27,6 +27,7 @@ type QuotaTracking struct {
 	OrganizationID int32
 	InvoiceCount   int32 // Remaining invoices (decremented on use)
 	MaxSeats       int32
+	AiCreditsMax   int32 // Period AI credit allowance (0 = not configured)
 	PeriodStart    time.Time
 	PeriodEnd      time.Time
 	LastSyncedAt   *time.Time
@@ -55,6 +56,7 @@ type BillingStatus struct {
 	InvoiceCount          int32 // Remaining invoices
 	Reason                string
 	CheckedAt             time.Time
+	CheckoutURL           string // Redirect URL when a checkout session is initiated
 }
 
 // WebhookEvent represents a Polar webhook event
@@ -94,4 +96,5 @@ type CheckoutSessionResponse struct {
 	ProductID      string
 	Amount         int64
 	CreatedAt      time.Time
+	InitPoint      string // Hosted checkout redirect URL (MercadoPago)
 }

@@ -530,6 +530,79 @@ func (s *memberService) DeleteOrganizationMember(
 	return nil
 }
 
+// ChangeMemberRole updates a member's role in both the auth provider (Stytch) and
+// the local database. Stytch is updated first; on failure the local row is untouched.
+func (s *memberService) ChangeMemberRole(
+	ctx context.Context,
+	orgID, memberID, role string,
+) error {
+	if orgID == "" || memberID == "" {
+		return fmt.Errorf("organization ID and member ID are required")
+	}
+
+	role = strings.ToLower(strings.TrimSpace(role))
+	switch role {
+	case "admin", "approver", "member":
+	default:
+		return fmt.Errorf("%w: %s", domain.ErrInvalidRole, role)
+	}
+
+	// Resolve local organization from the auth provider org ID
+	localOrg, err := s.localOrgRepo.GetByStytchID(ctx, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve local organization: %w", err)
+	}
+
+	// Fetch the member to resolve their email
+	member, err := s.authMemberRepo.GetMember(ctx, orgID, memberID)
+	if err != nil {
+		return fmt.Errorf("failed to get member: %w", err)
+	}
+
+	// Resolve the local account by email
+	account, err := s.localAccountRepo.GetByEmail(ctx, localOrg.ID, member.Email)
+	if err != nil {
+		return fmt.Errorf("failed to resolve local account: %w", err)
+	}
+
+	// Last-admin guard: never demote the only remaining active admin
+	if account.Role == "admin" && role != "admin" {
+		accounts, listErr := s.localAccountRepo.ListByOrganization(ctx, localOrg.ID)
+		if listErr != nil {
+			return listErr
+		}
+		admins := 0
+		for _, a := range accounts {
+			if a.Role == "admin" && a.Status == "active" {
+				admins++
+			}
+		}
+		if admins <= 1 {
+			return domain.ErrLastAdminDemotion
+		}
+	}
+
+	// Sync to Stytch first (dual SSOT); reject the change on failure
+	if role != account.Role {
+		if err := s.authMemberRepo.AssignRoles(ctx, &domain.AssignAuthRolesRequest{
+			OrganizationID: orgID,
+			MemberID:       memberID,
+			Roles:          []string{role},
+		}); err != nil {
+			return fmt.Errorf("failed to sync member role to auth provider: %w", err)
+		}
+		account.Role = role
+		account.StytchRoleSlug = role
+	}
+
+	// Persist locally
+	if _, err := s.localAccountRepo.Update(ctx, account); err != nil {
+		return fmt.Errorf("failed to update local account role: %w", err)
+	}
+
+	return nil
+}
+
 // Returns true if email is found in any organization, false otherwise
 func (s *memberService) CheckEmailExists(ctx context.Context, email string) (bool, error) {
 	// Validate email format

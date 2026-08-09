@@ -11,9 +11,10 @@ import { DocumentSources } from "./document-sources";
 interface ChatMessageProps {
   message: ChatMessageType;
   sources?: SimilarDocument[];
+  streaming?: boolean;
 }
 
-export function ChatMessage({ message, sources }: ChatMessageProps) {
+export function ChatMessage({ message, sources, streaming = false }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -45,7 +46,10 @@ export function ChatMessage({ message, sources }: ChatMessageProps) {
           className="rounded-lg rounded-tl-sm px-3 py-2"
           style={{ backgroundColor: "#f3f4f6" }}
         >
-          <p className="text-sm whitespace-pre-wrap" style={{ color: "#111827" }}>{message.content}</p>
+          <p className="text-sm whitespace-pre-wrap" style={{ color: "#111827" }}>
+            {message.content}
+            {streaming && <span className="ml-0.5 inline-block h-3.5 w-0.5 align-middle animate-pulse" style={{ backgroundColor: "#7c3aed" }} />}
+          </p>
           <p className="text-xs mt-1" style={{ color: "#6b7280" }}>
             {ChatHelpers.formatTimestamp(message.createdAt)}
           </p>

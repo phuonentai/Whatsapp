@@ -4,7 +4,7 @@
  * Member and User Management Models
  */
 
-export type MemberRole = "admin" | "manager" | "member";
+export type MemberRole = "admin" | "approver" | "member";
 export type MemberStatus = "active" | "pending" | "inactive";
 
 /**
@@ -33,6 +33,7 @@ export interface UserProfile {
   role: MemberRole;
   organizationId: string;
   organizationName: string;
+  organizationStatus?: string;
 }
 
 /**
@@ -86,8 +87,8 @@ export const MemberHelpers = {
         color: "bg-blue-100 text-blue-700 border-blue-200",
         description: "Full system control and member management",
       },
-      manager: {
-        label: "Manager",
+      approver: {
+        label: "Approver",
         color: "bg-emerald-100 text-emerald-700 border-emerald-200",
         description: "Elevated access - edit, delete, and approve resources",
       },

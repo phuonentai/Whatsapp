@@ -183,6 +183,30 @@ func FromJSONB(b []byte) map[string]any {
 	return result
 }
 
+// ToJSONBArray converts a slice to JSON bytes for a JSONB array column
+func ToJSONBArray(items []any) []byte {
+	if items == nil {
+		return []byte("[]")
+	}
+	data, err := json.Marshal(items)
+	if err != nil {
+		return []byte("[]")
+	}
+	return data
+}
+
+// FromJSONBStringSlice converts JSON bytes to a string slice
+func FromJSONBStringSlice(b []byte) []string {
+	if len(b) == 0 {
+		return nil
+	}
+	var result []string
+	if err := json.Unmarshal(b, &result); err != nil {
+		return nil
+	}
+	return result
+}
+
 // ToVector converts a float64 slice to pgvector.Vector
 func ToVector(embedding []float64) pgvector.Vector {
 	// Convert []float64 to []float32 for pgvector

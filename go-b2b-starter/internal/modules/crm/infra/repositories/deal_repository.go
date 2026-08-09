@@ -37,10 +37,10 @@ func (r *dealRepository) GetByID(ctx context.Context, orgID, dealID int32) (*dom
 		ContactPhone: helpers.FromPgText(result.ContactPhone), CompanyName: helpers.FromPgText(result.CompanyName)}, nil
 }
 
-func (r *dealRepository) List(ctx context.Context, orgID int32, pipelineID, stageID int32, status string, limit, offset int32) ([]*domain.DealWithRefs, error) {
+func (r *dealRepository) List(ctx context.Context, orgID int32, pipelineID, stageID int32, status string, contactID, limit, offset int32) ([]*domain.DealWithRefs, error) {
 	results, err := r.store.ListDealsByOrganization(ctx, sqlc.ListDealsByOrganizationParams{
 		OrganizationID: orgID, Column2: pipelineID, Column3: stageID,
-		Column4: helpers.ToPgText(status), Limit: limit, Offset: offset,
+		Column4: helpers.ToPgText(status), Column5: contactID, Limit: limit, Offset: offset,
 	})
 	if err != nil { return nil, fmt.Errorf("failed to list deals: %w", err) }
 	deals := make([]*domain.DealWithRefs, len(results))

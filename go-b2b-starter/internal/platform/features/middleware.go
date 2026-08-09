@@ -92,6 +92,7 @@ func EntitlementMiddleware(provider FeatureProvider, getOrgCtx RequestContextFun
 				Features: make(map[string]bool),
 				Quotas:   make(map[string]int32),
 				Usage:    make(map[string]int32),
+				Modules:  make(map[string]ModuleState),
 			}
 		}
 

@@ -10,6 +10,11 @@ import {
   RefreshCcw,
   ArrowLeft,
   ChevronRight,
+  Boxes,
+  Bot,
+  ShieldCheck,
+  MessageCircle,
+  ScrollText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -21,6 +26,8 @@ import { InviteMember } from "./invite-member";
 import { MemberHelpers } from "@/lib/models/member.model";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
+import { useWhatsAppConfigQuery } from "@/lib/hooks/queries/use-whatsapp-config-query";
+import { WhatsAppConfigSection } from "./whatsapp-config-section";
 import {
   Card,
   CardContent,
@@ -38,6 +45,11 @@ import {
 } from "@/components/ui/dialog";
 import type { SubscriptionGateState } from "@/lib/polar/current-subscription";
 import { SubscriptionTab } from "./subscription-tab";
+import { ModulesSection } from "./modules-section";
+import { PlaybookSetupCard } from "./playbooks-section";
+import { AgentSettingsSection } from "./agent-settings-section";
+import { ComplianceSection } from "./compliance-section";
+import { AuditLogView } from "./audit-log-view";
 
 // Query hooks - Component depends ONLY on these hooks
 import { useProfileQuery } from "@/lib/hooks/queries/use-profile-query";
@@ -51,7 +63,7 @@ interface SettingsContentProps {
   // No props required - component fetches its own data
 }
 
-type SettingsView = "overview" | "profile" | "members" | "subscription";
+type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp";
 
 interface OverviewSection {
   key: Exclude<SettingsView, "overview">;
@@ -76,12 +88,41 @@ const DETAIL_META: Record<Exclude<SettingsView, "overview">, { title: string; de
     title: "Subscription & billing",
     description: "Review your subscription status, usage limits, and cancellation controls.",
   },
+  modules: {
+    title: "Modules",
+    description: "Enable product modules and adjust each one to your needs.",
+  },
+  ai: {
+    title: "AI Copilot",
+    description: "Configure the WhatsApp AI assistant: mode, tone, guardrails, and consent.",
+  },
+  compliance: {
+    title: "Compliance (Ley 1581)",
+    description: "Data consent, export, and right-to-erasure controls for your contacts.",
+  },
+  audit: {
+    title: "Audit log",
+    description: "Read-only record of activity across your organization.",
+  },
+  whatsapp: {
+    title: "Messaging",
+    description: "Connect and manage your WhatsApp Business integration.",
+  },
 };
 
 function parseViewParam(raw: string | null): SettingsView | null {
   if (!raw) return null;
   const normalized = raw.toLowerCase();
-  if (normalized === "profile" || normalized === "members" || normalized === "subscription") {
+  if (
+    normalized === "profile" ||
+    normalized === "members" ||
+    normalized === "subscription" ||
+    normalized === "modules" ||
+    normalized === "ai" ||
+    normalized === "compliance" ||
+    normalized === "audit" ||
+    normalized === "whatsapp"
+  ) {
     return normalized as SettingsView;
   }
   return null;
@@ -216,6 +257,7 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     isInitialized: permissionsReady,
   } = usePermissions();
   const canManageMembers = hasPermission(PERMISSIONS.ORG_MANAGE);
+  const canViewAudit = hasPermission(PERMISSIONS.AUDIT_VIEW);
   const hasSubscriptionPermission = hasPermission(PERMISSIONS.ORG_MANAGE);
   const shouldLoadSubscription = permissionsReady && hasSubscriptionPermission;
 
@@ -229,6 +271,50 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   const [viewStack, setViewStack] = useState<SettingsView[]>(["overview"]);
   const currentView = viewStack[viewStack.length - 1];
   const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+
+  // Render-phase sync of the settings view stack with the ?view= URL param.
+  // Guards prevent infinite loops; setState here is the React-sanctioned
+  // "adjust state during render" pattern (avoids setState-in-effect).
+  const [prevRequested, setPrevRequested] = useState<SettingsView | null>(null);
+  const requestedView = permissionsReady ? parseViewParam(viewParam) : null;
+  if (requestedView !== prevRequested) {
+    setPrevRequested(requestedView);
+    if (requestedView) {
+      const isAllowed =
+        (requestedView === "members" && canManageMembers) ||
+        (requestedView === "subscription" && hasSubscriptionPermission) ||
+        (requestedView === "ai" && canManageMembers) ||
+        (requestedView === "compliance" && canManageMembers) ||
+        (requestedView === "audit" && canViewAudit) ||
+        (requestedView === "whatsapp" && canManageMembers);
+      if (isAllowed) {
+        setViewStack((stack) =>
+          stack[stack.length - 1] === requestedView ? stack : ["overview", requestedView]
+        );
+      }
+    }
+  }
+
+  if (
+    currentView === "subscription" &&
+    !hasSubscriptionPermission &&
+    viewStack[viewStack.length - 1] !== "overview"
+  ) {
+    setViewStack(["overview"]);
+  }
+  if (
+    (currentView === "members" ||
+      currentView === "ai" ||
+      currentView === "compliance" ||
+      currentView === "whatsapp") &&
+    !canManageMembers &&
+    viewStack[viewStack.length - 1] !== "overview"
+  ) {
+    setViewStack(["overview"]);
+  }
+  if (currentView === "audit" && !canViewAudit && viewStack[viewStack.length - 1] !== "overview") {
+    setViewStack(["overview"]);
+  }
 
   // Track if we've shown the payment toast to prevent duplicates
   const paymentToastShownRef = useRef(false);
@@ -268,14 +354,22 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     if (!requested) return;
     if (requested === "members" && !canManageMembers) return;
     if (requested === "subscription" && !hasSubscriptionPermission) return;
+    if (requested === "ai" && !canManageMembers) return;
+    if (requested === "compliance" && !canManageMembers) return;
+    if (requested === "audit" && !canViewAudit) return;
+    if (requested === "whatsapp" && !canManageMembers) return;
 
+    // Intentionally syncs the view stack from the URL query param (deep links,
+    // refresh, back/forward). Cannot be derived during render without losing the
+    // in-app back-stack semantics.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setViewStack((stack) => {
       if (stack[stack.length - 1] === requested) {
         return stack;
       }
       return ["overview", requested];
     });
-  }, [permissionsReady, canManageMembers, hasSubscriptionPermission, viewParam]);
+  }, [permissionsReady, canManageMembers, hasSubscriptionPermission, canViewAudit, viewParam]);
 
   const pushView = (view: Exclude<SettingsView, "overview">) => {
     setViewStack((stack) => {
@@ -339,6 +433,10 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     enabled: shouldLoadSubscription,
   });
 
+  const { data: whatsappConfig } = useWhatsAppConfigQuery({
+    enabled: permissionsReady && canManageMembers,
+  });
+
   // Mutations
   const inviteMemberMutation = useInviteMember();
 
@@ -348,18 +446,6 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   const hasOrganization = Boolean(organizationId);
   const canInviteMembers = canManageMembers && hasOrganization;
   const canViewMembers = canManageMembers && hasOrganization;
-
-  useEffect(() => {
-    if (currentView === "subscription" && !hasSubscriptionPermission) {
-      setViewStack(["overview"]);
-    }
-  }, [currentView, hasSubscriptionPermission]);
-
-  useEffect(() => {
-    if (currentView === "members" && (!canManageMembers || !hasOrganization)) {
-      setViewStack(["overview"]);
-    }
-  }, [currentView, canManageMembers, hasOrganization]);
 
   const subscriptionQuick = useMemo(() => {
     if (!hasSubscriptionPermission) {
@@ -461,6 +547,57 @@ export function SettingsContent({}: SettingsContentProps = {}) {
       });
     }
 
+    sections.push({
+      key: "modules",
+      title: "Modules",
+      description: "Enable product modules and configure them for your workspace.",
+      value: "Manage modules",
+      helper: "Tickets, agents, analytics and more.",
+      icon: Boxes,
+    });
+
+    if (canManageMembers) {
+      sections.push({
+        key: "ai",
+        title: "AI Copilot",
+        description: "WhatsApp AI assistant: mode, tone, guardrails, consent.",
+        value: "Configure assistant",
+        helper: "Autopilot window, escalation rules and brand voice.",
+        icon: Bot,
+      });
+
+      sections.push({
+        key: "compliance",
+        title: "Compliance (Ley 1581)",
+        description: "Consent, data export, and right-to-erasure controls.",
+        value: "Manage data rights",
+        helper: "Habeas Data export and anonymization.",
+        icon: ShieldCheck,
+      });
+
+      const whatsAppValue = whatsappConfig?.businessPhone || "Not connected";
+      const whatsAppHelper = whatsappConfig ? "Active — manage your connection." : "Connect WhatsApp to receive messages";
+      sections.push({
+        key: "whatsapp",
+        title: "Messaging",
+        description: "Connect and manage your WhatsApp Business integration.",
+        value: whatsAppValue,
+        helper: whatsAppHelper,
+        icon: MessageCircle,
+      });
+    }
+
+    if (canViewAudit) {
+      sections.push({
+        key: "audit",
+        title: "Audit log",
+        description: "Read-only record of activity across the organization.",
+        value: "View activity",
+        helper: "Notes, calls, emails, tasks, and system events.",
+        icon: ScrollText,
+      });
+    }
+
     return sections;
   }, [
     profile,
@@ -474,6 +611,8 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     subscriptionQuick,
     isSubscriptionLoading,
     subscriptionErrorMessage,
+    canViewAudit,
+    whatsappConfig,
   ]);
 
   // Handle invite member
@@ -632,6 +771,36 @@ export function SettingsContent({}: SettingsContentProps = {}) {
             onRefresh={handleRefreshSubscription}
           />
         );
+      case "modules":
+        return <ModulesSection />;
+      case "ai":
+        return <AgentSettingsSection />;
+      case "compliance":
+        return <ComplianceSection />;
+      case "audit":
+        if (!canViewAudit) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Access restricted</AlertTitle>
+              <AlertDescription>
+                You don&apos;t have permission to view the audit log.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <AuditLogView />;
+      case "whatsapp":
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Access restricted</AlertTitle>
+              <AlertDescription>
+                You don&apos;t have permission to manage the WhatsApp integration.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <WhatsAppConfigSection />;
       default:
         return null;
     }
@@ -725,6 +894,8 @@ export function SettingsContent({}: SettingsContentProps = {}) {
           Open a section below to review the full details without the clutter.
         </p>
       </div>
+
+      <PlaybookSetupCard />
 
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
         <ul className="divide-y divide-gray-100">

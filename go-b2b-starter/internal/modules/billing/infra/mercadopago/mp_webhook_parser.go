@@ -12,9 +12,28 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 )
 
+// VerifyWebhookSignature verifies a MercadoPago IPN webhook signature.
+// It supports both the current MercadoPago format
+// ("ts=<timestamp>,v1=<hex hmac>" over "id:<id>;request-id:<request_id>;ts:<ts>;<body>")
+// and a plain raw-hex HMAC-SHA256 of the body (legacy/test clients).
 func VerifyWebhookSignature(payload []byte, signatureHeader string, secret string) error {
 	if secret == "" {
 		return fmt.Errorf("webhook secret is not configured")
+	}
+
+	params := parseSignatureParams(signatureHeader)
+	if ts, ok := params["ts"]; ok {
+		if v1, ok := params["v1"]; ok {
+			expected, err := hex.DecodeString(v1)
+			if err != nil {
+				return fmt.Errorf("invalid signature v1 format: %w", err)
+			}
+			signingInput := signatureSigningInput(payload, ts)
+			if hmacMatches(expected, []byte(secret), []byte(signingInput)) {
+				return nil
+			}
+			return fmt.Errorf("webhook signature mismatch")
+		}
 	}
 
 	expectedMAC, err := hex.DecodeString(signatureHeader)
@@ -31,6 +50,35 @@ func VerifyWebhookSignature(payload []byte, signatureHeader string, secret strin
 	}
 
 	return nil
+}
+
+func parseSignatureParams(header string) map[string]string {
+	params := make(map[string]string)
+	for _, part := range strings.Split(header, ",") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) == 2 {
+			params[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return params
+}
+
+// signatureSigningInput builds the MercadoPago signing input:
+// "id:<notification_id>;request-id:<request_id>;ts:<timestamp>;<raw body>".
+// id and request_id are read from the notification payload.
+func signatureSigningInput(payload []byte, ts string) string {
+	var notification struct {
+		ID        string `json:"id"`
+		RequestID string `json:"request_id"`
+	}
+	_ = json.Unmarshal(payload, &notification)
+	return fmt.Sprintf("id:%s;request-id:%s;ts:%s;%s", notification.ID, notification.RequestID, ts, payload)
+}
+
+func hmacMatches(expectedHex, secret, input []byte) bool {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write(input)
+	return hmac.Equal(expectedHex, mac.Sum(nil))
 }
 
 type MPWebhookPayload struct {

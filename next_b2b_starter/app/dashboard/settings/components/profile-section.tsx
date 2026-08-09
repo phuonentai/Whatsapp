@@ -1,16 +1,65 @@
 "use client";
 
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 import { UserProfile, MemberHelpers } from "@/lib/models/member.model";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { PERMISSIONS } from "@/lib/auth/permissions";
+import { queryKeys } from "@/lib/hooks/queries/query-keys";
+import { organizationRepository } from "@/lib/api/api/repositories/organization-repository";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface ProfileSectionProps {
   profile: UserProfile;
 }
 
 export function ProfileSection({ profile }: ProfileSectionProps) {
+  const { hasPermission, isInitialized } = usePermissions();
+  const canManage = isInitialized && hasPermission(PERMISSIONS.ORG_MANAGE);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState(
+    profile.organizationName || ""
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const roleConfig = MemberHelpers.getRoleConfig(profile.role);
   const displayName =
     profile.name?.trim() ||
     (profile.email ? profile.email.split("@")[0] : "AP Cash member");
+
+  const handleSaveWorkspace = async () => {
+    const name = workspaceName.trim();
+    if (!name) {
+      setValidationError("El nombre del workspace no puede estar vacío.");
+      return;
+    }
+    setValidationError(null);
+    setIsSaving(true);
+    try {
+      await organizationRepository.updateOrganization({
+        name,
+        status: profile.organizationStatus || "active",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.profile.all,
+      });
+      setIsEditing(false);
+      toast.success("Workspace actualizado");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo actualizar el workspace"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -63,13 +112,67 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
             Workspace
           </p>
-          <h3 className="text-xl font-semibold text-gray-900">
-            {profile.organizationName || "No workspace connected"}
-          </h3>
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-xl font-semibold text-gray-900">
+              {profile.organizationName || "No workspace connected"}
+            </h3>
+            {canManage && profile.organizationName && !isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setWorkspaceName(profile.organizationName);
+                  setIsEditing(true);
+                }}
+              >
+                Editar
+              </Button>
+            )}
+          </div>
           <p className="text-sm text-gray-600">
             Configure branding, invite collaborators, and manage approvals within this workspace.
           </p>
         </header>
+
+        {isEditing && (
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="workspace-name" className="text-sm font-medium">
+              Nombre del workspace
+            </Label>
+            <Input
+              id="workspace-name"
+              type="text"
+              value={workspaceName}
+              onChange={(e) => setWorkspaceName(e.target.value)}
+              disabled={isSaving}
+            />
+            {validationError && (
+              <p className="text-xs text-red-600">{validationError}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleSaveWorkspace}
+                disabled={isSaving}
+                className="bg-gray-900 text-white hover:bg-gray-800"
+              >
+                {isSaving ? "Guardando…" : "Guardar"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsEditing(false);
+                  setValidationError(null);
+                  setWorkspaceName(profile.organizationName || "");
+                }}
+                disabled={isSaving}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 space-y-4 text-sm">
           <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3">

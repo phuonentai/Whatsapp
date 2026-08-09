@@ -24,7 +24,15 @@ const COOKIE_OPTIONS = {
 } as const;
 
 export function StytchProvider({ children, config }: Props) {
+  // Mock auth (E2E only): the Stytch SDK cannot validate mock sessions, so
+  // skip the provider entirely. Consumers already handle a missing provider.
+  const mockAuth = process.env.NEXT_PUBLIC_AUTH_MOCK_ENABLED === "true";
+
   const stytchClient = useMemo(() => {
+    if (mockAuth) {
+      return null;
+    }
+
     if (!config.publicToken) {
       throw new Error(
         "NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN is required to initialize Stytch."
@@ -34,7 +42,11 @@ export function StytchProvider({ children, config }: Props) {
     return createStytchB2BUIClient(config.publicToken, {
       cookieOptions: COOKIE_OPTIONS,
     });
-  }, [config.publicToken]);
+  }, [config.publicToken, mockAuth]);
+
+  if (mockAuth) {
+    return <StytchConfigProvider config={config}>{children}</StytchConfigProvider>;
+  }
 
   return (
     <StytchB2BProvider stytch={stytchClient}>

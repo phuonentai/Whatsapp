@@ -15,6 +15,7 @@ interface ChatInterfaceProps {
   sessionTitle?: string;
   isLoading?: boolean;
   isSending?: boolean;
+  streamingMessageId?: number | null;
   onSendMessage: (message: string, useRag: boolean) => Promise<void>;
   onNewChat: () => void;
   messageSources?: Record<number, SimilarDocument[]>;
@@ -77,6 +78,7 @@ export function ChatInterface({
   sessionTitle,
   isLoading = false,
   isSending = false,
+  streamingMessageId = null,
   onSendMessage,
   onNewChat,
   messageSources,
@@ -143,9 +145,10 @@ export function ChatInterface({
               key={message.id}
               message={message}
               sources={messageSources?.[message.id]}
+              streaming={streamingMessageId === message.id}
             />
           ))}
-          {isSending && <TypingIndicator />}
+          {isSending && streamingMessageId === null && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>
       )}

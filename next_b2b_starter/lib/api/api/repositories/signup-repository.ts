@@ -10,18 +10,16 @@ import {
   SignupOwner,
   SignupResult,
 } from "@/lib/models/signup.model";
-import { generateSecurePassword } from "@/lib/utils/password-generator";
 
 class SignupRepository {
   // Legacy method with password (kept for backwards compatibility)
   async bootstrapOrganization(
-    owner: SignupOwner & { password?: string },
+    owner: SignupOwner,
     organization: SignupOrganization
   ): Promise<SignupResult> {
     const payload: BootstrapOrganizationRequestDto = {
       org_display_name: organization.displayName,
       owner_email: owner.email,
-      owner_password: owner.password || "", // Fallback for legacy
       owner_name: owner.fullName,
     };
 
@@ -39,23 +37,12 @@ class SignupRepository {
     owner: SignupOwner,
     organization: SignupOrganization
   ): Promise<SignupResult> {
-    // Generate a secure random password for backend compatibility
-    // Users won't see or use this - they authenticate via magic link
-    const securePassword = generateSecurePassword(24);
-
     const payload: SignupMagicLinkRequestDto = {
       org_display_name: organization.displayName,
       owner_email: owner.email,
       owner_name: owner.fullName,
-      owner_password: securePassword,
       industry: organization.industry || "Technology", // Fallback to Technology if not set
     };
-
-    // Debug logging (remove in production)
-    console.log("Signup payload being sent:", {
-      ...payload,
-      owner_password: "[REDACTED]", // Don't log actual password
-    });
 
     const response = await apiClient.post<SignupMagicLinkResponseDto>(
       "/auth/signup",

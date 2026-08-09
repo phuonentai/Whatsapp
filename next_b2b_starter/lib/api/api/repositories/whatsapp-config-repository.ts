@@ -4,17 +4,17 @@ import { WhatsAppConfig, WhatsAppConfigInput } from "@/lib/models/whatsapp-confi
 
 class WhatsAppConfigRepository {
   async getConfig(): Promise<WhatsAppConfig> {
-    const response = await apiClient.get<WhatsAppConfigDto>("/whatsapp/config");
+    const response = await apiClient.get<WhatsAppConfigDto>("/v1/whatsapp/config");
     return this.toModel(response);
   }
 
   async upsertConfig(input: WhatsAppConfigInput): Promise<WhatsAppConfig> {
-    const response = await apiClient.put<WhatsAppConfigDto>("/whatsapp/config", input);
+    const response = await apiClient.put<WhatsAppConfigDto>("/v1/whatsapp/config", input);
     return this.toModel(response);
   }
 
   async toggleConfig(): Promise<WhatsAppConfig> {
-    const response = await apiClient.patch<WhatsAppConfigDto>("/whatsapp/config/toggle");
+    const response = await apiClient.patch<WhatsAppConfigDto>("/v1/whatsapp/config/toggle");
     return this.toModel(response);
   }
 

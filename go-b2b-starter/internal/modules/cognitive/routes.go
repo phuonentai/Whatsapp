@@ -4,16 +4,28 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	serverDomain "github.com/moasq/go-b2b-starter/internal/platform/server/domain"
 )
 
+// FeatureAIAssistant gates AI routes (derived from subscription metadata).
+const FeatureAIAssistant = "ai_assistant"
+
 type Routes struct {
-	handler *Handler
+	handler         *Handler
+	featureProvider features.FeatureProvider
+	creditGuard     *AiCreditGuard
 }
 
-func NewRoutes(handler *Handler) *Routes {
+func NewRoutes(
+	handler *Handler,
+	featureProvider features.FeatureProvider,
+	creditGuard *AiCreditGuard,
+) *Routes {
 	return &Routes{
-		handler: handler,
+		handler:         handler,
+		featureProvider: featureProvider,
+		creditGuard:     creditGuard,
 	}
 }
 
@@ -22,11 +34,15 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 	cognitiveGroup.Use(
 		resolver.Get("auth"),
 		resolver.Get("org_context"),
+		features.EntitlementMiddleware(r.featureProvider, auth.GetRequestContext),
 		resolver.Get("subscription"),
 	)
 	{
-		// Chat endpoint
+		// Chat endpoint — gated by the ai_assistant feature flag, then by the
+		// AI credit guard (402 when period credits are exhausted).
 		cognitiveGroup.POST("/chat",
+			features.Require(FeatureAIAssistant),
+			r.creditGuard.RequireCredits(),
 			auth.RequirePermissionFunc("resource", "create"),
 			r.handler.Chat)
 

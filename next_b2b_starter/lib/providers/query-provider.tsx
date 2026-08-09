@@ -74,12 +74,13 @@ export function QueryProvider({ children }: QueryProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {process.env.NODE_ENV === "development" && (
-        <ReactQueryDevtools
-          initialIsOpen={false}
-          buttonPosition="bottom-right"
-        />
-      )}
+      {process.env.NODE_ENV === "development" &&
+        process.env.NEXT_PUBLIC_QUERY_DEVTOOLS !== "false" && (
+          <ReactQueryDevtools
+            initialIsOpen={false}
+            buttonPosition="bottom-right"
+          />
+        )}
     </QueryClientProvider>
   );
 }

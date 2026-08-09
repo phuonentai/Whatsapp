@@ -12,16 +12,20 @@ import (
 	// Domain interfaces - these are the interfaces we provide
 	billingDomain "github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 	cognitiveDomain "github.com/moasq/go-b2b-starter/internal/modules/cognitive/domain"
+	crmDomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	documentDomain "github.com/moasq/go-b2b-starter/internal/modules/documents/domain"
 	fileDomain "github.com/moasq/go-b2b-starter/internal/modules/files/domain"
 	orgDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
+	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
 
 	// Repository implementations from module infra layers
 	billingRepos "github.com/moasq/go-b2b-starter/internal/modules/billing/infra/repositories"
 	cognitiveRepos "github.com/moasq/go-b2b-starter/internal/modules/cognitive/infra/repositories"
+	crmRepos "github.com/moasq/go-b2b-starter/internal/modules/crm/infra/repositories"
 	documentRepos "github.com/moasq/go-b2b-starter/internal/modules/documents/infra/repositories"
 	fileInfra "github.com/moasq/go-b2b-starter/internal/modules/files/infra"
 	orgRepos "github.com/moasq/go-b2b-starter/internal/modules/organizations/infra/repositories"
+	whatsappRepos "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/infra/repositories"
 
 	// Legacy adapters - kept temporarily for backward compatibility
 	"github.com/moasq/go-b2b-starter/internal/db/adapters"
@@ -123,6 +127,13 @@ func registerDomainStores(container *dig.Container) error {
 		return fmt.Errorf("failed to provide subscription repository: %w", err)
 	}
 
+	// Register AiUsageRepository - implements billing/domain.AiUsageRepository
+	if err := container.Provide(func(sqlcStore sqlc.Store) billingDomain.AiUsageRepository {
+		return billingRepos.NewAiUsageRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide ai usage repository: %w", err)
+	}
+
 	// Register EmbeddingRepository - implements cognitive/domain.EmbeddingRepository
 	if err := container.Provide(func(sqlcStore sqlc.Store) cognitiveDomain.EmbeddingRepository {
 		return cognitiveRepos.NewEmbeddingRepository(sqlcStore)
@@ -135,6 +146,75 @@ func registerDomainStores(container *dig.Container) error {
 		return cognitiveRepos.NewChatRepository(sqlcStore)
 	}); err != nil {
 		return fmt.Errorf("failed to provide chat repository: %w", err)
+	}
+
+	// Register WhatsApp repositories - implement whatsapp/domain ports
+	if err := container.Provide(func(sqlcStore sqlc.Store) whatsappDomain.ConfigRepository {
+		return whatsappRepos.NewConfigRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide whatsapp config repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) whatsappDomain.WebhookLogRepository {
+		return whatsappRepos.NewWebhookLogRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide whatsapp webhook log repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) whatsappDomain.SignupFlowRepository {
+		return whatsappRepos.NewSignupFlowRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide whatsapp signup flow repository: %w", err)
+	}
+
+	// Register CRM repositories - implement crm/domain ports
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.ContactRepository {
+		return crmRepos.NewContactRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide contact repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.ConversationRepository {
+		return crmRepos.NewConversationRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide conversation repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.MessageRepository {
+		return crmRepos.NewMessageRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide message repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.CompanyRepository {
+		return crmRepos.NewCompanyRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide company repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.DealRepository {
+		return crmRepos.NewDealRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide deal repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.PipelineRepository {
+		return crmRepos.NewPipelineRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide pipeline repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.PipelineStageRepository {
+		return crmRepos.NewPipelineStageRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide pipeline stage repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.ActivityRepository {
+		return crmRepos.NewActivityRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide activity repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.TagRepository {
+		return crmRepos.NewTagRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide tag repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) crmDomain.EntityTagRepository {
+		return crmRepos.NewEntityTagRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide entity tag repository: %w", err)
 	}
 
 	// Register FileMetadataRepository - implements files/domain.FileMetadataRepository

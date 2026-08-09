@@ -32,7 +32,7 @@ export function useCompanyQuery(id: number) {
   });
 }
 
-export function useDealsQuery(params?: { pipeline_id?: number; stage_id?: number; estado?: string }) {
+export function useDealsQuery(params?: { pipeline_id?: number; stage_id?: number; estado?: string; contact_id?: number }) {
   return useQuery({
     queryKey: queryKeys.crm.deals(params),
     queryFn: () => crmRepository.listDeals(params),
@@ -55,7 +55,7 @@ export function usePipelinesQuery() {
   });
 }
 
-export function useActivitiesQuery(params?: { tipo?: string }) {
+export function useActivitiesQuery(params?: { tipo?: string; limit?: number; offset?: number }) {
   return useQuery({
     queryKey: queryKeys.crm.activities(params),
     queryFn: () => crmRepository.listActivities(params),
@@ -83,5 +83,13 @@ export function useTagsQuery() {
     queryKey: queryKeys.crm.tags(),
     queryFn: () => crmRepository.listTags(),
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useEntityTagsQuery(entityType: string, entityId: number) {
+  return useQuery({
+    queryKey: queryKeys.crm.entityTags(entityType, entityId),
+    queryFn: () => crmRepository.listEntityTags(entityType, entityId),
+    enabled: !!entityId,
   });
 }

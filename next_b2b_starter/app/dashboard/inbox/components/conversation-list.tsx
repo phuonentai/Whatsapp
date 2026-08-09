@@ -11,6 +11,7 @@ interface ConversationListProps {
   isLoading: boolean;
   statusFilter: string;
   onStatusFilterChange: (filter: string) => void;
+  pendingCounts?: Record<number, number>;
 }
 
 const statusTabs = [
@@ -40,6 +41,7 @@ export function ConversationList({
   isLoading,
   statusFilter,
   onStatusFilterChange,
+  pendingCounts,
 }: ConversationListProps) {
   return (
     <div className="flex h-full flex-col">
@@ -99,8 +101,15 @@ export function ConversationList({
                     <span className="truncate text-sm font-medium text-gray-900">
                       {conv.contactDisplayName || conv.contactPhone || "Unknown"}
                     </span>
-                    <span className="shrink-0 text-xs text-gray-400">
-                      {timeAgo(conv.lastMessageAt)}
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      {pendingCounts && pendingCounts[conv.id] > 0 && (
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-semibold text-white">
+                          {pendingCounts[conv.id]}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400">
+                        {timeAgo(conv.lastMessageAt)}
+                      </span>
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">

@@ -112,13 +112,31 @@ export function Header() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <LifeBuoy className="h-4 w-4" />
-                  <span className="sr-only">Support</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  asChild
+                >
+                  <a
+                    href={
+                      process.env.NEXT_PUBLIC_CONTACT_EMAIL ||
+                      "mailto:info@yourdomain.com"
+                    }
+                    aria-label="Support"
+                  >
+                    <LifeBuoy className="h-4 w-4" />
+                  </a>
                 </Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Settings className="h-4 w-4" />
-                  <span className="sr-only">Preferences</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  asChild
+                >
+                  <Link href="/dashboard/settings" aria-label="Preferences">
+                    <Settings className="h-4 w-4" />
+                  </Link>
                 </Button>
                 <UserMenu />
               </div>

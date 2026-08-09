@@ -7,24 +7,31 @@ import { ContactTable } from "@/components/crm/contact-table";
 import { CompanyTable } from "@/components/crm/company-table";
 import { DealKanban } from "@/components/crm/deal-kanban";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
-import { PipelineEditor } from "@/components/crm/pipeline-editor";
+import { PipelineView } from "@/components/crm/pipeline-view";
 import { TagManager } from "@/components/crm/tag-manager";
 import { UpgradeBanner } from "@/components/crm/upgrade-banner";
+import { ContactDetail } from "@/components/crm/contact-detail";
+import { CompanyDetail } from "@/components/crm/company-detail";
+import { DealDetail } from "@/components/crm/deal-detail";
+import { TicketsPanel } from "@/components/tickets/tickets-panel";
 
-type Tab = "contactos" | "empresas" | "negocios" | "actividad" | "etiquetas";
+type Tab = "contactos" | "empresas" | "negocios" | "actividad" | "etiquetas" | "pipelines" | "tickets";
 
-const TAB_LABELS: Record<Tab, { label: string; feature?: string; upgradePlan?: string }> = {
+const TAB_LABELS: Record<Tab, { label: string; feature?: string; upgradePlan?: string; module?: string }> = {
   contactos: { label: "Contactos" },
   empresas: { label: "Empresas", feature: "crm_companies", upgradePlan: "Pro" },
   negocios: { label: "Negocios", feature: "crm_deals", upgradePlan: "Pro" },
   actividad: { label: "Actividad", feature: "crm_activities", upgradePlan: "Pro" },
   etiquetas: { label: "Etiquetas", feature: "crm_tags", upgradePlan: "Enterprise" },
+  pipelines: { label: "Pipelines", feature: "crm_deals", upgradePlan: "Pro" },
+  tickets: { label: "Tickets", feature: "tickets_module", upgradePlan: "Tickets", module: "tickets" },
 };
 
 export function CRMPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const view = (searchParams.get("view") as Tab) || "contactos";
+  const detailId = Number(searchParams.get("id")) || 0;
   const features = useFeatures();
   const { data: entitlement, isLoading } = useEntitlementQuery();
 
@@ -78,24 +85,39 @@ export function CRMPage() {
           >
             {tab.label}
             {tab.disabled && tab.upgradePlan && (
-              <span className="ml-1 text-xs text-gray-400">(Pro)</span>
+              <span className="ml-1 text-xs text-gray-400">
+                {tab.key === "etiquetas" ? "Desbloquear con Enterprise" : `(${tab.upgradePlan})`}
+              </span>
             )}
           </button>
         ))}
       </div>
 
-      {view === "contactos" && <ContactTable />}
-      {view === "empresas" && (
-        entitlement?.funcionalidades?.crm_companies ? <CompanyTable /> : <UpgradeBanner feature="Empresas" plan="Pro" />
-      )}
-      {view === "negocios" && (
-        entitlement?.funcionalidades?.crm_deals ? <DealKanban /> : <UpgradeBanner feature="Negocios" plan="Pro" />
-      )}
+      {view === "contactos" &&
+        (detailId ? <ContactDetail id={detailId} /> : <ContactTable />)}
+      {view === "empresas" &&
+        (entitlement?.funcionalidades?.crm_companies ? (
+          detailId ? <CompanyDetail id={detailId} /> : <CompanyTable />
+        ) : (
+          <UpgradeBanner feature="Empresas" plan="Pro" />
+        ))}
+      {view === "negocios" &&
+        (entitlement?.funcionalidades?.crm_deals ? (
+          detailId ? <DealDetail id={detailId} /> : <DealKanban />
+        ) : (
+          <UpgradeBanner feature="Negocios" plan="Pro" />
+        ))}
       {view === "actividad" && (
         entitlement?.funcionalidades?.crm_activities ? <ActivityTimeline /> : <UpgradeBanner feature="Actividad" plan="Pro" />
       )}
       {view === "etiquetas" && (
         entitlement?.funcionalidades?.crm_tags ? <TagManager /> : <UpgradeBanner feature="Etiquetas" plan="Enterprise" />
+      )}
+      {view === "pipelines" && (
+        entitlement?.funcionalidades?.crm_deals ? <PipelineView /> : <UpgradeBanner feature="Pipelines" plan="Pro" />
+      )}
+      {view === "tickets" && (
+        entitlement?.funcionalidades?.tickets_module ? <TicketsPanel /> : <UpgradeBanner feature="Tickets" plan="Tickets" />
       )}
     </div>
   );
