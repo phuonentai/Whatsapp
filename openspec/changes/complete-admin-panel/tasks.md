@@ -8,9 +8,9 @@
 
 ## 1b. Backend: Stytch circuit breaker on outbound sync path
 
-- [x] 1b.1 [BE-INFRA] Add a two-tier circuit breaker (threshold 5, cooldown 10s, half-open probe 2) to the shared Stytch client (`internal/platform/stytch`) with a `Run(ctx, fn)` guard; parameters config-driven with the listed defaults. Verification: `cd go-b2b-starter && go build ./...`
-- [x] 1b.2 [BE-INFRA] Guard `stytchOrganizationRepository.UpdateOrganization` and `stytchMemberRepository.AssignRoles` via the client breaker; breaker-open fails fast and the service rejects with no local write. Verification: `cd go-b2b-starter && make test`
-- [x] 1b.3 [BE-INFRA] Add unit test: breaker-open blocks the call before reaching the SDK. Verification: `cd go-b2b-starter && make test`
+- [x] 1b.1 [BE-INFRA] Add a two-tier circuit breaker (threshold 5, cooldown 10s, half-open probe 2) to the shared Stytch client (`internal/platform/stytch`) with a `Run(ctx, fn)` guard; parameters config-driven with the listed defaults. Verification: `cd go-b2b-starter && go build ./...` — DONE: `circuit_breaker.go` + `Client.Run`; config knobs `STYTCH_CIRCUIT_BREAKER_THRESHOLD/TIMEOUT/HALF_OPEN_PROBES` with defaults in `config.go`; `go build ./...` EXIT 0.
+- [x] 1b.2 [BE-INFRA] Guard `stytchOrganizationRepository.UpdateOrganization` and `stytchMemberRepository.AssignRoles` via the client breaker; breaker-open fails fast and the service rejects with no local write. Verification: `cd go-b2b-starter && make test` — DONE: both calls wrapped in `client.Run`; breaker-open returns `ErrCircuitOpen` → service rejects before local write.
+- [x] 1b.3 [BE-INFRA] Add unit test: breaker-open blocks the call before reaching the SDK. Verification: `cd go-b2b-starter && make test` — DONE: `circuit_breaker_test.go` covers open-block (fn skipped), half-open recovery, context cancellation, client wiring; `go test ./internal/platform/stytch/...` PASS.
 
 ## 2. Frontend: navigation, header, WhatsApp settings view
 

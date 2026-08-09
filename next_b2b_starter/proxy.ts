@@ -54,39 +54,41 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Mock auth mode (test/dev only): the X-Test-Org-ID cookie/header grants access
+  // Mock auth mode (test/dev only): the X-Test-Org-ID cookie/header grants
+  // access. The mock context is ALSO injected as a cookie into the downstream
+  // request (and set on the response) so server components, route handlers,
+  // and rewrites all see it on the very first navigation.
   if (process.env.AUTH_MOCK_ENABLED === "true") {
     const mockOrg =
       request.cookies.get("X-Test-Org-ID")?.value ??
       request.headers.get("X-Test-Org-ID") ??
       "";
     if (mockOrg) {
-      return NextResponse.next();
+      const injectedCookie =
+        `X-Test-Org-ID=${encodeURIComponent(mockOrg)}` +
+        (request.headers.get("cookie")
+          ? `; ${request.headers.get("cookie")}`
+          : "");
+      const response = NextResponse.next({
+        request: {
+          headers: new Headers([
+            ...request.headers.entries(),
+            ["cookie", injectedCookie],
+          ]),
+        },
+      });
+      response.cookies.set("X-Test-Org-ID", mockOrg, {
+        path: "/",
+        maxAge: 3600,
+        sameSite: "lax",
+      });
+      return response;
     }
   }
 
   // 5. Check for session cookies
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME);
   const sessionJwt = request.cookies.get(SESSION_JWT_COOKIE_NAME);
-
-  // Mock auth (E2E only): bypass the session check when the X-Test-Org-ID
-  // context is present and AUTH_MOCK_ENABLED=true. Mirrors the mock session
-  // support in lib/auth/stytch/server.ts. Production path unchanged.
-  const mockAuthEnabled = process.env.AUTH_MOCK_ENABLED === "true";
-  const mockOrgId =
-    request.headers.get("x-test-org-id") ||
-    request.cookies.get("X-Test-Org-ID")?.value;
-  if (mockAuthEnabled && mockOrgId) {
-    // Persist the mock context as a cookie so server components, route
-    // handlers, and rewrites all see it (headers are not always forwarded).
-    const response = NextResponse.next();
-    response.cookies.set("X-Test-Org-ID", mockOrgId, {
-      path: "/",
-      maxAge: 3600,
-      sameSite: "lax",
-    });
-    return response;
-  }
 
   // If no session, redirect to login
   if (!sessionToken && !sessionJwt) {

@@ -175,7 +175,7 @@ export const getMemberSession = cache(
       const cookieStore = await cookies();
       const headerStore = await headers();
       const mockOrgId =
-        headerStore.get("x-test-org-id")?.value ||
+        headerStore.get("x-test-org-id") ||
         cookieStore.get("X-Test-Org-ID")?.value;
       if (mockOrgId) {
         const [orgSlug, email] = mockOrgId.split(":", 2);
