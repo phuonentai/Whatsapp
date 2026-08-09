@@ -41,6 +41,11 @@ var (
 	// Tickets (helpdesk module) permissions
 	PermTicketView   = NewPermission("ticket", "view")
 	PermTicketManage = NewPermission("ticket", "manage")
+
+	// CRM bulk export permissions
+	PermContactExport   = NewPermission("contact", "export")
+	PermDealExport      = NewPermission("deal", "export")
+	PermActivityExport  = NewPermission("activity", "export")
 )
 
 // AllPermissions is the complete list of all permissions in the system.
@@ -55,6 +60,9 @@ var AllPermissions = []Permission{
 	PermOrgManage,
 	PermTicketView,
 	PermTicketManage,
+	PermContactExport,
+	PermDealExport,
+	PermActivityExport,
 }
 
 // =============================================================================
@@ -115,6 +123,9 @@ var (
 			PermOrgView,
 			PermTicketView,
 			PermTicketManage,
+			PermContactExport,
+			PermDealExport,
+			PermActivityExport,
 		},
 	}
 

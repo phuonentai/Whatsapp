@@ -26,7 +26,12 @@ export class DealsKanbanPage {
 
   async getCard(name: string): Promise<Locator | null> {
     const card = this.board.locator(`[data-testid="deal-card"]:has-text("${name}")`);
-    return (await card.count()) > 0 ? card : null;
+    try {
+      await card.first().waitFor({ state: "attached", timeout: 3000 });
+      return card;
+    } catch {
+      return null;
+    }
   }
 
   async moveToStage(dealName: string, targetStage: string) {

@@ -420,25 +420,29 @@ func (s *memberService) GetCurrentUserProfile(
 	}
 
 	// Get member details from auth provider
-	member, err := s.authMemberRepo.GetMember(ctx, orgID, memberID)
-	if err != nil {
+	member, memberErr := s.authMemberRepo.GetMember(ctx, orgID, memberID)
+	if memberErr != nil && !errors.Is(memberErr, domain.ErrAuthConnection) {
 		s.logger.Error("failed to get member details", loggerDomain.Fields{
 			"org_id":    orgID,
 			"member_id": memberID,
-			"error":     err.Error(),
+			"error":     memberErr.Error(),
 		})
-		return nil, fmt.Errorf("failed to get member details: %w", err)
+		return nil, fmt.Errorf("failed to get member details: %w", memberErr)
 	}
 
 	// Get organization details from auth provider
-	organization, err := s.authOrgRepo.GetOrganization(ctx, orgID)
-	if err != nil {
+	organization, orgErr := s.authOrgRepo.GetOrganization(ctx, orgID)
+	if orgErr != nil && !errors.Is(orgErr, domain.ErrAuthConnection) {
 		s.logger.Error("failed to get organization details", loggerDomain.Fields{
 			"org_id": orgID,
-			"error":  err.Error(),
+			"error":  orgErr.Error(),
 		})
-		return nil, fmt.Errorf("failed to get organization details: %w", err)
+		return nil, fmt.Errorf("failed to get organization details: %w", orgErr)
 	}
+
+	// Development mode: the Stytch client is nil (placeholder credentials).
+	// Fall back to local data so the profile endpoint still works.
+	providerUnavailable := memberErr != nil || orgErr != nil
 
 	// Get local organization details (for database ID)
 	localOrg, err := s.localOrgRepo.GetByStytchID(ctx, orgID)
@@ -459,6 +463,28 @@ func (s *memberService) GetCurrentUserProfile(
 			"error":  err.Error(),
 		})
 		return nil, fmt.Errorf("failed to get local account: %w", err)
+	}
+
+	if providerUnavailable {
+		member = &domain.AuthMember{
+			MemberID:      memberID,
+			OrganizationID: orgID,
+			Email:         email,
+			Name:          localAccount.FullName,
+			Roles:         []string{localAccount.Role},
+			Status:        localAccount.Status,
+			EmailVerified: localAccount.StytchEmailVerified,
+			CreatedAt:     localAccount.CreatedAt,
+			UpdatedAt:     localAccount.UpdatedAt,
+		}
+		organization = &domain.AuthOrganization{
+			OrganizationID: orgID,
+			Slug:           localOrg.Slug,
+			DisplayName:    localOrg.Name,
+			Status:         localOrg.Status,
+			CreatedAt:      localOrg.CreatedAt,
+			UpdatedAt:      localOrg.UpdatedAt,
+		}
 	}
 
 	// Build profile response

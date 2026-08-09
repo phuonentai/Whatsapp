@@ -27,7 +27,12 @@ export class ActivitiesPage {
 
   async getActivity(subject: string): Promise<Locator | null> {
     const item = this.timeline.locator(`[data-testid="activity-item"]:has-text("${subject}")`);
-    return (await item.count()) > 0 ? item : null;
+    try {
+      await item.first().waitFor({ state: "attached", timeout: 3000 });
+      return item;
+    } catch {
+      return null;
+    }
   }
 
   async filterByType(type: string) {

@@ -28,7 +28,12 @@ export class AdminPanelPage {
 
   async hasSidebarEntry(name: string): Promise<boolean> {
     const entry = await this.sidebarEntry(name);
-    return (await entry.count()) > 0;
+    try {
+      await entry.first().waitFor({ state: "attached", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async openOverviewSection(title: string) {
@@ -46,7 +51,12 @@ export class AdminPanelPage {
 
   async getAuditLog(): Promise<Locator | null> {
     const list = this.auditLogList;
-    return (await list.count()) > 0 ? list : null;
+    try {
+      await list.first().waitFor({ state: "attached", timeout: 3000 });
+      return list;
+    } catch {
+      return null;
+    }
   }
 
   async filterAuditByType(type: string) {

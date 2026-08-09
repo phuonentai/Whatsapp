@@ -29,7 +29,12 @@ export class PipelinesPage {
 
   async getPipeline(name: string): Promise<Locator | null> {
     const item = this.pipelineList.locator(`text="${name}"`);
-    return (await item.count()) > 0 ? item : null;
+    try {
+      await item.first().waitFor({ state: "attached", timeout: 3000 });
+      return item;
+    } catch {
+      return null;
+    }
   }
 
   async editStage(stageName: string, newName: string) {

@@ -26,7 +26,12 @@ export class TagsPage {
 
   async getTag(name: string): Promise<Locator | null> {
     const tag = this.tagList.locator(`text="${name}"`);
-    return (await tag.count()) > 0 ? tag : null;
+    try {
+      await tag.first().waitFor({ state: "attached", timeout: 3000 });
+      return tag;
+    } catch {
+      return null;
+    }
   }
 
   async delete(name: string) {

@@ -24,12 +24,22 @@ export class InboxPage {
 
   async getConversation(phoneOrName: string): Promise<Locator | null> {
     const row = this.page.locator(`button:has-text("${phoneOrName}")`).first();
-    return (await row.count()) > 0 ? row : null;
+    try {
+      await row.first().waitFor({ state: "attached", timeout: 3000 });
+      return row;
+    } catch {
+      return null;
+    }
   }
 
   async hasMessage(text: string): Promise<boolean> {
     const msg = this.page.locator(`[data-testid="message-thread"] :text("${text}")`).first();
-    return (await msg.count()) > 0;
+    try {
+      await msg.waitFor({ state: "attached", timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** Switch the status filter tab (All / Active / Closed / Archived). */

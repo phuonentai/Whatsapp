@@ -35,7 +35,12 @@ export class CompaniesPage {
 
   async getRow(name: string): Promise<Locator | null> {
     const row = this.table.locator(`tr:has-text("${name}")`);
-    return (await row.count()) > 0 ? row : null;
+    try {
+      await row.first().waitFor({ state: "attached", timeout: 3000 });
+      return row;
+    } catch {
+      return null;
+    }
   }
 
   async delete(name: string) {
