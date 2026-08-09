@@ -61,6 +61,7 @@ run-e2e:
     - cd ../go-b2b-starter
     - curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xz
     - ./migrate -path internal/db/postgres/sqlc/migrations -database "$DATABASE_URL" up
+    - POSTGRES_HOST=postgres POSTGRES_PORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres POSTGRES_DB=saas_db_test SKIP_MIGRATIONS=true AUTH_MOCK_ENABLED=true go run ./cmd/seed-e2e
     - AUTH_MOCK_ENABLED=true DATABASE_URL="$DATABASE_URL" go run ./cmd/api/main.go &
     - cd ../next_b2b_starter && pnpm dev -p 3001 &
     - sleep 10
