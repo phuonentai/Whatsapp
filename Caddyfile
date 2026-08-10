@@ -38,8 +38,16 @@
 		reverse_proxy backend:8080
 	}
 
-	# Backend health check (optional, for container orchestration)
+	# Backend health checks (liveness + readiness, for container orchestration)
 	handle /health {
+		reverse_proxy backend:8080
+	}
+
+	handle /healthz {
+		reverse_proxy backend:8080
+	}
+
+	handle /readyz {
 		reverse_proxy backend:8080
 	}
 

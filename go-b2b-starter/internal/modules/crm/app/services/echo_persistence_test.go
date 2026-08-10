@@ -53,8 +53,8 @@ func (f *fakeEchoConvRepo) UpdateLastMessageAt(_ context.Context, _ int32, _ int
 
 type fakeEchoMsgRepo struct {
 	domain.MessageRepository
-	inserted  bool
-	lastMsg   *domain.Message
+	inserted    bool
+	lastMsg     *domain.Message
 	insertCalls int
 }
 
@@ -91,6 +91,7 @@ func newEchoCRMService(msgRepo *fakeEchoMsgRepo, actRepo *fakeEchoActivityRepo) 
 		&fakeEchoConvRepo{},
 		msgRepo,
 		actRepo,
+		nil, // outbox: unused on the WhatsApp echo path
 		noEntitlement{},
 		noopLogger{},
 	)
@@ -121,7 +122,7 @@ func TestProcessEchoMessage_PersistsOutbound(t *testing.T) {
 	if msgRepo.lastMsg.Direction != domain.MessageDirectionOutbound {
 		t.Fatalf("expected outbound direction, got %s", msgRepo.lastMsg.Direction)
 	}
-	if msgRepo.lastMsg.OrganizationID != 7 || msgRepo.lastMsg.ContactID != 1 || msgRepo.lastMsg.WhatsAppMessageID != "wamid.echo1" {
+	if msgRepo.lastMsg.OrganizationID != 7 || msgRepo.lastMsg.ContactID != 1 || msgRepo.lastMsg.ProviderMessageID != "wamid.echo1" {
 		t.Fatalf("unexpected message: %+v", msgRepo.lastMsg)
 	}
 	if msgRepo.lastMsg.MessageData["origin"] != "echo" {
@@ -165,6 +166,7 @@ func TestEchoListener_ErrorPropagated(t *testing.T) {
 		&fakeEchoConvRepo{},
 		&failingMsgRepo{failing},
 		&fakeEchoActivityRepo{},
+		nil, // outbox: unused on the WhatsApp echo path
 		noEntitlement{},
 		noopLogger{},
 	)

@@ -11,9 +11,10 @@ interface ReplyInputProps {
   conversationId: number;
   value?: string;
   onChange?: (value: string) => void;
+  onSent?: () => void;
 }
 
-export function ReplyInput({ onSend, isSending, conversationId, value, onChange }: ReplyInputProps) {
+export function ReplyInput({ onSend, isSending, conversationId, value, onChange, onSent }: ReplyInputProps) {
   const [internalText, setInternalText] = useState("");
 
   const isControlled = value !== undefined && onChange !== undefined;
@@ -31,6 +32,7 @@ export function ReplyInput({ onSend, isSending, conversationId, value, onChange 
     if (!text.trim() || isSending) return;
     await onSend(text.trim());
     setText("");
+    onSent?.();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

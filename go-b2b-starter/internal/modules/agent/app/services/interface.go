@@ -4,14 +4,19 @@ import (
 	"context"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	igEvents "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 )
 
-// AgentService drives the agentic WhatsApp assistant pipeline.
+// AgentService drives the agentic messaging assistant pipeline.
 type AgentService interface {
 	// HandleMessageReceived runs the pipeline for an inbound WhatsApp event
 	// (analysis, consent, guardrails, copilot draft or autopilot send).
 	HandleMessageReceived(ctx context.Context, event *whatsappEvents.MessageReceived) error
+
+	// HandleInstagramMessageReceived runs the same pipeline for an inbound
+	// Instagram DM (IG mid as provider message id).
+	HandleInstagramMessageReceived(ctx context.Context, event *igEvents.MessageReceived) error
 
 	// ApproveSuggestion sends a pending suggestion after guardrail evaluation.
 	// The suggestion is sent only when the decision is allow; denials are
@@ -23,6 +28,10 @@ type AgentService interface {
 
 	// ListPendingSuggestions returns the org's pending queue.
 	ListPendingSuggestions(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.Suggestion, error)
+
+	// SeedPendingSuggestion inserts a pending reply suggestion for a
+	// conversation without running the LLM pipeline (mock-auth test seeding).
+	SeedPendingSuggestion(ctx context.Context, orgID, conversationID int32, body string) (*domain.Suggestion, error)
 
 	// GetFlowDebug returns the latest flow for a conversation with its suggestions.
 	GetFlowDebug(ctx context.Context, orgID, conversationID int32) (*FlowDebug, error)
@@ -69,8 +78,8 @@ type ContactExport struct {
 
 // ConversationExport is one conversation with its messages.
 type ConversationExport struct {
-	ID       int32           `json:"id"`
-	Status   string          `json:"status"`
+	ID       int32            `json:"id"`
+	Status   string           `json:"status"`
 	Messages []*MessageExport `json:"messages"`
 }
 

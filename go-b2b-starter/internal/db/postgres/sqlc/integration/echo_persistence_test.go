@@ -27,7 +27,8 @@ func TestEchoMessageConcurrentDeliveriesYieldOneRow(t *testing.T) {
 			OrganizationID:    orgA,
 			ConversationID:    convID,
 			ContactID:         contactID,
-			WhatsappMessageID: helpers.ToPgText("wamid-echo-1"),
+			Channel:           "whatsapp",
+			ProviderMessageID: helpers.ToPgText("wamid-echo-1"),
 			Direction:         "outbound",
 			MessageType:       "text",
 			Content:           helpers.ToPgText("sent from the phone app"),
@@ -80,8 +81,8 @@ func TestEchoMessageConcurrentDeliveriesYieldOneRow(t *testing.T) {
 	if rows[0].Direction != "outbound" {
 		t.Fatalf("expected direction outbound, got %s", rows[0].Direction)
 	}
-	if rows[0].WhatsappMessageID.String != "wamid-echo-1" {
-		t.Fatalf("expected wamid-echo-1, got %s", rows[0].WhatsappMessageID.String)
+	if rows[0].ProviderMessageID.String != "wamid-echo-1" {
+		t.Fatalf("expected wamid-echo-1, got %s", rows[0].ProviderMessageID.String)
 	}
 }
 
@@ -95,7 +96,8 @@ func TestEchoMessageDuplicateSequentialReturnsExisting(t *testing.T) {
 			OrganizationID:    orgA,
 			ConversationID:    convID,
 			ContactID:         contactID,
-			WhatsappMessageID: helpers.ToPgText("wamid-echo-2"),
+			Channel:           "whatsapp",
+			ProviderMessageID: helpers.ToPgText("wamid-echo-2"),
 			Direction:         "outbound",
 			MessageType:       "text",
 			Content:           helpers.ToPgText("dup echo"),
@@ -117,9 +119,10 @@ func TestEchoMessageDuplicateSequentialReturnsExisting(t *testing.T) {
 		t.Fatalf("expected pgx.ErrNoRows, got %v", err)
 	}
 
-	existing, err := testStore.GetMessageByWhatsAppID(ctx, sqlc.GetMessageByWhatsAppIDParams{
+	existing, err := testStore.GetMessageByProviderID(ctx, sqlc.GetMessageByProviderIDParams{
 		OrganizationID:    orgA,
-		WhatsappMessageID: helpers.ToPgText("wamid-echo-2"),
+		Channel:           "whatsapp",
+		ProviderMessageID: helpers.ToPgText("wamid-echo-2"),
 	})
 	if err != nil {
 		t.Fatalf("fetch existing: %v", err)

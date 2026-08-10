@@ -81,6 +81,10 @@ func (p *billingFeatureProvider) GetEntitlement(ctx context.Context, orgID int32
 	}, nil
 }
 
+// defaultGrantedModules are always enabled for active subscriptions,
+// independent of purchased product metadata (read-only base features).
+var defaultGrantedModules = []string{"analytics"}
+
 // resolveModules determines per-org module state from subscription metadata
 // module keys (e.g., "module_tickets") merged with stored per-org configs.
 // Inactive subscriptions never receive module features.
@@ -97,8 +101,10 @@ func (p *billingFeatureProvider) resolveModules(
 
 	metadataKeys := parseModuleKeys(metadata)
 	if len(metadataKeys) == 0 {
-		return result
+		metadataKeys = []string{}
 	}
+	// Base-plan modules are always granted to active subscriptions.
+	metadataKeys = append(metadataKeys, defaultGrantedModules...)
 
 	active, err := p.moduleService.ListCatalogInternal(ctx)
 	if err != nil {

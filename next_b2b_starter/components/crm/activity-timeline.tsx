@@ -2,7 +2,11 @@
 
 import { useActivitiesQuery } from "@/lib/hooks/queries/use-crm-queries";
 import { useCreateActivity } from "@/lib/hooks/mutations/use-crm-mutations";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { useState } from "react";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
 
 const TIPO_OPTIONS = [
   { value: "nota", label: "Nota" },
@@ -24,6 +28,22 @@ export function ActivityTimeline() {
   const [fechaVencimiento, setFechaVencimiento] = useState("");
 
   const isTarea = tipo === "tarea";
+
+  const { hasPermission } = usePermissions();
+  const canExport = hasPermission("activity:export");
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await crmRepository.exportActivities();
+      toast.success("Actividades exportadas");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al exportar actividades");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleSubmit = () => {
     createActivity.mutate({
@@ -69,6 +89,16 @@ export function ActivityTimeline() {
           >
             {showForm ? "Cancelar" : "Nueva actividad"}
           </button>
+          {canExport && (
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? "Exportando..." : "Exportar"}
+            </button>
+          )}
         </div>
       </div>
 

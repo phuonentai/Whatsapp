@@ -15,6 +15,7 @@ import (
 	crmDomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	documentDomain "github.com/moasq/go-b2b-starter/internal/modules/documents/domain"
 	fileDomain "github.com/moasq/go-b2b-starter/internal/modules/files/domain"
+	instagramDomain "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain"
 	orgDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
 
@@ -24,6 +25,7 @@ import (
 	crmRepos "github.com/moasq/go-b2b-starter/internal/modules/crm/infra/repositories"
 	documentRepos "github.com/moasq/go-b2b-starter/internal/modules/documents/infra/repositories"
 	fileInfra "github.com/moasq/go-b2b-starter/internal/modules/files/infra"
+	instagramRepos "github.com/moasq/go-b2b-starter/internal/modules/instagram/infra/repositories"
 	orgRepos "github.com/moasq/go-b2b-starter/internal/modules/organizations/infra/repositories"
 	whatsappRepos "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/infra/repositories"
 
@@ -163,6 +165,18 @@ func registerDomainStores(container *dig.Container) error {
 		return whatsappRepos.NewSignupFlowRepository(sqlcStore)
 	}); err != nil {
 		return fmt.Errorf("failed to provide whatsapp signup flow repository: %w", err)
+	}
+
+	// Register Instagram repositories - implement instagram/domain ports
+	if err := container.Provide(func(sqlcStore sqlc.Store) instagramDomain.ConfigRepository {
+		return instagramRepos.NewConfigRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide instagram config repository: %w", err)
+	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) instagramDomain.WebhookLogRepository {
+		return instagramRepos.NewWebhookLogRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide instagram webhook log repository: %w", err)
 	}
 
 	// Register CRM repositories - implement crm/domain ports

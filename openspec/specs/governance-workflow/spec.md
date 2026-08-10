@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the OpenSpec governance workflow: premise validation before delta specs, verification gate before completion, and archive decision.
+
+## Requirements
 
 ### Requirement: Premise validation before writing delta specs
 
@@ -72,3 +76,19 @@ The repository SHALL document the three gates (premise validation, verification 
 - **WHEN** an agent reads AGENTS.md
 - **THEN** the Mandatory Workflow section SHALL describe the premise validation step for proposals, the verification gate for apply, and the archive-after-completion rule
 - **AND** it SHALL warn that `openspec update` may regenerate `.opencode/skills/` files and overwrite local edits
+
+### Requirement: Verification commands are runnable
+
+The apply workflow SHALL only record verification commands in `tasks.md` that are runnable with the project's current toolchain, and the repository SHALL maintain tooling (scripts, configs, dependencies) that makes each recorded command executable without workarounds. Frontend lint verification SHALL reference a Next-16-compatible invocation (`pnpm lint` backed by `eslint .` with flat config); a change SHALL NOT defer a verification command as "blocked by pre-existing tooling" without an owning change that restores the tooling.
+
+#### Scenario: Lint command is runnable
+
+- **WHEN** a frontend change records `pnpm lint` as a verification command
+- **THEN** the command SHALL execute with the project's flat ESLint configuration
+- **AND** the change SHALL NOT be reported complete unless the command exits zero OR the remaining violations are recorded verbatim as a documented baseline in `tasks.md` with a follow-up change created to clear them
+
+#### Scenario: Tooling is broken
+
+- **WHEN** a verification command cannot run with the current toolchain (e.g., `next lint` removed, legacy config incompatible)
+- **THEN** the failure SHALL be recorded in `tasks.md`
+- **AND** a separate owning change SHALL be created to restore the tooling before the dependent change can pass its verification gate

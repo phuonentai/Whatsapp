@@ -378,6 +378,64 @@ Get Stytch credentials from: https://stytch.com/dashboard
 
 ---
 
+## 🧪 E2E Tests
+
+The Playwright suite (`next_b2b_starter/e2e/`, 61 tests across 13 specs) runs fully offline using mock auth. No Stytch, Meta, or billing credentials are required.
+
+### Canonical e2e environment
+
+| Component | Value |
+|-----------|-------|
+| Go backend | `:8080` (`SERVER_ADDRESS=:8080`) |
+| Next.js frontend | `:3001` (`pnpm dev -p 3001`) |
+| Test database | `saas_db_test` |
+| Auth | `AUTH_MOCK_ENABLED=true` (`X-Test-Org-ID: <slug>:<email>`) |
+| Mock orgs | `test-org-free`, `test-org-pro`, `test-org-enterprise`, `test-org-rbac` |
+
+`next_b2b_starter/.env.local` already carries the e2e values (`API_REWRITE_TARGET=http://localhost:8080`, `APP_BASE_URL=http://localhost:3001`). E2E helper defaults in `e2e/helpers/` point at `:8080`.
+
+### One-command run
+
+```bash
+# From go-b2b-starter/ — boots infra, migrates, seeds, starts both servers, runs suite, cleans up
+make test-e2e
+```
+
+Prerequisites: Docker (root `docker-compose.yml` postgres + redis), Go 1.25, pnpm, and a Playwright chromium install:
+
+```bash
+pnpm --dir next_b2b_starter exec playwright install chromium
+```
+
+`make test-e2e` is the local equivalent of the CI `e2e` job in `.github/workflows/ci.yml`, so the two cannot drift.
+
+### Running the pieces manually
+
+```bash
+# 1. Infra + test DB (postgres/redis from docker-compose.yml)
+docker compose -f docker-compose.yml up -d postgres redis
+docker compose -f docker-compose.yml exec -T postgres createdb -U postgres saas_db_test 2>/dev/null || true
+
+# 2. Migrate + seed
+POSTGRES_DB=saas_db_test docker compose -f docker-compose.yml run --rm migrate
+POSTGRES_HOST=localhost POSTGRES_DB=saas_db_test AUTH_MOCK_ENABLED=true go run ./cmd/seed-e2e
+
+# 3. Backend (mock auth, :8080)
+AUTH_MOCK_ENABLED=true SERVER_ADDRESS=:8080 go run ./cmd/api/main.go &
+
+# 4. Frontend (:3001, reads .env.local)
+pnpm --dir next_b2b_starter dev -p 3001 &
+
+# 5. Suite
+pnpm --dir next_b2b_starter test:e2e
+```
+
+### CI
+
+Push/pull requests run `.github/workflows/ci.yml` (backend unit tests, frontend lint+build, offline e2e). The workflow also fails if `AUTH_MOCK_ENABLED=true` ever appears in production configuration.
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Docker containers won't start

@@ -28,6 +28,13 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 
 	crmGroup.GET("/entitlement", r.handler.GetEntitlement)
 
+	crmGroup.GET("/export/contactos.csv", auth.RequirePermissionFunc("contact", "export"), r.handler.ExportContactos)
+	crmGroup.GET("/export/empresas.csv", features.Require(crmDomain.FeatureCompanies), auth.RequirePermissionFunc("contact", "export"), r.handler.ExportEmpresas)
+	crmGroup.GET("/export/negocios.csv", features.Require(crmDomain.FeatureDeals), auth.RequirePermissionFunc("deal", "export"), r.handler.ExportNegocios)
+	crmGroup.GET("/export/actividades.csv", features.Require(crmDomain.FeatureActivities), auth.RequirePermissionFunc("activity", "export"), r.handler.ExportActividades)
+	crmGroup.GET("/import/contactos/template.csv", auth.RequirePermissionFunc("contact", "view"), r.handler.ImportContactosTemplate)
+	crmGroup.POST("/import/contactos", auth.RequirePermissionFunc("contact", "manage"), r.handler.ImportContactos)
+
 	contactos := crmGroup.Group("/contactos")
 	contactos.GET("", auth.RequirePermissionFunc("contact", "view"), r.handler.ListContactos)
 	contactos.GET("/search", auth.RequirePermissionFunc("contact", "view"), r.handler.SearchContactos)

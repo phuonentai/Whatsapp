@@ -25,12 +25,11 @@ export class CompaniesPage {
     if (data.sector) await this.page.fill('input[name="sector"]', data.sector);
     if (data.ciudad) await this.page.fill('input[name="ciudad"]', data.ciudad);
     await this.page.getByRole("button", { name: /guardar|crear/i }).click();
-    await this.page.waitForResponse((res) => res.url().includes("/api/crm/empresas") && res.ok());
+    await this.page.waitForResponse((res) => res.url().includes("/api/crm/empresas") && res.request().method() === "POST" && res.ok());
   }
 
   async search(query: string) {
     await this.searchInput.fill(query);
-    await this.page.waitForTimeout(500);
   }
 
   async getRow(name: string): Promise<Locator | null> {
@@ -46,7 +45,10 @@ export class CompaniesPage {
   async delete(name: string) {
     const row = await this.getRow(name);
     if (!row) throw new Error(`Company ${name} not found`);
-    await row.locator('button:has-text("eliminar"), button[aria-label="Eliminar"]').click();
+    await row.locator('button:has-text("Eliminar"), button[aria-label="Eliminar"]').click();
     await this.page.getByRole("button", { name: /confirmar|sí|eliminar/i }).click();
+    await this.page.waitForResponse(
+      (res) => res.url().includes("/api/crm/empresas") && res.request().method() === "DELETE" && res.ok()
+    );
   }
 }

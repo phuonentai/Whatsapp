@@ -28,9 +28,14 @@ interface MessageDto {
 }
 
 async function findConversationByPhone(phone: string): Promise<ConversationDto | undefined> {
-  const res = await apiRequest<{ data?: ConversationDto[] }>("/crm/conversaciones");
-  const list = Array.isArray(res) ? res : res.data ?? [];
-  return list.find((c) => c.contact_phone === phone || c.contact_display_name === phone);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const res = await apiRequest<{ data?: ConversationDto[] }>("/crm/conversaciones");
+    const list = Array.isArray(res) ? res : res.data ?? [];
+    const found = list.find((c) => c.contact_phone === phone || c.contact_display_name === phone);
+    if (found) return found;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return undefined;
 }
 
 test.describe("WhatsApp Inbox", () => {
@@ -73,9 +78,23 @@ test.describe("WhatsApp Inbox", () => {
       messageId,
     });
 
+    // Retry on stall/drop: the Next dev server can drop the connection under
+    // parallel load; the 10s AbortSignal in deliverWebhook converts a hang into
+    // a fast reject, and this loop turns that into a resilient re-delivery.
     for (let i = 0; i < 2; i++) {
-      const res = await deliverWebhook(WEBHOOK_SECRET, payload);
-      expect(res.status).toBe(200);
+      let res: Awaited<ReturnType<typeof deliverWebhook>> | null = null;
+      let lastError: unknown = new Error("deliverWebhook did not complete");
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          res = await deliverWebhook(WEBHOOK_SECRET, payload);
+          if (res.status === 200) break;
+          lastError = new Error(`deliverWebhook returned ${res.status}`);
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      expect(res, String(lastError)).not.toBeNull();
+      expect(res!.status).toBe(200);
     }
 
     const conv = await findConversationByPhone(from);

@@ -32,12 +32,13 @@ export class ContactsPage {
       await this.page.selectOption('select[name="lead_status"]', data.leadStatus);
     }
     await this.page.getByRole("button", { name: /guardar|crear/i }).click();
-    await this.page.waitForResponse((res) => res.url().includes("/api/crm/contactos") && res.ok());
+    await this.page.waitForResponse(
+      (res) => res.url().includes("/api/crm/contactos") && res.request().method() === "POST" && res.ok()
+    );
   }
 
   async search(query: string) {
     await this.searchInput.fill(query);
-    await this.page.waitForTimeout(500);
   }
 
   async getRow(phone: string): Promise<Locator | null> {

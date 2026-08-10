@@ -9,7 +9,7 @@ WHERE organization_id = $1
   AND (NULLIF($3, '') IS NULL OR lead_status = $3)
   AND ($4::int = 0 OR company_id = $4)
   AND ($5::int = 0 OR assigned_to = $5)
-ORDER BY last_message_at DESC NULLS LAST
+ORDER BY COALESCE(last_message_at, created_at) DESC NULLS LAST
 LIMIT $6 OFFSET $7;
 
 -- name: SearchContacts :many
@@ -19,7 +19,7 @@ WHERE organization_id = $1
     OR email ILIKE '%' || $2 || '%'
     OR phone_number ILIKE '%' || $2 || '%'
     OR numero_documento ILIKE '%' || $2 || '%')
-ORDER BY last_message_at DESC NULLS LAST
+ORDER BY COALESCE(last_message_at, created_at) DESC NULLS LAST
 LIMIT $3 OFFSET $4;
 
 -- name: UpdateContact :one
@@ -67,7 +67,7 @@ SELECT c.*,
     (SELECT COUNT(*) FROM crm.deals WHERE company_id = c.id) AS total_negocios
 FROM crm.companies c
 WHERE c.organization_id = $1
-ORDER BY c.name ASC
+ORDER BY c.created_at DESC
 LIMIT $2 OFFSET $3;
 
 -- name: SearchCompanies :many
@@ -80,7 +80,7 @@ WHERE c.organization_id = $1
     OR c.nit ILIKE '%' || $2 || '%'
     OR c.sector ILIKE '%' || $2 || '%'
     OR c.ciudad ILIKE '%' || $2 || '%')
-ORDER BY c.name ASC
+ORDER BY c.created_at DESC
 LIMIT $3 OFFSET $4;
 
 -- name: UpdateCompany :one

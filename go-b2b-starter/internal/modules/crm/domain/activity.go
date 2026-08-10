@@ -5,13 +5,14 @@ import "time"
 type ActivityType string
 
 const (
-	ActivityTypeNota           ActivityType = "nota"
-	ActivityTypeLlamada        ActivityType = "llamada"
-	ActivityTypeCorreo         ActivityType = "correo"
-	ActivityTypeReunion        ActivityType = "reunion"
-	ActivityTypeTarea          ActivityType = "tarea"
-	ActivityTypeWhatsAppMessage ActivityType = "whatsapp_message"
-	ActivityTypeSistema        ActivityType = "sistema"
+	ActivityTypeNota             ActivityType = "nota"
+	ActivityTypeLlamada          ActivityType = "llamada"
+	ActivityTypeCorreo           ActivityType = "correo"
+	ActivityTypeReunion          ActivityType = "reunion"
+	ActivityTypeTarea            ActivityType = "tarea"
+	ActivityTypeWhatsAppMessage  ActivityType = "whatsapp_message"
+	ActivityTypeInstagramMessage ActivityType = "instagram_message"
+	ActivityTypeSistema          ActivityType = "sistema"
 )
 
 type Activity struct {

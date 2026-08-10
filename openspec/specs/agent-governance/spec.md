@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the guardrail governance contract where every side-effecting agent action is ruled, while escalation and drafting remain always allowed.
+
+## Requirements
 
 ### Requirement: Every side-effecting action is guardrail-governed
 

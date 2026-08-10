@@ -2,38 +2,29 @@
 
 # File: scripts/run_tests_with_coverage.sh
 
-echo "Running tests with coverage for all modules..."
+set -o pipefail
+
+echo "Running tests with coverage for the root module..."
 
 # Create coverage directory
 mkdir -p coverage
-rm -f coverage/coverage.txt
+rm -f coverage/coverage.txt coverage/coverage.out
 
-# Find all go.mod files and run tests
-find ./src -name go.mod | while read -r mod_file; do
-    mod_dir=$(dirname "$mod_file")
-    mod_name=$(basename "$mod_dir")
-    
-    echo "Testing module: $mod_name"
-    
-    (
-        cd "$mod_dir"
-        if go test -v -coverprofile=coverage.out ./...; then
-            if [ -s coverage.out ]; then
-                echo "mode: atomic" > "../../coverage/coverage.$mod_name.txt"
-                tail -n +2 coverage.out >> "../../coverage/coverage.$mod_name.txt"
-            else
-                echo "No coverage data generated for $mod_name"
-            fi
-        else
-            echo "Tests failed for $mod_name"
-        fi
-        rm -f coverage.out
-    )
-done
+# Run tests for the single root Go module
+if ! go test -v -coverprofile=coverage/coverage.out ./...; then
+    echo "Tests FAILED for module root" >&2
+    exit 1
+fi
 
-# Combine all coverage files
-echo "mode: atomic" > coverage/coverage.txt
-find coverage -name 'coverage.*.txt' -print0 | xargs -0 tail -q -n +2 >> coverage/coverage.txt
+if [ -s coverage/coverage.out ]; then
+    echo "mode: atomic" > coverage/coverage.txt
+    tail -n +2 coverage/coverage.out >> coverage/coverage.txt
+else
+    echo "No coverage data generated" >&2
+    exit 1
+fi
+
+rm -f coverage/coverage.out
 
 # Remove any non-coverage lines (like file headers)
 sed -i '/^[^[:space:]]*:/!d' coverage/coverage.txt
@@ -45,4 +36,5 @@ if [ -s coverage/coverage.txt ]; then
     echo "Coverage report generated in coverage/coverage.html"
 else
     echo "No coverage data generated"
+    exit 1
 fi

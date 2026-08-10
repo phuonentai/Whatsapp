@@ -15,6 +15,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
 	billingServices "github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
 	crmServices "github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
+	igEvents "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/pkg/whatsapp"
 )
@@ -55,21 +56,49 @@ func NewAgentService(
 var affirmativeTerms = []string{"sí", "si ", "acepto", "autorizo", "ok", "okay", "claro", "dale", "me parece bien"}
 
 func (s *agentService) HandleMessageReceived(ctx context.Context, event *whatsappEvents.MessageReceived) error {
-	orgID := event.OrganizationID
 	phone, err := whatsapp.CanonicalizeE164(event.From)
 	if err != nil {
 		return fmt.Errorf("invalid sender phone: %w", err)
 	}
 
-	contact, err := s.repo.ResolveContact(ctx, orgID, phone, event.From, event.WhatsAppTimestamp)
+	contact, err := s.repo.ResolveContact(ctx, event.OrganizationID, phone, event.From, event.WhatsAppTimestamp)
 	if err != nil {
 		return err
 	}
-	conv, err := s.repo.ResolveConversation(ctx, orgID, contact.ID, event.WhatsAppTimestamp)
+	conv, err := s.repo.ResolveConversation(ctx, event.OrganizationID, contact.ID, domain.ChannelWhatsapp, event.WhatsAppTimestamp)
 	if err != nil {
 		return err
 	}
 
+	return s.runPipeline(ctx, event.OrganizationID, contact, conv, event.MessageSID, event.Content, event.WhatsAppTimestamp, phone)
+}
+
+// HandleInstagramMessageReceived drives the same pipeline for Instagram DMs:
+// contact keyed by IG-scoped user id, conversation on the instagram channel,
+// and the IG mid as the provider message id.
+func (s *agentService) HandleInstagramMessageReceived(ctx context.Context, event *igEvents.MessageReceived) error {
+	contact, err := s.repo.ResolveContactByIGUser(ctx, event.OrganizationID, event.FromIGUserID, event.FromIGUserID, event.IGTimestamp)
+	if err != nil {
+		return err
+	}
+	conv, err := s.repo.ResolveConversation(ctx, event.OrganizationID, contact.ID, domain.ChannelInstagram, event.IGTimestamp)
+	if err != nil {
+		return err
+	}
+
+	return s.runPipeline(ctx, event.OrganizationID, contact, conv, event.MessageSID, event.Content, event.IGTimestamp, event.FromIGUserID)
+}
+
+// runPipeline is the shared analysis/decision pipeline for all channels.
+func (s *agentService) runPipeline(
+	ctx context.Context,
+	orgID int32,
+	contact *domain.ContactRef,
+	conv *domain.ConversationRef,
+	messageID, content string,
+	ts time.Time,
+	senderLabel string,
+) error {
 	settings, err := s.getSettingsOrDefault(ctx, orgID)
 	if err != nil {
 		return err
@@ -91,11 +120,11 @@ func (s *agentService) HandleMessageReceived(ctx context.Context, event *whatsap
 			return err
 		}
 		return s.audit(ctx, orgID, flow, domain.GuardrailActionSendMessage, domain.DecisionSkip,
-			[]string{"kill_switch"}, "", event.MessageSID, contact)
+			[]string{"kill_switch"}, "", messageID, contact)
 	}
 
 	// Dedupe: a retried webhook must not run the pipeline twice for one message.
-	if _, err := s.repo.GetPendingSuggestionByMessage(ctx, orgID, event.MessageSID); err == nil {
+	if _, err := s.repo.GetPendingSuggestionByMessage(ctx, orgID, messageID); err == nil {
 		return nil
 	}
 
@@ -104,19 +133,19 @@ func (s *agentService) HandleMessageReceived(ctx context.Context, event *whatsap
 	switch contact.ConsentStatus {
 	case domain.ConsentNone:
 		if settings.ConsentRequired {
-			if err := s.sendConsentRequest(ctx, orgID, conv.ID, settings, flow, event.MessageSID, contact); err != nil {
+			if err := s.sendConsentRequest(ctx, orgID, conv.ID, settings, flow, messageID, contact); err != nil {
 				return err
 			}
 			return nil
 		}
 	case domain.ConsentRequested:
-		if isAffirmative(event.Content) {
+		if isAffirmative(content) {
 			now := time.Now()
 			contact, err = s.repo.UpdateContactConsent(ctx, orgID, contact.ID, domain.ConsentGranted, &now)
 			if err != nil {
 				return err
 			}
-			if err := s.audit(ctx, orgID, flow, "consent_grant", domain.DecisionAllow, nil, "", event.MessageSID, contact); err != nil {
+			if err := s.audit(ctx, orgID, flow, "consent_grant", domain.DecisionAllow, nil, "", messageID, contact); err != nil {
 				return err
 			}
 			s.log.Info("contact consent granted", loggerdomain.Fields{"org_id": orgID, "contact_id": contact.ID})
@@ -124,12 +153,12 @@ func (s *agentService) HandleMessageReceived(ctx context.Context, event *whatsap
 	}
 
 	// Analysis (metered, credit-gated).
-	draft, skipReason, err := s.analyze(ctx, orgID, settings, event, contact)
+	draft, skipReason, err := s.analyze(ctx, orgID, settings, content, senderLabel, contact)
 	if err != nil {
 		return err
 	}
 	if skipReason != "" {
-		if err := s.escalate(ctx, orgID, flow, event.MessageSID, contact, skipReason); err != nil {
+		if err := s.escalate(ctx, orgID, flow, messageID, contact, skipReason); err != nil {
 			return err
 		}
 		return nil
@@ -137,15 +166,15 @@ func (s *agentService) HandleMessageReceived(ctx context.Context, event *whatsap
 
 	// Decide + act.
 	if settings.Mode == domain.ModeAutopilot {
-		return s.tryAutopilotSend(ctx, orgID, conv.ID, flow, settings, contact, draft, event.MessageSID)
+		return s.tryAutopilotSend(ctx, orgID, conv.ID, flow, settings, contact, draft, messageID)
 	}
 
-	return s.createReplySuggestion(ctx, orgID, conv.ID, contact.ID, flow, draft, event.MessageSID, domain.SuggestionSourceCopilot)
+	return s.createReplySuggestion(ctx, orgID, conv.ID, contact.ID, flow, draft, messageID, domain.SuggestionSourceCopilot)
 }
 
 // analyze runs the consolidated metered LLM call. Returns the suggested reply,
 // a skip reason when credits are exhausted (empty otherwise), and an error.
-func (s *agentService) analyze(ctx context.Context, orgID int32, settings *domain.AgentSettings, event *whatsappEvents.MessageReceived, contact *domain.ContactRef) (string, string, error) {
+func (s *agentService) analyze(ctx context.Context, orgID int32, settings *domain.AgentSettings, content, senderLabel string, contact *domain.ContactRef) (string, string, error) {
 	status, err := s.billing.GetAiUsageStatus(ctx, orgID)
 	if err != nil {
 		s.log.Warn("ai usage status unavailable, proceeding fail-open", loggerdomain.Fields{"org_id": orgID, "error": err.Error()})
@@ -156,7 +185,7 @@ func (s *agentService) analyze(ctx context.Context, orgID int32, settings *domai
 	systemPrompt := analysisSystemPrompt(settings)
 	userPrompt := fmt.Sprintf(
 		"Mensaje entrante de %s (%s):\n%s",
-		contact.DisplayName, contact.PhoneNumber, event.Content,
+		contact.DisplayName, senderLabel, content,
 	)
 
 	ctx = llmdomain.WithOrgID(ctx, orgID)
@@ -192,13 +221,13 @@ func (s *agentService) tryAutopilotSend(ctx context.Context, orgID, convID int32
 	}
 
 	dec, err := s.guardrails.Evaluate(ctx, orgID, domain.GuardrailInput{
-		Action:      domain.GuardrailActionSendMessage,
-		Draft:       draft,
-		Settings:    *settings,
-		Contact:     toContactFacts(contact),
-		SentToday:   sentToday,
-		Autonomous:  true,
-		Now:         time.Now(),
+		Action:     domain.GuardrailActionSendMessage,
+		Draft:      draft,
+		Settings:   *settings,
+		Contact:    toContactFacts(contact),
+		SentToday:  sentToday,
+		Autonomous: true,
+		Now:        time.Now(),
 	})
 	if err != nil {
 		dec = domain.GuardrailDecision{Allowed: false, Reasons: []string{"guardrail_error"}}
@@ -302,10 +331,10 @@ func (s *agentService) getSettingsOrDefault(ctx context.Context, orgID int32) (*
 func (s *agentService) audit(ctx context.Context, orgID int32, flow *domain.ConversationFlow, action string, decision domain.AgentDecision, reasons []string, approver, messageID string, contact *domain.ContactRef) error {
 	flowID := flow.ID
 	_, err := s.repo.InsertAction(ctx, &domain.AgentAction{
-		OrganizationID:    orgID,
-		FlowID:            &flowID,
-		Action:            action,
-		Decision:          decision,
+		OrganizationID: orgID,
+		FlowID:         &flowID,
+		Action:         action,
+		Decision:       decision,
 		PolicyInput: map[string]any{
 			"action":        action,
 			"flow_status":   string(flow.Status),
@@ -314,7 +343,7 @@ func (s *agentService) audit(ctx context.Context, orgID int32, flow *domain.Conv
 			"approver":      approver,
 			"now":           time.Now().UTC().Format(time.RFC3339),
 		},
-		Reasons:           reasons,
+		Reasons:            reasons,
 		ApprovedByMemberID: approver,
 		WhatsAppMessageID:  messageID,
 	})
@@ -355,13 +384,13 @@ func (s *agentService) ApproveSuggestion(ctx context.Context, orgID, suggestionI
 	}
 
 	dec, err := s.guardrails.Evaluate(ctx, orgID, domain.GuardrailInput{
-		Action:      domain.GuardrailActionSendMessage,
-		Draft:       body,
-		Settings:    *settings,
-		Contact:     toContactFacts(contact),
-		Autonomous:  false,
-		Approver:    memberID,
-		Now:         time.Now(),
+		Action:     domain.GuardrailActionSendMessage,
+		Draft:      body,
+		Settings:   *settings,
+		Contact:    toContactFacts(contact),
+		Autonomous: false,
+		Approver:   memberID,
+		Now:        time.Now(),
 	})
 	if err != nil {
 		dec = domain.GuardrailDecision{Allowed: false, Reasons: []string{"guardrail_error"}}
@@ -421,6 +450,38 @@ func (s *agentService) ListPendingSuggestions(ctx context.Context, orgID int32, 
 		limit = 50
 	}
 	return s.repo.ListSuggestions(ctx, orgID, domain.SuggestionPending, limit, offset)
+}
+
+// SeedPendingSuggestion inserts a pending reply suggestion for a conversation
+// without running the LLM pipeline. Mock-auth only; used by e2e tests to drive
+// the approve/reject UI without a live AI backend.
+func (s *agentService) SeedPendingSuggestion(ctx context.Context, orgID, conversationID int32, body string) (*domain.Suggestion, error) {
+	conv, err := s.repo.GetConversationRef(ctx, orgID, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	flow, err := s.repo.GetActiveFlowByConversation(ctx, orgID, conversationID)
+	if err != nil {
+		if !errors.Is(err, domain.ErrFlowNotFound) {
+			return nil, err
+		}
+		flow, err = s.repo.CreateFlow(ctx, orgID, conversationID, conv.ContactID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	flowID := flow.ID
+	return s.repo.InsertSuggestion(ctx, &domain.Suggestion{
+		OrganizationID:    orgID,
+		ConversationID:    conversationID,
+		ContactID:         conv.ContactID,
+		FlowID:            &flowID,
+		Type:              domain.SuggestionReply,
+		Body:              body,
+		Metadata:          map[string]any{"source": "e2e_seed"},
+		Source:            domain.SuggestionSourceCopilot,
+		WhatsAppMessageID: "",
+	})
 }
 
 func (s *agentService) GetFlowDebug(ctx context.Context, orgID, conversationID int32) (*FlowDebug, error) {
@@ -505,8 +566,8 @@ func extractSuggestedReply(text string) (string, error) {
 		return "", fmt.Errorf("no JSON object in response")
 	}
 	var parsed struct {
-		Intent        string `json:"intent"`
-		Sentiment     string `json:"sentiment"`
+		Intent         string `json:"intent"`
+		Sentiment      string `json:"sentiment"`
 		SuggestedReply string `json:"suggested_reply"`
 	}
 	if err := json.Unmarshal([]byte(trimmed[start:end+1]), &parsed); err != nil {

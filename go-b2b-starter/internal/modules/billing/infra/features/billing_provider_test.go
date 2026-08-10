@@ -90,3 +90,10 @@ func TestParseQuotas_IncludesAiCredits(t *testing.T) {
 	assert.Equal(t, int32(1000), quotas["ai_credits"])
 	assert.Equal(t, int32(500), quotas["contacts"])
 }
+
+func TestParseModuleKeys_DefaultGrantedModulesAlwaysIncluded(t *testing.T) {
+	keys := parseModuleKeys(map[string]any{"crm_features": "x"})
+	assert.Empty(t, keys)
+	keys = append(keys, defaultGrantedModules...)
+	assert.Contains(t, keys, "analytics")
+}

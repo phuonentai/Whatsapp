@@ -2,8 +2,11 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
@@ -14,23 +17,26 @@ type webhookLogRepository struct {
 	store sqlc.Store
 }
 
+// transactioner is implemented by *sqlc.SQLStore (see gen/exec.go) and lets
+// repositories compose queries atomically. Non-transactional stores run the
+// function directly (test fakes).
+type transactioner interface {
+	Transaction(ctx context.Context, fn func(sqlc.Store) error) error
+}
+
+func (r *webhookLogRepository) inTx(ctx context.Context, fn func(sqlc.Store) error) error {
+	if t, ok := r.store.(transactioner); ok {
+		return t.Transaction(ctx, fn)
+	}
+	return fn(r.store)
+}
+
 func NewWebhookLogRepository(store sqlc.Store) domain.WebhookLogRepository {
 	return &webhookLogRepository{store: store}
 }
 
 func (r *webhookLogRepository) Insert(ctx context.Context, log *domain.WebhookLog) (*domain.WebhookLog, error) {
-	params := sqlc.InsertWebhookLogParams{
-		OrganizationID: log.OrganizationID,
-		Status:         log.Status,
-		EventType:      helpers.ToPgText(log.EventType),
-		PhoneNumberID:  helpers.ToPgText(log.PhoneNumberID),
-		RawHeaders:     log.RawHeaders,
-		RawBody:        log.RawBody,
-		ErrorMessage:   helpers.ToPgText(log.ErrorMessage),
-		ProcessedAt:    helpers.ToPgTimestampPtr(log.ProcessedAt),
-	}
-
-	result, err := r.store.InsertWebhookLog(ctx, params)
+	result, err := r.store.InsertWebhookLog(ctx, r.params(log))
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert webhook log: %w", err)
 	}
@@ -38,10 +44,71 @@ func (r *webhookLogRepository) Insert(ctx context.Context, log *domain.WebhookLo
 	return r.mapToDomain(&result), nil
 }
 
+// InsertWithOutbox persists the webhook log and its outbox events atomically.
+// A duplicate delivery (unique violation on delivery_key) maps to
+// domain.ErrDuplicateDelivery; the transaction is rolled back entirely.
+func (r *webhookLogRepository) InsertWithOutbox(ctx context.Context, log *domain.WebhookLog, events []domain.OutboxEventInput) (*domain.WebhookLog, error) {
+	var result *domain.WebhookLog
+
+	err := r.inTx(ctx, func(s sqlc.Store) error {
+		inserted, err := s.InsertWebhookLog(ctx, r.params(log))
+		if err != nil {
+			return err
+		}
+		mapped := r.mapToDomain(&inserted)
+		result = mapped
+
+		for _, ev := range events {
+			if _, err := s.InsertOutboxEvent(ctx, sqlc.InsertOutboxEventParams{
+				EventType:      ev.EventType,
+				Payload:        ev.Payload,
+				OrganizationID: helpers.ToPgInt4Ptr(log.OrganizationID),
+			}); err != nil {
+				return fmt.Errorf("failed to insert outbox event %q: %w", ev.EventType, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" && pgErr.ConstraintName == "idx_webhook_logs_delivery_key" {
+			return nil, domain.ErrDuplicateDelivery
+		}
+		return nil, fmt.Errorf("failed to insert webhook log with outbox events: %w", err)
+	}
+
+	return result, nil
+}
+
+func (r *webhookLogRepository) GetByID(ctx context.Context, id int32) (*domain.WebhookLog, error) {
+	result, err := r.store.GetWebhookLogByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sqlc.ErrRecordNotFound) {
+			return nil, domain.ErrWebhookLogNotFound
+		}
+		return nil, fmt.Errorf("failed to get webhook log %d: %w", id, err)
+	}
+	return r.mapToDomain(&result), nil
+}
+
+func (r *webhookLogRepository) params(log *domain.WebhookLog) sqlc.InsertWebhookLogParams {
+	return sqlc.InsertWebhookLogParams{
+		OrganizationID: helpers.ToPgInt4Ptr(log.OrganizationID),
+		Status:         log.Status,
+		EventType:      helpers.ToPgText(log.EventType),
+		PhoneNumberID:  helpers.ToPgText(log.PhoneNumberID),
+		RawHeaders:     log.RawHeaders,
+		RawBody:        log.RawBody,
+		ErrorMessage:   helpers.ToPgText(log.ErrorMessage),
+		ProcessedAt:    helpers.ToPgTimestampPtr(log.ProcessedAt),
+		DeliveryKey:    helpers.ToPgText(log.DeliveryKey),
+	}
+}
+
 func (r *webhookLogRepository) GetStatsByOrganization(ctx context.Context, orgID int32) (*domain.WebhookLogStats, error) {
 	now := time.Now()
 	last24hRows, err := r.store.GetWebhookLogStatsByOrganization(ctx, sqlc.GetWebhookLogStatsByOrganizationParams{
-		OrganizationID: orgID,
+		OrganizationID: helpers.ToPgInt4(orgID),
 		CreatedAt:      helpers.ToPgTimestamp(now.Add(-24 * time.Hour)),
 	})
 	if err != nil {
@@ -49,7 +116,7 @@ func (r *webhookLogRepository) GetStatsByOrganization(ctx context.Context, orgID
 	}
 
 	last7dRows, err := r.store.GetWebhookLogStatsByOrganization(ctx, sqlc.GetWebhookLogStatsByOrganizationParams{
-		OrganizationID: orgID,
+		OrganizationID: helpers.ToPgInt4(orgID),
 		CreatedAt:      helpers.ToPgTimestamp(now.Add(-7 * 24 * time.Hour)),
 	})
 	if err != nil {
@@ -57,7 +124,7 @@ func (r *webhookLogRepository) GetStatsByOrganization(ctx context.Context, orgID
 	}
 
 	totalRows, err := r.store.GetWebhookLogStatsByOrganization(ctx, sqlc.GetWebhookLogStatsByOrganizationParams{
-		OrganizationID: orgID,
+		OrganizationID: helpers.ToPgInt4(orgID),
 		CreatedAt:      helpers.ToPgTimestamp(time.Time{}),
 	})
 	if err != nil {
@@ -79,7 +146,7 @@ func (r *webhookLogRepository) GetStatsByOrganization(ctx context.Context, orgID
 		stats.Total += int(row.Count)
 	}
 
-	lastError, err := r.store.GetLastWebhookErrorByOrganization(ctx, orgID)
+	lastError, err := r.store.GetLastWebhookErrorByOrganization(ctx, helpers.ToPgInt4(orgID))
 	if err == nil && lastError.ErrorMessage.Valid {
 		stats.LastError = lastError.ErrorMessage.String
 		if lastError.CreatedAt.Valid {
@@ -93,7 +160,7 @@ func (r *webhookLogRepository) GetStatsByOrganization(ctx context.Context, orgID
 func (r *webhookLogRepository) mapToDomain(l *sqlc.WhatsappWebhookLog) *domain.WebhookLog {
 	return &domain.WebhookLog{
 		ID:             l.ID,
-		OrganizationID: l.OrganizationID,
+		OrganizationID: helpers.FromPgInt4Ptr(l.OrganizationID),
 		Status:         l.Status,
 		EventType:      helpers.FromPgText(l.EventType),
 		PhoneNumberID:  helpers.FromPgText(l.PhoneNumberID),
@@ -101,6 +168,7 @@ func (r *webhookLogRepository) mapToDomain(l *sqlc.WhatsappWebhookLog) *domain.W
 		RawBody:        l.RawBody,
 		ErrorMessage:   helpers.FromPgText(l.ErrorMessage),
 		ProcessedAt:    helpers.FromPgTimestampPtr(l.ProcessedAt),
+		DeliveryKey:    helpers.FromPgText(l.DeliveryKey),
 		CreatedAt:      l.CreatedAt.Time,
 	}
 }

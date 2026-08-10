@@ -21,6 +21,12 @@ type Config struct {
 	WebhookSecret string `mapstructure:"SIIGO_WEBHOOK_SECRET"`
 	Sandbox       bool   `mapstructure:"SIIGO_SANDBOX"`
 	Debug         bool   `mapstructure:"SIIGO_DEBUG"`
+	// MasterKey is the base64 AES-256 envelope key for per-org credential
+	// encryption at rest. Never logged.
+	MasterKey string `mapstructure:"SIIGO_MASTER_KEY"`
+	// NumberingMode is "auto" (default; Siigo assigns consecutive numbers)
+	// or "manual" (platform supplies the next number in the payload).
+	NumberingMode string `mapstructure:"SIIGO_NUMBERING_MODE"`
 }
 
 // LoadConfig reads the Siigo config from env. Sandbox is the default so no
@@ -38,6 +44,8 @@ func LoadConfig() (Config, error) {
 	viper.SetDefault("SIIGO_SANDBOX", true)
 	viper.SetDefault("SIIGO_DEBUG", false)
 	viper.SetDefault("SIIGO_WEBHOOK_SECRET", "")
+	viper.SetDefault("SIIGO_MASTER_KEY", "")
+	viper.SetDefault("SIIGO_NUMBERING_MODE", "auto")
 
 	if err := viper.ReadInConfig(); err == nil {
 		_ = err
@@ -62,6 +70,15 @@ func (c *Config) Validate() error {
 	}
 	if c.BaseURL == "" {
 		return fmt.Errorf("siigo base URL is required (SIIGO_BASE_URL)")
+	}
+	if c.MasterKey == "" {
+		return fmt.Errorf("siigo master key is required (SIIGO_MASTER_KEY)")
+	}
+	if c.NumberingMode == "" {
+		c.NumberingMode = "auto"
+	}
+	if c.NumberingMode != "auto" && c.NumberingMode != "manual" {
+		return fmt.Errorf("invalid siigo numbering mode %q (SIIGO_NUMBERING_MODE: auto|manual)", c.NumberingMode)
 	}
 	return nil
 }

@@ -92,13 +92,21 @@ export async function getServerPermissions(
       : [];
 
     // Filter to only valid string permissions (trust backend as source of truth)
-    const permissions = rawPermissions.filter(
+    let permissions = rawPermissions.filter(
       (permission): permission is string =>
         typeof permission === 'string' && permission.trim().length > 0
     );
     const roles = rawRoles.filter(
       (role): role is string => typeof role === 'string'
     );
+
+    // Expand wildcard grants (`*:*`) into the full known permission set so
+    // downstream literal `includes(...)` checks (e.g. sidebar, guards) work.
+    // The mock auth backend issues `*:*` for admin roles.
+    if (permissions.includes('*:*')) {
+      const allKnown = Object.values(PERMISSIONS);
+      permissions = Array.from(new Set([...permissions, ...allKnown]));
+    }
 
     return {
       profile,

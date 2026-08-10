@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines WhatsApp compliance: consent state machine per Ley 1581, PII masking before third-party AI calls, and Habeas Data export.
+
+## Requirements
 
 ### Requirement: Consent state machine for data treatment (Ley 1581)
 

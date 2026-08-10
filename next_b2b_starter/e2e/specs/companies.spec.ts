@@ -22,19 +22,16 @@ test.describe("Empresas", () => {
     await row!.locator('button:has-text("Editar"), button[aria-label="Editar"]').click();
     await page.fill('input[name="name"]', `${name} Updated`);
     await page.getByRole("button", { name: /guardar/i }).click();
-    await page.waitForTimeout(300);
+    await expect(page.locator(`tr:has-text("${name} Updated")`)).toBeVisible();
 
     await companiesPage.delete(name);
-    const deleted = await companiesPage.getRow(name);
-    expect(deleted).toBeNull();
+    await expect(companiesPage.table.locator(`tr:has-text("${name}")`)).toHaveCount(0);
   });
 
-  test("search filters results", async ({ page }) => {
+  test("search filters results", async () => {
     await companiesPage.goto();
     await companiesPage.search("nonexistent-company-xyz");
-    await page.waitForTimeout(300);
-    const rows = await companiesPage.table.locator("tbody tr").count();
-    expect(rows).toBe(0);
+    await expect(companiesPage.table.locator("tbody tr")).toHaveCount(0);
   });
 
   test("duplicate name shows error", async ({ page }) => {
@@ -44,7 +41,7 @@ test.describe("Empresas", () => {
     await companiesPage.newCompanyButton.click();
     await page.fill('input[name="name"]', name);
     await page.getByRole("button", { name: /guardar|crear/i }).click();
-    const error = page.locator("text=ya existe,text=duplicado");
+    const error = page.locator("text=ya existe");
     await expect(error).toBeVisible();
   });
 

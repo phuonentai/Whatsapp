@@ -19,29 +19,29 @@ type DealService interface {
 }
 
 type CreateDealRequest struct {
-	Nombre             string
-	ContactID          *int32
-	CompanyID          *int32
-	PipelineID         int32
-	StageID            *int32
-	Monto              *float64
-	Moneda             string
-	FechaCierreEsperada *string
-	Notas              string
-	AssignedTo         *int32
+	Nombre              string   `json:"nombre"`
+	ContactID           *int32   `json:"contact_id"`
+	CompanyID           *int32   `json:"company_id"`
+	PipelineID          int32    `json:"pipeline_id"`
+	StageID             *int32   `json:"stage_id"`
+	Monto               *float64 `json:"monto"`
+	Moneda              string   `json:"moneda"`
+	FechaCierreEsperada *string  `json:"fecha_cierre_esperada"`
+	Notas               string   `json:"notas"`
+	AssignedTo          *int32   `json:"assigned_to"`
 }
 type UpdateDealRequest struct {
-	ID                 int32
-	OrganizationID     int32
-	Nombre             string
-	ContactID          *int32
-	CompanyID          *int32
-	Monto              *float64
-	Moneda             string
-	FechaCierreEsperada *string
-	Estado             string
-	Notas              string
-	AssignedTo         *int32
+	ID                  int32    `json:"id"`
+	OrganizationID      int32    `json:"organization_id"`
+	Nombre              string   `json:"nombre"`
+	ContactID           *int32   `json:"contact_id"`
+	CompanyID           *int32   `json:"company_id"`
+	Monto               *float64 `json:"monto"`
+	Moneda              string   `json:"moneda"`
+	FechaCierreEsperada *string  `json:"fecha_cierre_esperada"`
+	Estado              string   `json:"estado"`
+	Notas               string   `json:"notas"`
+	AssignedTo          *int32   `json:"assigned_to"`
 }
 
 type dealService struct {
@@ -67,8 +67,12 @@ func (s *dealService) Create(ctx context.Context, orgID int32, req *CreateDealRe
 		Monto: req.Monto, Moneda: req.Moneda, Estado: domain.DealStatusAbierto,
 		Notas: req.Notas, AssignedTo: req.AssignedTo,
 	}
-	if deal.Moneda == "" { deal.Moneda = "COP" }
-	if err := deal.Validate(); err != nil { return nil, err }
+	if deal.Moneda == "" {
+		deal.Moneda = "COP"
+	}
+	if err := deal.Validate(); err != nil {
+		return nil, err
+	}
 	return s.dealRepo.Create(ctx, deal)
 }
 func (s *dealService) GetByID(ctx context.Context, orgID, dealID int32) (*domain.DealWithRefs, error) {
@@ -88,9 +92,13 @@ func (s *dealService) Update(ctx context.Context, orgID int32, req *UpdateDealRe
 }
 func (s *dealService) UpdateStage(ctx context.Context, orgID, dealID, stageID, changedBy int32, oldStageName, newStageName string) (*domain.Deal, error) {
 	_, err := s.dealRepo.GetByID(ctx, orgID, dealID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	updated, err := s.dealRepo.UpdateStage(ctx, orgID, dealID, stageID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if s.eventBus != nil {
 		s.eventBus.Publish(ctx, &events.DealStageChanged{
 			DealID: dealID, OrganizationID: orgID, NewStageID: stageID, ChangedBy: changedBy,

@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
@@ -25,19 +26,25 @@ func (r *pipelineRepository) Create(ctx context.Context, p *domain.Pipeline) (*d
 		OrganizationID: p.OrganizationID, Nombre: p.Nombre,
 		EsPredeterminado: p.EsPredeterminado, Orden: p.Orden,
 	})
-	if err != nil { return nil, fmt.Errorf("failed to create pipeline: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipeline: %w", err)
+	}
 	return mapPipeline(&result), nil
 }
 
 func (r *pipelineRepository) GetByID(ctx context.Context, orgID, pipelineID int32) (*domain.Pipeline, error) {
 	result, err := r.store.GetPipelineByID(ctx, sqlc.GetPipelineByIDParams{ID: pipelineID, OrganizationID: orgID})
-	if err != nil { return nil, fmt.Errorf("failed to get pipeline: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pipeline: %w", err)
+	}
 	return mapPipeline(&result), nil
 }
 
 func (r *pipelineRepository) List(ctx context.Context, orgID int32) ([]*domain.PipelineWithStages, error) {
 	results, err := r.store.ListPipelinesByOrganization(ctx, orgID)
-	if err != nil { return nil, fmt.Errorf("failed to list pipelines: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pipelines: %w", err)
+	}
 	pipelines := make([]*domain.PipelineWithStages, len(results))
 	for i := range results {
 		pipelines[i] = mapPipelineRow(&results[i])
@@ -47,17 +54,21 @@ func (r *pipelineRepository) List(ctx context.Context, orgID int32) ([]*domain.P
 
 func (r *pipelineRepository) GetDefault(ctx context.Context, orgID int32) (*domain.Pipeline, error) {
 	result, err := r.store.GetDefaultPipelineByOrganization(ctx, orgID)
-	if err != nil { return nil, fmt.Errorf("failed to get default pipeline: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default pipeline: %w", err)
+	}
 	return mapPipeline(&result), nil
 }
 
 func (r *pipelineRepository) Update(ctx context.Context, p *domain.Pipeline) (*domain.Pipeline, error) {
 	result, err := r.store.UpdatePipeline(ctx, sqlc.UpdatePipelineParams{
 		ID: p.ID, OrganizationID: p.OrganizationID,
-		Column3: helpers.ToPgText(p.Nombre),
+		Column3:          helpers.ToPgText(p.Nombre),
 		EsPredeterminado: p.EsPredeterminado, Orden: p.Orden,
 	})
-	if err != nil { return nil, fmt.Errorf("failed to update pipeline: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to update pipeline: %w", err)
+	}
 	return mapPipeline(&result), nil
 }
 
@@ -86,7 +97,18 @@ func mapPipelineRow(r *sqlc.ListPipelinesByOrganizationRow) *domain.PipelineWith
 }
 
 func parseStagesJSON(data interface{}) []domain.PipelineStage {
-	return nil
+	if data == nil {
+		return nil
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return nil
+	}
+	var stages []domain.PipelineStage
+	if err := json.Unmarshal(raw, &stages); err != nil {
+		return nil
+	}
+	return stages
 }
 
 // PipelineStageRepository
@@ -96,21 +118,29 @@ func (r *stageRepository) Create(ctx context.Context, s *domain.PipelineStage) (
 		PipelineID: s.PipelineID, Nombre: s.Nombre, Orden: s.Orden,
 		Color: helpers.ToPgText(s.Color), Probabilidad: helpers.ToPgInt4Ptr(s.Probabilidad),
 	})
-	if err != nil { return nil, fmt.Errorf("failed to create stage: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stage: %w", err)
+	}
 	return mapStage(&result), nil
 }
 
 func (r *stageRepository) ListByPipeline(ctx context.Context, pipelineID int32) ([]*domain.PipelineStage, error) {
 	results, err := r.store.ListStagesByPipeline(ctx, pipelineID)
-	if err != nil { return nil, fmt.Errorf("failed to list stages: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to list stages: %w", err)
+	}
 	stages := make([]*domain.PipelineStage, len(results))
-	for i := range results { stages[i] = mapStage(&results[i]) }
+	for i := range results {
+		stages[i] = mapStage(&results[i])
+	}
 	return stages, nil
 }
 
 func (r *stageRepository) GetByID(ctx context.Context, stageID int32) (*domain.PipelineStage, error) {
 	result, err := r.store.GetStageByID(ctx, stageID)
-	if err != nil { return nil, fmt.Errorf("failed to get stage: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stage: %w", err)
+	}
 	return mapStage(&result), nil
 }
 
@@ -120,7 +150,9 @@ func (r *stageRepository) Update(ctx context.Context, s *domain.PipelineStage) (
 		Column3: helpers.ToPgText(s.Nombre), Orden: s.Orden,
 		Column5: helpers.ToPgText(s.Color), Probabilidad: helpers.ToPgInt4Ptr(s.Probabilidad),
 	})
-	if err != nil { return nil, fmt.Errorf("failed to update stage: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to update stage: %w", err)
+	}
 	return mapStage(&result), nil
 }
 
@@ -133,6 +165,6 @@ func mapStage(c *sqlc.CrmPipelineStage) *domain.PipelineStage {
 		ID: c.ID, PipelineID: c.PipelineID, Nombre: c.Nombre,
 		Orden: c.Orden, Color: helpers.FromPgText(c.Color),
 		Probabilidad: helpers.FromPgInt4Ptr(c.Probabilidad),
-		CreatedAt: c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
+		CreatedAt:    c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
 	}
 }

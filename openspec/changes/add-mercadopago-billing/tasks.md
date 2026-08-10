@@ -17,9 +17,9 @@
 ## 3. Organization Billing Provider Preference [DB-SQLC]
 
 - [x] 3.1 Create migration to add `billing_provider` column to `organizations` table (nullable varchar, default null = polar)
-- [ ] 3.2 Add SQLC query `GetOrganizationBillingProvider` (returns the provider string)
-- [ ] 3.3 Add SQLC query `SetOrganizationBillingProvider` (upserts the provider string)
-- [ ] 3.4 Regenerate SQLC code with `make sqlc`
+- [x] 3.2 Add SQLC query `GetOrganizationBillingProvider` (returns the provider string) — verified present in tree by complete-mvp-gaps 2026-08-10: `internal/db/postgres/sqlc/gen/organizations.sql.go:372` + `sqlc/query/organizations.sql:55` (regenerated SQLC includes it; see also wire-mercadopago-billing reconciliation note below)
+- [x] 3.3 Add SQLC query `SetOrganizationBillingProvider` (upserts the provider string) — verified present in tree by complete-mvp-gaps 2026-08-10: `organizations.sql.go:633` + `sqlc/query/organizations.sql:60`
+- [x] 3.4 Regenerate SQLC code with `make sqlc` — verified by complete-mvp-gaps 2026-08-10: generated code under `sqlc/gen/` contains both queries, matching the source query files; regeneration is deterministic (sqlc generate clean)
 
 ## 4. Provider Router [BE-INFRA]
 

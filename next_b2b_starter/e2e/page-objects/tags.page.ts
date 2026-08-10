@@ -21,7 +21,7 @@ export class TagsPage {
     await this.page.fill('input[name="nombre"]', data.name);
     if (data.color) await this.page.fill('input[name="color"]', data.color);
     await this.page.getByRole("button", { name: /guardar|crear/i }).click();
-    await this.page.waitForResponse((res) => res.url().includes("/api/crm/etiquetas") && res.ok());
+    await this.page.waitForResponse((res) => res.url().includes("/api/crm/etiquetas") && res.request().method() === "POST" && res.ok());
   }
 
   async getTag(name: string): Promise<Locator | null> {

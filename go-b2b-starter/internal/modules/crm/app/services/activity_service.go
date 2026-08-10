@@ -18,17 +18,17 @@ type ActivityService interface {
 }
 
 type CreateActivityRequest struct {
-	ContactID        *int32
-	CompanyID        *int32
-	DealID           *int32
-	ConversationID   *int32
-	Tipo             domain.ActivityType
-	Asunto           string
-	Contenido        string
-	Estado           string
-	FechaVencimiento *string
-	RealizadaPor     *int32
-	Metadata         map[string]interface{}
+	ContactID        *int32                 `json:"contact_id"`
+	CompanyID        *int32                 `json:"company_id"`
+	DealID           *int32                 `json:"deal_id"`
+	ConversationID   *int32                 `json:"conversation_id"`
+	Tipo             domain.ActivityType    `json:"tipo"`
+	Asunto           string                 `json:"asunto"`
+	Contenido        string                 `json:"contenido"`
+	Estado           string                 `json:"estado"`
+	FechaVencimiento *string                `json:"fecha_vencimiento"`
+	RealizadaPor     *int32                 `json:"realizada_por"`
+	Metadata         map[string]interface{} `json:"metadata"`
 }
 
 type activityService struct {
@@ -58,7 +58,7 @@ func (s *activityService) Create(ctx context.Context, orgID int32, req *CreateAc
 		Asunto: req.Asunto, Contenido: req.Contenido, Estado: req.Estado,
 		FechaVencimiento: fechaVencimiento,
 		RealizadaPor:     req.RealizadaPor, Metadata: req.Metadata,
-		RealizadaEn:      time.Now(),
+		RealizadaEn: time.Now(),
 	}
 	return s.activityRepo.Create(ctx, a)
 }

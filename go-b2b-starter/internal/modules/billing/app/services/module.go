@@ -10,6 +10,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/polar"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/repositories"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/routing"
+	payments "github.com/moasq/go-b2b-starter/internal/modules/payments/app/services"
 	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 	mercadopagopkg "github.com/moasq/go-b2b-starter/internal/platform/mercadopago"
@@ -41,14 +42,15 @@ type providerRouterParams struct {
 type billingServiceParams struct {
 	dig.In
 
-	Repo            domain.SubscriptionRepository
-	AiRepo          domain.AiUsageRepository
-	OrgAdapter      domain.OrganizationAdapter
-	BillingProvider domain.BillingProvider
-	MPProvider      domain.BillingProvider `name:"mercadopago"`
-	Resolver        routing.BillingProviderResolver
-	ModuleService   registryServices.ModuleService
-	Logger          logger.Logger
+	Repo               domain.SubscriptionRepository
+	AiRepo             domain.AiUsageRepository
+	OrgAdapter         domain.OrganizationAdapter
+	BillingProvider    domain.BillingProvider
+	MPProvider         domain.BillingProvider `name:"mercadopago"`
+	Resolver           routing.BillingProviderResolver
+	ModuleService      registryServices.ModuleService
+	Logger             logger.Logger
+	PaymentEventHandler payments.PaymentEventHandler `optional:"true"`
 }
 
 // Configure registers all services in the dependency container
@@ -91,7 +93,7 @@ func (m *Module) Configure(container *dig.Container) error {
 
 	// Register BillingService
 	if err := container.Provide(func(p billingServiceParams) BillingService {
-		return NewBillingService(p.Repo, p.AiRepo, p.OrgAdapter, p.BillingProvider, p.MPProvider, p.Resolver, p.ModuleService, p.Logger)
+		return NewBillingService(p.Repo, p.AiRepo, p.OrgAdapter, p.BillingProvider, p.MPProvider, p.Resolver, p.ModuleService, p.Logger, p.PaymentEventHandler)
 	}); err != nil {
 		return err
 	}

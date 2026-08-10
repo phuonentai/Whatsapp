@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { ActivitiesPage } from "../page-objects/activities.page";
+import { uniqueColombianPhone } from "../helpers/phones";
 
 test.describe("Actividades", () => {
   let activitiesPage: ActivitiesPage;
@@ -44,7 +45,7 @@ test.describe("Actividades", () => {
 
     const subject = `Task Fields ${Date.now()}`;
     await page.getByRole("button", { name: /nueva actividad/i }).click();
-    await page.selectOption('select:has(option[value="tarea"])', "tarea");
+    await page.selectOption('select[name="tipo"]', "tarea");
     await page.fill('input[placeholder="Asunto"]', subject);
     await page.fill('input[aria-label="Fecha de vencimiento"]', "2026-12-31");
     await page.selectOption('select[aria-label="Estado"]', "pendiente");
@@ -52,7 +53,7 @@ test.describe("Actividades", () => {
     await page.waitForResponse((res) => res.url().includes("/api/crm/actividades") && res.ok());
 
     await expect(page.locator(`text=${subject}`)).toBeVisible();
-    await expect(page.locator("text=Vence:")).toBeVisible();
+    await expect(page.locator("text=Vence:").first()).toBeVisible();
   });
 
   test("filter control filters activities by type", async ({ page }) => {
@@ -62,12 +63,10 @@ test.describe("Actividades", () => {
     await activitiesPage.create({ type: "llamada", subject });
 
     await page.selectOption('[data-testid="activity-type-filter"]', "llamada");
-    await page.waitForTimeout(500);
 
     await expect(page.locator(`text=${subject}`)).toBeVisible();
 
     await page.selectOption('[data-testid="activity-type-filter"]', "nota");
-    await page.waitForTimeout(500);
     await expect(page.locator(`text=${subject}`)).toBeHidden();
   });
 
@@ -75,7 +74,7 @@ test.describe("Actividades", () => {
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-pro:admin-pro@test.com" });
 
     const ts = Date.now();
-    const contactPhone = `+57311${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `Timeline Contact ${ts}`;
     const noteSubject = `Timeline Note ${ts}`;
 
@@ -115,6 +114,6 @@ test.describe("Actividades", () => {
     await page.waitForURL(/view=negocios&id=\d+/);
 
     await expect(page.locator("text=Etapa")).toBeVisible();
-    await expect(page.locator("text=Actividades")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /actividad/i })).toBeVisible();
   });
 });

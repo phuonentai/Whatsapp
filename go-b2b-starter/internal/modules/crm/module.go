@@ -3,10 +3,13 @@ package crm
 import (
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	igDomain "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain"
+	igGraphapi "github.com/moasq/go-b2b-starter/internal/modules/instagram/infra/graphapi"
 	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
+	"github.com/moasq/go-b2b-starter/internal/platform/outbox"
 	"go.uber.org/dig"
 )
 
@@ -93,10 +96,11 @@ func (m *Module) RegisterDependencies() error {
 		conversationRepo domain.ConversationRepository,
 		messageRepo domain.MessageRepository,
 		activityRepo domain.ActivityRepository,
+		outboxRepo outbox.Repository,
 		featureProvider features.FeatureProvider,
 		log logger.Logger,
 	) services.CRMService {
-		return services.NewCRMService(contactRepo, conversationRepo, messageRepo, activityRepo, featureProvider, log)
+		return services.NewCRMService(contactRepo, conversationRepo, messageRepo, activityRepo, outboxRepo, featureProvider, log)
 	}); err != nil {
 		return err
 	}
@@ -120,6 +124,35 @@ func (m *Module) RegisterDependencies() error {
 	}
 
 	if err := m.container.Provide(func(
+		crmService services.CRMService,
+		log logger.Logger,
+	) services.InstagramMessageListener {
+		return services.NewInstagramMessageListener(crmService, log)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		crmService services.CRMService,
+		log logger.Logger,
+	) services.InstagramEchoListener {
+		return services.NewInstagramEchoListener(crmService, log)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		igConfigRepo igDomain.ConfigRepository,
+		contactRepo domain.ContactRepository,
+		igClient igGraphapi.IGClient,
+		log logger.Logger,
+	) *services.ProfileBackfillListener {
+		return services.NewProfileBackfillListener(igConfigRepo, contactRepo, igClient, log)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
 		activityService services.ActivityService,
 		log logger.Logger,
 	) services.DealStageListener {
@@ -133,8 +166,22 @@ func (m *Module) RegisterDependencies() error {
 		contactRepo domain.ContactRepository,
 		msgRepo domain.MessageRepository,
 		whatsappRepo whatsappDomain.ConfigRepository,
+		igConfigRepo igDomain.ConfigRepository,
+		outboxRepo outbox.Repository,
 	) services.OutboundService {
-		return services.NewOutboundService(convRepo, contactRepo, msgRepo, whatsappRepo)
+		return services.NewOutboundService(convRepo, contactRepo, msgRepo, whatsappRepo, igConfigRepo, outboxRepo)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		msgRepo domain.MessageRepository,
+		whatsappRepo whatsappDomain.ConfigRepository,
+		igConfigRepo igDomain.ConfigRepository,
+		igClient igGraphapi.IGClient,
+		log logger.Logger,
+	) *services.MessageSendHandler {
+		return services.NewMessageSendHandler(msgRepo, whatsappRepo, igConfigRepo, igClient, log)
 	}); err != nil {
 		return err
 	}

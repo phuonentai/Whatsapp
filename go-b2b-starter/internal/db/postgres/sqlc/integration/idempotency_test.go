@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgtype"
 	"sync"
 	"testing"
 
@@ -21,7 +22,7 @@ func seedContactAndConversation(t *testing.T, ctx context.Context, orgID int32, 
 	t.Helper()
 	contact, err := testStore.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgID,
-		PhoneNumber:    phone,
+		PhoneNumber:    pgtype.Text{String: phone, Valid: true},
 		DisplayName:    helpers.ToPgText("IT Contact"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -31,6 +32,7 @@ func seedContactAndConversation(t *testing.T, ctx context.Context, orgID int32, 
 	conv, err := testStore.CreateConversation(ctx, sqlc.CreateConversationParams{
 		OrganizationID: orgID,
 		ContactID:      contact.ID,
+		Channel:        "whatsapp",
 		Status:         "active",
 	})
 	if err != nil {
@@ -49,7 +51,8 @@ func TestMessageIdempotentInsertSingleAndDuplicate(t *testing.T) {
 			OrganizationID:    orgA,
 			ConversationID:    convID,
 			ContactID:         contactID,
-			WhatsappMessageID: helpers.ToPgText("wamid-dup-1"),
+			Channel:           "whatsapp",
+			ProviderMessageID: helpers.ToPgText("wamid-dup-1"),
 			Direction:         "inbound",
 			MessageType:       "text",
 			Content:           helpers.ToPgText("hola"),
@@ -73,9 +76,10 @@ func TestMessageIdempotentInsertSingleAndDuplicate(t *testing.T) {
 		t.Fatalf("expected pgx.ErrNoRows, got: %v", err)
 	}
 
-	existing, err := testStore.GetMessageByWhatsAppID(ctx, sqlc.GetMessageByWhatsAppIDParams{
+	existing, err := testStore.GetMessageByProviderID(ctx, sqlc.GetMessageByProviderIDParams{
 		OrganizationID:    orgA,
-		WhatsappMessageID: helpers.ToPgText("wamid-dup-1"),
+		Channel:           "whatsapp",
+		ProviderMessageID: helpers.ToPgText("wamid-dup-1"),
 	})
 	if err != nil {
 		t.Fatalf("fallback fetch: %v", err)
@@ -85,7 +89,7 @@ func TestMessageIdempotentInsertSingleAndDuplicate(t *testing.T) {
 	}
 
 	count := countRows(t, ctx, fmt.Sprintf(
-		"SELECT count(*) FROM crm.messages WHERE organization_id = %d AND whatsapp_message_id = 'wamid-dup-1'", orgA))
+		"SELECT count(*) FROM crm.messages WHERE organization_id = %d AND provider_message_id = 'wamid-dup-1'", orgA))
 	if count != 1 {
 		t.Fatalf("expected exactly 1 row, got %d", count)
 	}
@@ -107,7 +111,8 @@ func TestMessageIdempotentConcurrentInserts(t *testing.T) {
 				OrganizationID:    orgA,
 				ConversationID:    convID,
 				ContactID:         contactID,
-				WhatsappMessageID: helpers.ToPgText("wamid-conc-1"),
+				Channel:           "whatsapp",
+				ProviderMessageID: helpers.ToPgText("wamid-conc-1"),
 				Direction:         "inbound",
 				MessageType:       "text",
 				Content:           helpers.ToPgText("hi"),
@@ -143,6 +148,7 @@ func TestConversationOneActivePerContact(t *testing.T) {
 	_, err := testStore.InsertActiveConversationIdempotent(ctx, sqlc.InsertActiveConversationIdempotentParams{
 		OrganizationID: orgA,
 		ContactID:      contactID,
+		Channel:           "whatsapp",
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
 	if err != pgx.ErrNoRows {
@@ -168,6 +174,7 @@ func TestConversationOneActivePerContact(t *testing.T) {
 	second, err := testStore.InsertActiveConversationIdempotent(ctx, sqlc.InsertActiveConversationIdempotentParams{
 		OrganizationID: orgA,
 		ContactID:      contactID,
+		Channel:           "whatsapp",
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
 	if err != nil {
@@ -184,7 +191,7 @@ func TestConversationConcurrentEnsureActive(t *testing.T) {
 
 	contact, err := testStore.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573003333004",
+		PhoneNumber:    pgtype.Text{String: "+573003333004", Valid: true},
 		DisplayName:    helpers.ToPgText("Conc Contact"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -202,6 +209,7 @@ func TestConversationConcurrentEnsureActive(t *testing.T) {
 			_, err := testStore.InsertActiveConversationIdempotent(ctx, sqlc.InsertActiveConversationIdempotentParams{
 				OrganizationID: orgA,
 				ContactID:      contact.ID,
+		Channel:           "whatsapp",
 				LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 			})
 			if err != nil && err != pgx.ErrNoRows {

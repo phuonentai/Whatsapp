@@ -75,6 +75,10 @@ export function useDealActivitiesQuery(dealId: number) {
     queryKey: queryKeys.crm.dealActivities(dealId),
     queryFn: () => crmRepository.listActivitiesByDeal(dealId),
     enabled: !!dealId,
+    // Deal activities are time-sensitive (stage changes create activities); the
+    // global default disables refetch-on-mount, which would keep a stale empty
+    // timeline when a deal was moved while viewing another route.
+    refetchOnMount: true,
   });
 }
 

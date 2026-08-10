@@ -35,7 +35,8 @@ class AgentRepository {
     const response = await apiClient.get<Wrapped<{ suggestions: AgentSuggestionDto[] }>>(
       "/agent/suggestions?status=pending"
     );
-    return (response.data?.suggestions ?? []).map(this.toSuggestionModel);
+    const suggestions = response.data?.suggestions ?? (response as unknown as { suggestions?: AgentSuggestionDto[] }).suggestions ?? [];
+    return suggestions.map(this.toSuggestionModel);
   }
 
   async approveSuggestion(

@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	// Redis cache key for RBAC policy
-	rbacPolicyCacheKey = "auth:stytch:rbac:policy"
+	// Redis cache key for RBAC policy.
+	// Versioned (v2) when the `export` action was added so the new action
+	// applies without waiting for the previous cache TTL to expire.
+	rbacPolicyCacheKey = "auth:stytch:rbac:policy:v2"
 	// Cache TTL matches Stytch SDK default (5 minutes)
 	rbacPolicyCacheTTL = 5 * time.Minute
 )

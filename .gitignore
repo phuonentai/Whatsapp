@@ -13,6 +13,9 @@ Thumbs.db
 # creates an .env file in the root.
 .env
 .env.*
+# Backup/scratch env files must never be tracked
+*.env.bak
+*.env.bak.*
 # But allow .env.example and example.env files (templates for users)
 !.env.example
 !**/.env.example

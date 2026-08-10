@@ -7,8 +7,11 @@ import (
 
 type ContactRepository interface {
 	UpsertByPhone(ctx context.Context, contact *Contact) (*Contact, error)
+	UpsertByIGUser(ctx context.Context, contact *Contact) (*Contact, error)
 	GetByID(ctx context.Context, orgID, contactID int32) (*Contact, error)
 	GetByPhone(ctx context.Context, orgID int32, phoneNumber string) (*Contact, error)
+	GetByIGUser(ctx context.Context, orgID int32, igUserID string) (*Contact, error)
+	UpdateInstagramProfile(ctx context.Context, orgID, contactID int32, username, avatarURL, displayName string) (*Contact, error)
 	List(ctx context.Context, orgID int32, limit, offset int32) ([]*Contact, error)
 	ListFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*Contact, error)
 	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*Contact, error)
@@ -19,23 +22,26 @@ type ContactRepository interface {
 type ConversationRepository interface {
 	GetByID(ctx context.Context, orgID, convID int32) (*Conversation, error)
 	GetActiveByContact(ctx context.Context, orgID, contactID int32) (*Conversation, error)
+	GetActiveByContactChannel(ctx context.Context, orgID, contactID int32, channel string) (*Conversation, error)
 	Create(ctx context.Context, conv *Conversation) (*Conversation, error)
 	EnsureActive(ctx context.Context, conv *Conversation) (*Conversation, error)
 	UpdateLastMessageAt(ctx context.Context, orgID, convID int32, lastMessageAt *time.Time) (*Conversation, error)
 	UpdateStatus(ctx context.Context, orgID, convID int32, status ConversationStatus) (*Conversation, error)
-	ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*ConversationWithContact, error)
+	ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*ConversationWithContact, error)
 }
 
 type MessageRepository interface {
 	Create(ctx context.Context, msg *Message) (*Message, error)
 	InsertIdempotent(ctx context.Context, msg *Message) (*Message, bool, error)
-	GetByWhatsAppID(ctx context.Context, orgID int32, whatsappMessageID string) (*Message, error)
+	GetByProviderID(ctx context.Context, orgID int32, channel, providerMessageID string) (*Message, error)
+	UpdateStatus(ctx context.Context, id int32, status, providerMessageID string) (*Message, error)
 	ListByConversation(ctx context.Context, orgID, convID int32, limit, offset int32) ([]*Message, error)
 }
 
 type CompanyRepository interface {
 	Create(ctx context.Context, company *Company) (*Company, error)
 	GetByID(ctx context.Context, orgID, companyID int32) (*CompanyWithCounts, error)
+	GetByNit(ctx context.Context, orgID int32, nit string) (*Company, error)
 	List(ctx context.Context, orgID int32, limit, offset int32) ([]*CompanyWithCounts, error)
 	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*CompanyWithCounts, error)
 	Update(ctx context.Context, company *Company) (*Company, error)

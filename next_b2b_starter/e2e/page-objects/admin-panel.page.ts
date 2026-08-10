@@ -1,4 +1,15 @@
-import { Page, Locator } from "@playwright/test";
+import { Page, Locator, expect } from "@playwright/test";
+
+const SETTINGS_VIEW_HEADINGS: Record<string, string> = {
+  profile: "Account & workspace",
+  members: "Team access",
+  subscription: "Subscription & billing",
+  modules: "Modules",
+  ai: "AI Copilot",
+  compliance: "Compliance",
+  audit: "Audit log",
+  whatsapp: "Messaging",
+};
 
 export class AdminPanelPage {
   readonly page: Page;
@@ -13,13 +24,14 @@ export class AdminPanelPage {
 
   async goto(path: string) {
     await this.page.goto(path);
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("load");
   }
 
   async gotoSettings(view?: string) {
     const url = view ? `/dashboard/settings?view=${view}` : "/dashboard/settings";
     await this.goto(url);
-    await this.page.waitForSelector("text=Workspace settings");
+    const heading = view ? SETTINGS_VIEW_HEADINGS[view] ?? "Messaging" : "Workspace settings";
+    await this.page.waitForSelector(`text=${heading}`);
   }
 
   async sidebarEntry(name: string): Promise<Locator> {
@@ -39,7 +51,7 @@ export class AdminPanelPage {
   async openOverviewSection(title: string) {
     await this.goto("/dashboard/settings");
     await this.page.getByRole("button", { name: new RegExp(title) }).first().click();
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("load");
   }
 
   async editWorkspaceName(name: string) {
@@ -61,6 +73,6 @@ export class AdminPanelPage {
 
   async filterAuditByType(type: string) {
     await this.page.selectOption('select[aria-label="Filter audit log by type"]', type);
-    await this.page.waitForTimeout(300);
+    await expect(this.auditLogList).toBeVisible();
   }
 }

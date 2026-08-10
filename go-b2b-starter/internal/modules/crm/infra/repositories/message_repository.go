@@ -24,7 +24,8 @@ func (r *messageRepository) Create(ctx context.Context, msg *domain.Message) (*d
 		OrganizationID:    msg.OrganizationID,
 		ConversationID:    msg.ConversationID,
 		ContactID:         msg.ContactID,
-		WhatsappMessageID: helpers.ToPgText(msg.WhatsAppMessageID),
+		Channel:           channelOrDefault(msg.Channel),
+		ProviderMessageID: helpers.ToPgText(msg.ProviderMessageID),
 		Direction:         string(msg.Direction),
 		MessageType:       string(msg.MessageType),
 		Content:           helpers.ToPgText(msg.Content),
@@ -46,7 +47,8 @@ func (r *messageRepository) InsertIdempotent(ctx context.Context, msg *domain.Me
 		OrganizationID:    msg.OrganizationID,
 		ConversationID:    msg.ConversationID,
 		ContactID:         msg.ContactID,
-		WhatsappMessageID: helpers.ToPgText(msg.WhatsAppMessageID),
+		Channel:           channelOrDefault(msg.Channel),
+		ProviderMessageID: helpers.ToPgText(msg.ProviderMessageID),
 		Direction:         string(msg.Direction),
 		MessageType:       string(msg.MessageType),
 		Content:           helpers.ToPgText(msg.Content),
@@ -57,8 +59,8 @@ func (r *messageRepository) InsertIdempotent(ctx context.Context, msg *domain.Me
 
 	result, err := r.store.InsertMessageIdempotent(ctx, params)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) && msg.WhatsAppMessageID != "" {
-			existing, getErr := r.GetByWhatsAppID(ctx, msg.OrganizationID, msg.WhatsAppMessageID)
+		if errors.Is(err, pgx.ErrNoRows) && msg.ProviderMessageID != "" {
+			existing, getErr := r.GetByProviderID(ctx, msg.OrganizationID, channelOrDefault(msg.Channel), msg.ProviderMessageID)
 			if getErr != nil {
 				return nil, false, fmt.Errorf("failed to fetch message after idempotent insert: %w", getErr)
 			}
@@ -70,17 +72,33 @@ func (r *messageRepository) InsertIdempotent(ctx context.Context, msg *domain.Me
 	return r.mapToDomain(&result), true, nil
 }
 
-func (r *messageRepository) GetByWhatsAppID(ctx context.Context, orgID int32, whatsappMessageID string) (*domain.Message, error) {
-	params := sqlc.GetMessageByWhatsAppIDParams{
+func (r *messageRepository) GetByProviderID(ctx context.Context, orgID int32, channel, providerMessageID string) (*domain.Message, error) {
+	params := sqlc.GetMessageByProviderIDParams{
 		OrganizationID:    orgID,
-		WhatsappMessageID: helpers.ToPgText(whatsappMessageID),
+		Channel:           channel,
+		ProviderMessageID: helpers.ToPgText(providerMessageID),
 	}
 
-	result, err := r.store.GetMessageByWhatsAppID(ctx, params)
+	result, err := r.store.GetMessageByProviderID(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message by whatsapp id: %w", err)
+		return nil, fmt.Errorf("failed to get message by provider id: %w", err)
 	}
 
+	return r.mapToDomain(&result), nil
+}
+
+func (r *messageRepository) UpdateStatus(ctx context.Context, id int32, status, providerMessageID string) (*domain.Message, error) {
+	result, err := r.store.UpdateMessageStatus(ctx, sqlc.UpdateMessageStatusParams{
+		ID:                id,
+		Status:            status,
+		ProviderMessageID: helpers.ToPgText(providerMessageID),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrMessageNotFound
+		}
+		return nil, fmt.Errorf("failed to update message status: %w", err)
+	}
 	return r.mapToDomain(&result), nil
 }
 
@@ -111,7 +129,8 @@ func (r *messageRepository) mapToDomain(m *sqlc.CrmMessage) *domain.Message {
 		OrganizationID:    m.OrganizationID,
 		ConversationID:    m.ConversationID,
 		ContactID:         m.ContactID,
-		WhatsAppMessageID: helpers.FromPgText(m.WhatsappMessageID),
+		Channel:           m.Channel,
+		ProviderMessageID: helpers.FromPgText(m.ProviderMessageID),
 		Direction:         domain.MessageDirection(m.Direction),
 		MessageType:       domain.MessageType(m.MessageType),
 		Content:           helpers.FromPgText(m.Content),

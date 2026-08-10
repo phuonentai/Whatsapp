@@ -7,32 +7,37 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/moasq/go-b2b-starter/internal/api"
+	db "github.com/moasq/go-b2b-starter/internal/db/cmd"
+	docs "github.com/moasq/go-b2b-starter/internal/docs/cmd"
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/cmd"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	authCmd "github.com/moasq/go-b2b-starter/internal/modules/auth/cmd"
 	billing "github.com/moasq/go-b2b-starter/internal/modules/billing/cmd"
+	campaigns "github.com/moasq/go-b2b-starter/internal/modules/campaigns/cmd"
 	cognitive "github.com/moasq/go-b2b-starter/internal/modules/cognitive/cmd"
 	crm "github.com/moasq/go-b2b-starter/internal/modules/crm/cmd"
-	db "github.com/moasq/go-b2b-starter/internal/db/cmd"
-	docs "github.com/moasq/go-b2b-starter/internal/docs/cmd"
 	documents "github.com/moasq/go-b2b-starter/internal/modules/documents/cmd"
-	eventbus "github.com/moasq/go-b2b-starter/internal/platform/eventbus/cmd"
 	files "github.com/moasq/go-b2b-starter/internal/modules/files/cmd"
+	instagram "github.com/moasq/go-b2b-starter/internal/modules/instagram/cmd"
 	invoicing "github.com/moasq/go-b2b-starter/internal/modules/invoicing/cmd"
+	organizations "github.com/moasq/go-b2b-starter/internal/modules/organizations/cmd"
+	orgDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
+	payments "github.com/moasq/go-b2b-starter/internal/modules/payments/cmd"
+	paywall "github.com/moasq/go-b2b-starter/internal/modules/paywall/cmd"
+	playbooks "github.com/moasq/go-b2b-starter/internal/modules/playbooks"
+	playbooksDomain "github.com/moasq/go-b2b-starter/internal/modules/playbooks/domain"
+	registry "github.com/moasq/go-b2b-starter/internal/modules/registry"
+	whatsapp "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/cmd"
+	eventbus "github.com/moasq/go-b2b-starter/internal/platform/eventbus/cmd"
 	llm "github.com/moasq/go-b2b-starter/internal/platform/llm/cmd"
 	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/cmd"
 	mercadopago "github.com/moasq/go-b2b-starter/internal/platform/mercadopago/cmd"
 	ocr "github.com/moasq/go-b2b-starter/internal/platform/ocr/cmd"
-	orgDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
-	organizations "github.com/moasq/go-b2b-starter/internal/modules/organizations/cmd"
-	paywall "github.com/moasq/go-b2b-starter/internal/modules/paywall/cmd"
-	playbooks "github.com/moasq/go-b2b-starter/internal/modules/playbooks"
-	registry "github.com/moasq/go-b2b-starter/internal/modules/registry"
+	outbox "github.com/moasq/go-b2b-starter/internal/platform/outbox/cmd"
 	polar "github.com/moasq/go-b2b-starter/internal/platform/polar/cmd"
 	redisCmd "github.com/moasq/go-b2b-starter/internal/platform/redis/cmd"
 	server "github.com/moasq/go-b2b-starter/internal/platform/server/cmd"
 	stytchCmd "github.com/moasq/go-b2b-starter/internal/platform/stytch/cmd"
-	whatsapp "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/cmd"
 )
 
 // orgLookupAdapter adapts orgDomain.OrganizationRepository to auth.OrganizationLookup
@@ -61,6 +66,12 @@ func InitMods(container *dig.Container) {
 	db.Init(container)
 	files.Init(container)
 	if err := eventbus.Init(container); err != nil {
+		panic(err)
+	}
+	// Outbox must be initialized before whatsapp (webhook service publishes
+	// events through the durable outbox) and before crm/agent (their
+	// listeners consume dispatched events).
+	if err := outbox.Init(container); err != nil {
 		panic(err)
 	}
 	if err := llm.Init(container); err != nil {
@@ -134,20 +145,15 @@ func InitMods(container *dig.Container) {
 	if err := playbooks.NewProvider(container).RegisterDependencies(); err != nil {
 		panic(err)
 	}
-	if err := billing.Init(container); err != nil {
-		panic(err)
+	// CatalogValidated: fail fast at boot if the Go catalog drifts from the
+	// seeded modules.playbooks payloads (guiones incl. pasos).
+	if err := container.Invoke(func(repo playbooksDomain.PlaybookRepository) error {
+		return playbooks.CatalogValidated(context.Background(), repo)
+	}); err != nil {
+		panic(fmt.Sprintf("playbook catalog validation failed: %v", err))
 	}
 
-	// Paywall middleware (access gating based on subscription status)
-	if err := paywall.SetupMiddleware(container); err != nil {
-		panic(err)
-	}
-	if err := paywall.RegisterNamedMiddlewares(container); err != nil {
-		panic(err)
-	}
-
-	// OCR service (Mistral API for document text extraction)
-	// Must be initialized before documents module (documents depends on OCR)
+	// OCR service (Mistral API for document text extraction)	// Must be initialized before documents module (documents depends on OCR)
 	if err := ocr.Init(container); err != nil {
 		panic(err)
 	}
@@ -169,6 +175,12 @@ func InitMods(container *dig.Container) {
 		panic(err)
 	}
 
+	// Instagram module (DM webhook ingress + config). Must precede crm: the
+	// CRM inbound/outbound paths route by conversation channel.
+	if err := instagram.Init(container); err != nil {
+		panic(err)
+	}
+
 	// CRM module (contacts/conversations/messages + outbound). Must precede
 	// agent: the agent pipeline depends on the CRM outbound service. This
 	// also wires the whatsapp.message.received CRM listener.
@@ -176,9 +188,38 @@ func InitMods(container *dig.Container) {
 		panic(err)
 	}
 
+	// Payments module (client-facing one-shot payment links). Depends on CRM
+	// repos/outbound; provides the PaymentEventHandler consumed by the billing
+	// webhook dispatch and the real PaymentLinker for invoicing. Must precede
+	// billing (BillingService construction consumes the handler) and invoicing.
+	if err := payments.Init(container); err != nil {
+		panic(err)
+	}
+
+	// Billing module (subscription lifecycle, quotas, webhooks).
+	// Registry module services must be registered before billing because
+	// BillingService depends on ModuleService.
+	if err := billing.Init(container); err != nil {
+		panic(err)
+	}
+
+	// Paywall middleware (access gating based on subscription status)
+	if err := paywall.SetupMiddleware(container); err != nil {
+		panic(err)
+	}
+	if err := paywall.RegisterNamedMiddlewares(container); err != nil {
+		panic(err)
+	}
+
 	// Agent module (agentic WhatsApp assistant). Subscribes to the same
 	// whatsapp.message.received event alongside the CRM listener.
 	if err := cmd.Init(container); err != nil {
+		panic(err)
+	}
+
+	// Campaigns module (segments + audience snapshot + AI audience builder).
+	// Depends on CRM repos (tags, activities) and the metered LLM client.
+	if err := campaigns.Init(container); err != nil {
 		panic(err)
 	}
 

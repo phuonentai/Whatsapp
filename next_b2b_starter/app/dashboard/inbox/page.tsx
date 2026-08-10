@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ConversationList } from "./components/conversation-list";
 import { MessageThread } from "./components/message-thread";
 import { ConversationHeader } from "./components/conversation-header";
@@ -16,14 +16,38 @@ import { useUpdateConversationStatus } from "@/lib/hooks/mutations/use-update-co
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { usePendingSuggestionsQuery } from "@/lib/hooks/queries/use-pending-suggestions-query";
-import type { Conversation, ConversationStatus } from "@/lib/models/conversation.model";
+import { useSequence } from "@/lib/hooks/use-sequence";
+import type { Conversation, ConversationStatus, Channel } from "@/lib/models/conversation.model";
+import type { PlaybookGuionDto } from "@/lib/api/api/dto/playbook.dto";
+
+const CHANNEL_VALUES: Array<Channel | "all"> = ["all", "whatsapp", "instagram"];
 
 export default function InboxPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission, isInitialized } = usePermissions();
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [draft, setDraft] = useState<string>("");
+
+  const rawChannel = searchParams.get("channel");
+  const channelFilter: Channel | "all" = CHANNEL_VALUES.includes(rawChannel as Channel)
+    ? (rawChannel as Channel)
+    : "all";
+
+  const handleChannelChange = useCallback(
+    (channel: Channel | "all") => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (channel === "all") {
+        next.delete("channel");
+      } else {
+        next.set("channel", channel);
+      }
+      const qs = next.toString();
+      router.replace(qs ? `/dashboard/inbox?${qs}` : "/dashboard/inbox");
+    },
+    [router, searchParams]
+  );
 
   useEffect(() => {
     if (isInitialized && !hasPermission(PERMISSIONS.ORG_MANAGE)) {
@@ -31,13 +55,15 @@ export default function InboxPage() {
     }
   }, [isInitialized, hasPermission, router]);
 
-  const { data: conversations, isLoading: isConvsLoading } = useConversationsQuery(
-    statusFilter ? { status: statusFilter } : undefined
-  );
+  const { data: conversations, isLoading: isConvsLoading } = useConversationsQuery({
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(channelFilter !== "all" ? { channel: channelFilter } : {}),
+  });
   const { data: messages, isLoading: isMsgsLoading } = useMessagesQuery(selectedConv?.id);
   const { data: pendingSuggestions } = usePendingSuggestionsQuery();
   const sendMsgMutation = useSendMessage(selectedConv?.id ?? 0);
   const updateStatusMutation = useUpdateConversationStatus();
+  const sequence = useSequence(selectedConv?.id ?? 0);
 
   const pendingCounts = (pendingSuggestions ?? []).reduce<Record<number, number>>((acc, s) => {
     if (s.status !== "pending") return acc;
@@ -55,11 +81,25 @@ export default function InboxPage() {
 
   const handleSelectConversation = (conv: Conversation) => {
     setSelectedConv(conv);
+    sequence.reset();
+    setDraft("");
   };
 
   const handleSendMessage = async (content: string) => {
     if (!selectedConv) return;
     await sendMsgMutation.mutateAsync(content);
+  };
+
+  const handleSelectGuion = (guion: PlaybookGuionDto) => {
+    const firstStep = sequence.start(guion);
+    setDraft(firstStep ?? guion.mensaje ?? "");
+  };
+
+  const handleSequenceSent = () => {
+    const nextStep = sequence.advance();
+    if (nextStep !== null) {
+      setDraft(nextStep);
+    }
   };
 
   const handleToggleStatus = async () => {
@@ -82,6 +122,8 @@ export default function InboxPage() {
           isLoading={isConvsLoading}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          channelFilter={channelFilter}
+          onChannelFilterChange={handleChannelChange}
           pendingCounts={pendingCounts}
         />
       </div>
@@ -96,17 +138,24 @@ export default function InboxPage() {
             />
             <MessageThread messages={messages ?? []} isLoading={isMsgsLoading} />
             <AgentSuggestionsPanel conversationId={selectedConv.id} />
-            <QuickReplies conversationId={selectedConv.id} onSelect={setDraft} />
+            <QuickReplies
+              conversationId={selectedConv.id}
+              onSelect={handleSelectGuion}
+              sequenceActive={sequence.active}
+              sequenceStep={sequence.stepIndex}
+              sequenceTotal={sequence.totalSteps}
+            />
             <ReplyInput
               onSend={handleSendMessage}
               isSending={sendMsgMutation.isPending}
               conversationId={selectedConv.id}
               value={draft}
               onChange={setDraft}
+              onSent={handleSequenceSent}
             />
           </>
         ) : (
-          <EmptyState />
+          <EmptyState channel={channelFilter} />
         )}
       </div>
     </div>

@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines auth-gated WhatsApp config endpoints: GET retrieval, PUT upsert, and PATCH active-state toggle.
+
+## Requirements
 
 ### Requirement: Auth-gated GET endpoint returns organization's WhatsApp config
 
@@ -8,7 +12,7 @@ The system SHALL expose a `GET /api/v1/whatsapp/config` endpoint protected by th
 
 - **WHEN** an authenticated user with `org:manage` permission requests `GET /api/v1/whatsapp/config`
 - **AND** the organization has a WhatsApp config record
-- **THEN** the system SHALL return HTTP 200 with the config object, masking `webhook_secret` and `verify_token` to show only the first 6 and last 4 characters (e.g., `"whsec_****abcd"`)
+- **THEN** the system SHALL return HTTP 200 with the config object, masking `webhook_secret`, `verify_token`, and `access_token` to show only the first 6 and last 4 characters (e.g., `"whsec_****abcd"`)
 
 #### Scenario: No config exists
 
@@ -34,24 +38,24 @@ The system SHALL expose a `PUT /api/v1/whatsapp/config` endpoint that creates a 
 
 - **WHEN** an authenticated user with `org:manage` permission sends `PUT /api/v1/whatsapp/config` with a valid body containing `phone_number_id`, `business_phone`, `webhook_secret`, and `verify_token`
 - **AND** the organization has no existing WhatsApp config
-- **THEN** the system SHALL insert a new row into `whatsapp.whatsapp_configs` scoped to the organization
-- **AND** the system SHALL return HTTP 200 with the created config (secrets masked)
+- **THEN** the system SHALL insert a new row into `whatsapp.whatsapp_configs` scoped to the organization, including optional fields `waba_id`, `access_token`, `api_version`, and `graph_api_url` if provided
+- **AND** the system SHALL return HTTP 200 with the created config (secrets and access_token masked)
 
 #### Scenario: Update an existing config
 
 - **WHEN** an authenticated user with `org:manage` permission sends `PUT /api/v1/whatsapp/config` with updated field values
 - **AND** the organization already has a WhatsApp config
 - **THEN** the system SHALL update the existing row using partial update semantics (only changed fields are updated; omitted fields retain their current values)
-- **AND** the system SHALL return HTTP 200 with the updated config (secrets masked)
+- **AND** the system SHALL return HTTP 200 with the updated config (secrets and access_token masked)
 
 #### Scenario: Secret field is empty on update
 
-- **WHEN** a `PUT /api/v1/whatsapp/config` request body has an empty `webhook_secret` or `verify_token`
+- **WHEN** a `PUT /api/v1/whatsapp/config` request body has an empty `webhook_secret`, `verify_token`, or `access_token`
 - **THEN** the system SHALL preserve the existing stored secret value (do not overwrite with empty string)
 
 #### Scenario: Secret field contains masked value on update
 
-- **WHEN** a `PUT /api/v1/whatsapp/config` request body has a masked `webhook_secret` (e.g., `"whsec_****abcd"`)
+- **WHEN** a `PUT /api/v1/whatsapp/config` request body has a masked `webhook_secret` (e.g., `"whsec_****abcd"`), `verify_token`, or `access_token`
 - **THEN** the system SHALL preserve the existing stored secret value
 
 #### Scenario: Validation fails
@@ -110,3 +114,24 @@ The system SHALL register WhatsApp routes in `internal/api/provider.go` so they 
 - **WHEN** the API server starts
 - **THEN** `GET /api/v1/whatsapp/config`, `PUT /api/v1/whatsapp/config`, and `PATCH /api/v1/whatsapp/config/toggle` SHALL be reachable with auth middleware applied
 - **AND** `GET /api/v1/webhooks/whatsapp` and `POST /api/v1/webhooks/whatsapp` SHALL be reachable without auth middleware
+
+### Requirement: WhatsApp config supports WABA ID and access token for outbound API
+
+The `whatsapp.whatsapp_configs` table SHALL support `waba_id` (VARCHAR, nullable), `access_token` (VARCHAR, nullable), `api_version` (VARCHAR, default `v21.0`), and `graph_api_url` (VARCHAR, default `https://graph.facebook.com`) columns for outbound WhatsApp Cloud API communication.
+
+#### Scenario: Config with new fields is returned
+
+- **WHEN** a config exists with `waba_id`, `access_token`, `api_version`, and `graph_api_url` set
+- **AND** `GET /api/v1/whatsapp/config` is called
+- **THEN** the response SHALL include all four fields, with `access_token` masked (first 6 + last 4 chars, `****` in between)
+
+#### Scenario: Config with default values for optional fields
+
+- **WHEN** a config is created without specifying `api_version` and `graph_api_url`
+- **THEN** the system SHALL default `api_version` to `v21.0` and `graph_api_url` to `https://graph.facebook.com`
+
+#### Scenario: Update config with new fields
+
+- **WHEN** `PUT /api/v1/whatsapp/config` is called with new values for `waba_id`, `access_token`, `api_version`, or `graph_api_url`
+- **THEN** the system SHALL update the corresponding fields
+

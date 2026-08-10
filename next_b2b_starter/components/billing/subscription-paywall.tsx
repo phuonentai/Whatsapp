@@ -11,6 +11,7 @@ import { useProductsQuery } from "@/lib/hooks/queries/use-products-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
+import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
 
 interface SubscriptionPaywallProps {
   // No props required - component fetches its own data
@@ -24,6 +25,7 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
   } = usePermissions();
   const hasSubscriptionPermission = hasPermission(PERMISSIONS.ORG_MANAGE);
   const shouldLoadSubscription = permissionsReady && hasSubscriptionPermission;
+  const mercadopagoEnabled = isMercadoPagoEnabled();
 
   const [isPlansOpen, setPlansOpen] = useState(false);
 
@@ -201,15 +203,17 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
 
             {state.reason === "NO_ACTIVE_SUBSCRIPTION" && (
               <p className="mt-8 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                Your payment method may have expired or the subscription was canceled. Restart your
-                plan to continue where you left off.
+                {mercadopagoEnabled
+                  ? "Your MercadoPago subscription may have been canceled or your payment method may have expired. Restart your plan to continue where you left off."
+                  : "Your payment method may have expired or the subscription was canceled. Restart your plan to continue where you left off."}
               </p>
             )}
 
             {state.reason === "CUSTOMER_NOT_FOUND" && (
               <p className="mt-8 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
-                We couldn&apos;t match your organization to an active Polar customer. Subscribe using
-                the same email you used to sign in, and we&apos;ll link everything automatically.
+                {mercadopagoEnabled
+                  ? "We couldn&apos;t match your organization to an active subscription. Subscribe via PSE or Nequi to reactivate it, and we&apos;ll link everything automatically."
+                  : "We couldn&apos;t match your organization to an active Polar customer. Subscribe using the same email you used to sign in, and we&apos;ll link everything automatically."}
               </p>
             )}
 
@@ -225,6 +229,7 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
         open={isPlansOpen}
         onOpenChange={setPlansOpen}
         subscriptionState={state}
+        mercadopagoEnabled={mercadopagoEnabled}
       />
     </main>
   );

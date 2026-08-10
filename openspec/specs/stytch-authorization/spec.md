@@ -1,4 +1,10 @@
-stytch-go from v16 to v18
+## Purpose
+
+Define how Stytch RBAC policies drive authorization in the Go backend: permission resolution, role normalization, RBAC API authentication, and the edge-middleware trust boundary.
+
+## Requirements
+
+### Requirement: stytch-go upgraded from v16 to v18
 
 The system SHALL use `github.com/stytchauth/stytch-go/v18` as the Stytch Go SDK dependency.
 
@@ -12,8 +18,6 @@ The `LoginOrSignup` magic link method SHALL NOT be called during organization bo
 - **AND** `go build` is executed
 - **THEN** compilation succeeds without import or signature errors
 - **AND** organization creation, member management, RBAC, and session operations remain functional
-
-## MODIFIED Requirements
 
 ### Requirement: Permission resolution from Stytch RBAC policy
 
@@ -42,7 +46,6 @@ If the Stytch RBAC API is unreachable and the cache is empty, the system MUST re
 - **AND** the Stytch RBAC API is unreachable
 - **THEN** the system returns a 503 Service Unavailable error
 
-## ADDED Requirements
 
 ### Requirement: Go backend accepts pre-validated JWT from edge middleware
 
@@ -85,3 +88,101 @@ The Go backend SHALL log a warning when the edge middleware's `X-Forwarded-Auth`
 - **AND** Stytch API returns an invalid/expired session response
 - **THEN** the Go backend SHALL log a warning with the `stytch_member_id`, `stytch_organization_id`, and Stytch API error
 - **AND** SHALL return a 401 Unauthorized
+
+### Requirement: RBAC export action for bulk download
+
+The Stytch RBAC policy SHALL define an `export` action on the `contact`, `deal`, and `activity` resources, and the `admin` and `manager` roles SHALL be granted it, so that bulk data download is a distinct, explicitly-granted privilege rather than an implied consequence of `view`. The Go backend SHALL mirror the action in its fallback role-permission maps (`rbac.go`/`roles.go`) for development and mock-auth parity. The Redis-cached RBAC policy (`rbacPolicyCacheKey`) SHALL be versioned when the action is introduced so the new action takes effect without waiting for the cache TTL to expire.
+
+#### Scenario: Export action exists in the Stytch policy
+
+- **WHEN** the Stytch RBAC policy is fetched
+- **THEN** the `contact`, `deal`, and `activity` resources SHALL list `export` among their actions
+- **AND** the `admin` and `manager` roles SHALL be granted `contact:export`, `deal:export`, and `activity:export`
+
+#### Scenario: Wildcard roles resolve export
+
+- **WHEN** a role is granted `contact:*` in the policy
+- **THEN** the expanded permissions SHALL include `contact:export` because `export` is a declared action of the `contact` resource
+
+#### Scenario: Policy cache reflects the new action after rollout
+
+- **WHEN** the policy cache key is versioned at rollout
+- **THEN** the next fetch of the policy SHALL resolve the new `export` action without waiting for the prior cache TTL
+
+### Requirement: Role normalization
+
+The system SHALL normalize Stytch role IDs by removing the `stytch_` prefix. For example, `stytch_member` SHALL be normalized to `member`, `stytch_admin` to `admin`.
+
+The normalization MUST use `strings.TrimPrefix(roleID, "stytch_")` — NOT string matching on partial substrings like `"member"`.
+
+#### Scenario: Standard role normalization
+
+- **WHEN** a role ID `stytch_member` is received
+- **THEN** it is normalized to `member`
+
+#### Scenario: Role without prefix passes through
+
+- **WHEN** a role ID `custom_role` is received
+- **THEN** it passes through unchanged as `custom_role`
+
+#### Scenario: Whitespace handling
+
+- **WHEN** a role ID has leading or trailing whitespace
+- **THEN** the whitespace is trimmed before prefix removal
+
+### Requirement: RBAC API endpoint authentication
+
+All RBAC API endpoints (roles, permissions, by-category, role details, check-permission, metadata) SHALL require a valid authenticated session. Unauthenticated requests MUST receive a 401 Unauthorized response.
+
+#### Scenario: Authenticated RBAC request
+
+- **WHEN** an authenticated user sends a GET request to `/api/rbac/roles`
+- **THEN** the system returns a 200 response with the roles and their permissions
+
+#### Scenario: Unauthenticated RBAC request
+
+- **WHEN** an unauthenticated user sends a GET request to `/api/rbac/roles`
+- **THEN** the system returns a 401 Unauthorized response
+
+### Requirement: RBACService implementation backed by Stytch policy
+
+The `RBACService` interface SHALL have a single implementation (`StytchRBACService`) that derives all methods from the Stytch RBAC policy. The following methods MUST be supported:
+
+| Method | Derivation |
+|--------|-----------|
+| `GetAllRoles()` | All roles from policy, each with `RoleInfo` including normalized ID and permissions |
+| `GetRoleInfo(roleID)` | Single role lookup by normalized ID |
+| `GetAllPermissions()` | All unique `resource:action` pairs from all role definitions |
+| `GetRolePermissions(roleID)` | Delegates to `RBACPolicyService.GetRolePermissions()` |
+| `GetPermissionsByCategory()` | Permissions grouped by resource (category = resource name) |
+| `GetPermissionsByRoleID(roleID)` | String IDs of all permissions for a role |
+| `HasPermission(roleID, permissionId)` | True if any role permission matches the permission ID |
+| `GetRBACMetadata()` | Counts derived from policy (total roles, total permissions, per-role counts) |
+
+#### Scenario: GetAllRoles returns roles from policy
+
+- **WHEN** `GetAllRoles()` is called
+- **THEN** it returns all roles defined in the Stytch RBAC policy
+- **AND** each role has a normalized ID, display name, and resolved permissions
+
+#### Scenario: GetRoleInfo for existing role
+
+- **WHEN** `GetRoleInfo("admin")` is called
+- **AND** the Stytch policy defines an `admin` role
+- **THEN** it returns the `RoleInfo` with the correct permissions
+
+#### Scenario: GetRoleInfo for non-existent role
+
+- **WHEN** `GetRoleInfo("nonexistent_role")` is called
+- **AND** the Stytch policy does NOT define this role
+- **THEN** it returns nil
+
+### Requirement: DTOs retained as API contract
+
+The `RoleDTO`, `PermissionDTO`, `RolesResponse`, `PermissionsResponse`, and other API response types in `auth/rbac.go` SHALL be retained. Only the hardcoded *data* (`RoleInfo` variables, `AllRoles`, `AllPermissions`, `GetRoleInfo()`, `HasPermission()`) SHALL be removed.
+
+#### Scenario: API response format unchanged
+
+- **WHEN** a client calls `GET /api/rbac/roles`
+- **THEN** the JSON response format SHALL be identical to the pre-change format
+- **AND** the values (role names, permission lists) SHALL come from Stytch RBAC policy, not hardcoded constants

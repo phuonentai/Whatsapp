@@ -26,10 +26,9 @@ var (
 )
 
 // migrationsToApply lists every .up.sql file in the migrations directory in
-// apply order, EXCLUDING 000002_add_tenant_isolation.up.sql, which references
-// public.organizations (nonexistent) and is a pre-existing broken migration
-// (documented in 000016_audit_report.md). The migrate CLI cannot apply this
-// migration set at all because 000002 is duplicated across two files.
+// apply order. The migrate CLI cannot apply this migration set because older
+// version prefixes were reused during renumbering; the harness applies the
+// files directly instead.
 var migrationsToApply = []string{
 	"000001_create_file_manager_schema.up.sql",
 	"000002_create_organizations_schema.up.sql",
@@ -47,8 +46,23 @@ var migrationsToApply = []string{
 	"000014_add_whatsapp_config_outbound_fields.up.sql",
 	"000015_add_billing_provider_to_organizations.up.sql",
 	"000016_create_crm_integrity_constraints.up.sql",
-	"000020_create_whatsapp_signup_flows.up.sql",
+	"000017_create_modules_tickets.up.sql",
+	"000018_create_ai_usage_ledger.up.sql",
+	"000019_create_agent_schema.up.sql",
+	"000020_create_playbooks.up.sql",
 	"000021_create_invoices.up.sql",
+	"000022_add_tenant_isolation.up.sql",
+	"000023_create_whatsapp_signup_flows.up.sql",
+	"000024_make_webhook_logs_org_nullable.up.sql",
+	"000025_update_playbook_sequence_seeds.up.sql",
+	"000026_create_outbox_events.up.sql",
+	"000027_add_webhook_logs_delivery_key.up.sql",
+	"000028_create_org_connections.up.sql",
+	"000029_create_campaign_segments.up.sql",
+	"000030_onboarding_data.up.sql",
+	"000031_create_client_payments.up.sql",
+	"000032_seed_analytics_module.up.sql",
+	"000033_add_instagram_schema.up.sql",
 }
 
 func TestMain(m *testing.M) {

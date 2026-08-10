@@ -12,6 +12,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/infra/repositories"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/infra/routing"
+	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/infra/secrets"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/infra/siigo"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 )
@@ -29,6 +30,18 @@ func ProvideDependencies(container *dig.Container) error {
 		return fmt.Errorf("failed to provide siigo config: %w", err)
 	}
 
+	// Envelope encryption (SIIGO_MASTER_KEY). Used for per-org credential
+	// storage; also satisfies the service CredentialCipher seam.
+	if err := container.Provide(func(cfg *siigo.Config) (*secrets.Envelope, error) {
+		env, err := secrets.NewEnvelope(cfg.MasterKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to init secrets envelope: %w", err)
+		}
+		return env, nil
+	}); err != nil {
+		return fmt.Errorf("failed to provide secrets envelope: %w", err)
+	}
+
 	// Local invoice repository (system of record).
 	if err := container.Provide(func(store sqlc.Store) domain.InvoiceRepository {
 		return repositories.NewInvoiceRepository(store)
@@ -36,16 +49,45 @@ func ProvideDependencies(container *dig.Container) error {
 		return fmt.Errorf("failed to provide invoice repository: %w", err)
 	}
 
+	// Local org connection repository.
+	if err := container.Provide(func(store sqlc.Store) domain.ConnectionRepository {
+		return repositories.NewConnectionRepository(store)
+	}); err != nil {
+		return fmt.Errorf("failed to provide connection repository: %w", err)
+	}
+
+	// Numeration snapshot + import-run repositories.
+	if err := container.Provide(func(store sqlc.Store) domain.NumerationRepository {
+		return repositories.NewNumerationRepository(store)
+	}); err != nil {
+		return fmt.Errorf("failed to provide numeration repository: %w", err)
+	}
+	if err := container.Provide(func(store sqlc.Store) domain.ImportRunRepository {
+		return repositories.NewImportRunRepository(store)
+	}); err != nil {
+		return fmt.Errorf("failed to provide import run repository: %w", err)
+	}
+
+	// Per-org credential resolver (repository + envelope decrypt).
+	if err := container.Provide(func(repo domain.ConnectionRepository, env *secrets.Envelope) domain.CredentialProvider {
+		return siigo.NewCredentialResolver(repo, env)
+	}); err != nil {
+		return fmt.Errorf("failed to provide credential resolver: %w", err)
+	}
+
 	// Siigo adapter (named binding) + per-org resolver + router as the single
 	// unnamed domain.InvoicingProvider. Mirrors billing ProviderRouter wiring.
-	if err := container.Provide(func(cfg *siigo.Config) domain.InvoicingProvider {
-		return siigo.NewAdapter(cfg, nil)
+	if err := container.Provide(func(cfg *siigo.Config, creds domain.CredentialProvider) domain.InvoicingProvider {
+		return siigo.NewAdapter(cfg, nil, creds)
 	}, dig.Name("siigo")); err != nil {
 		return fmt.Errorf("failed to provide siigo adapter: %w", err)
 	}
 
-	if err := container.Provide(func() routing.ProviderResolver {
-		return routing.NewStaticResolver("siigo")
+	// Provider resolver driven by the org connection state: only live
+	// connections route to siigo; everything else routes to the explicit
+	// "none" no-op provider.
+	if err := container.Provide(func(repo domain.ConnectionRepository) routing.ProviderResolver {
+		return routing.NewConnectionProviderResolver(repo)
 	}); err != nil {
 		return fmt.Errorf("failed to provide invoicing provider resolver: %w", err)
 	}
@@ -68,9 +110,17 @@ func ProvideDependencies(container *dig.Container) error {
 		return fmt.Errorf("failed to configure invoicing services: %w", err)
 	}
 
-	// Webhook handler.
-	if err := container.Provide(func(svc services.InvoicingService, cfg *siigo.Config, log loggerDomain.Logger) *invoicing.Handler {
-		return invoicing.NewHandler(svc, cfg, log)
+	// Webhook handler + org-facing connection endpoints.
+	if err := container.Provide(func(
+		svc services.InvoicingService,
+		connSvc services.ConnectionService,
+		numerationSvc services.NumerationService,
+		importSvc services.ImportService,
+		testInvoiceSvc services.TestInvoiceService,
+		cfg *siigo.Config,
+		log loggerDomain.Logger,
+	) *invoicing.Handler {
+		return invoicing.NewHandler(svc, connSvc, numerationSvc, importSvc, testInvoiceSvc, cfg, log)
 	}); err != nil {
 		return fmt.Errorf("failed to provide invoicing handler: %w", err)
 	}

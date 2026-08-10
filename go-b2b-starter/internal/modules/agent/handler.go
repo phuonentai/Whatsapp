@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -16,7 +18,7 @@ import (
 
 // Handler exposes the agent HTTP API.
 type Handler struct {
-	agent     services.AgentService
+	agent      services.AgentService
 	compliance services.ComplianceService
 }
 
@@ -81,6 +83,48 @@ func (h *Handler) HandleApproveSuggestion(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, suggestion)
+}
+
+// HandleSeedSuggestion inserts a pending reply suggestion for e2e testing.
+// Only reachable when mock auth is enabled (AUTH_MOCK_ENABLED=true).
+func (h *Handler) HandleSeedSuggestion(c *gin.Context) {
+	reqCtx := auth.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	if os.Getenv("AUTH_MOCK_ENABLED") != "true" {
+		c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+			http.StatusNotFound, "not_found", "Recurso no encontrado.",
+		))
+		return
+	}
+
+	var body struct {
+		ConversationID int32  `json:"conversation_id"`
+		Body           string `json:"body"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_body", "Cuerpo de solicitud inválido."))
+		return
+	}
+	if body.ConversationID <= 0 || strings.TrimSpace(body.Body) == "" {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_body", "conversation_id y body son requeridos."))
+		return
+	}
+
+	suggestion, err := h.agent.SeedPendingSuggestion(c.Request.Context(), orgID, body.ConversationID, body.Body)
+	if err != nil {
+		if errors.Is(err, domain.ErrConversationNotFound) {
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound, "conversation_not_found", "La conversación no existe.",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError, "agent_seed_failed", "No se pudo crear la sugerencia.",
+		))
+		return
+	}
+	c.JSON(http.StatusCreated, suggestion)
 }
 
 // HandleRejectSuggestion marks a suggestion as rejected.

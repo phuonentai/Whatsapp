@@ -18,7 +18,7 @@ func NewRoutes(handler *Handler) *Routes {
 }
 
 func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.MiddlewareResolver) {
-	group := router.Group("/api/agent")
+	group := router.Group("/agent")
 	group.Use(
 		resolver.Get("auth"),
 		resolver.Get("org_context"),
@@ -36,6 +36,11 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		group.POST("/suggestions/:id/reject",
 			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.HandleRejectSuggestion)
+
+		// Mock-auth test seeding endpoint (AUTH_MOCK_ENABLED=true only).
+		group.POST("/suggestions/seed",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleSeedSuggestion)
 
 		group.GET("/settings",
 			auth.RequirePermissionFunc("org", "view"),

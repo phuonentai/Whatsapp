@@ -31,6 +31,45 @@ type serviceParams struct {
 	PaymentLinker PaymentLinker `optional:"true"`
 }
 
+// connectionParams wires the connection service. The validator is the Siigo
+// adapter (named binding); the cipher is the envelope-encryption infra.
+type connectionParams struct {
+	dig.In
+
+	Repo      domain.ConnectionRepository
+	Validator domain.ConnectionValidator `name:"siigo"`
+	Cipher    CredentialCipher
+	Logger    loggerDomain.Logger
+}
+
+type numerationParams struct {
+	dig.In
+
+	Reader  domain.NumerationReader `name:"siigo"`
+	Repo    domain.NumerationRepository
+	ConnSvc ConnectionService
+	Logger  loggerDomain.Logger
+}
+
+type importParams struct {
+	dig.In
+
+	Reader      domain.CustomerReader `name:"siigo"`
+	CompanyRepo crmDomain.CompanyRepository
+	ContactRepo crmDomain.ContactRepository
+	RunRepo     domain.ImportRunRepository
+	Logger      loggerDomain.Logger
+}
+
+type testInvoiceParams struct {
+	dig.In
+
+	Provider domain.InvoicingProvider
+	Repo     domain.InvoiceRepository
+	ConnSvc  ConnectionService
+	Logger   loggerDomain.Logger
+}
+
 func (m *Module) Configure(container *dig.Container) error {
 	if err := container.Provide(func(p serviceParams) InvoicingService {
 		return NewInvoicingService(
@@ -41,8 +80,32 @@ func (m *Module) Configure(container *dig.Container) error {
 		return fmt.Errorf("failed to provide invoicing service: %w", err)
 	}
 
-	if err := container.Provide(func(svc InvoicingService, log loggerDomain.Logger) DealStageListener {
-		return NewDealStageListener(svc, log)
+	if err := container.Provide(func(p connectionParams) ConnectionService {
+		return NewConnectionService(p.Repo, p.Validator, p.Cipher, p.Logger)
+	}); err != nil {
+		return fmt.Errorf("failed to provide connection service: %w", err)
+	}
+
+	if err := container.Provide(func(p numerationParams) NumerationService {
+		return NewNumerationService(p.Reader, p.Repo, p.ConnSvc, p.Logger)
+	}); err != nil {
+		return fmt.Errorf("failed to provide numeration service: %w", err)
+	}
+
+	if err := container.Provide(func(p importParams) ImportService {
+		return NewImportService(p.Reader, p.CompanyRepo, p.ContactRepo, p.RunRepo, p.Logger)
+	}); err != nil {
+		return fmt.Errorf("failed to provide import service: %w", err)
+	}
+
+	if err := container.Provide(func(p testInvoiceParams) TestInvoiceService {
+		return NewTestInvoiceService(p.Provider, p.Repo, p.ConnSvc, p.Logger)
+	}); err != nil {
+		return fmt.Errorf("failed to provide test invoice service: %w", err)
+	}
+
+	if err := container.Provide(func(svc InvoicingService, connSvc ConnectionService, activitySvc crmServices.ActivityService, log loggerDomain.Logger) DealStageListener {
+		return NewDealStageListener(svc, connSvc, activitySvc, log)
 	}); err != nil {
 		return fmt.Errorf("failed to provide invoicing deal stage listener: %w", err)
 	}

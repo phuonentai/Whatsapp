@@ -56,10 +56,15 @@ INSERT INTO whatsapp.webhook_logs (
     raw_headers,
     raw_body,
     error_message,
-    processed_at
+    processed_at,
+    delivery_key
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
 ) RETURNING *;
+
+-- name: GetWebhookLogByID :one
+SELECT * FROM whatsapp.webhook_logs
+WHERE id = $1;
 
 -- name: UpdateWebhookLogStatus :one
 UPDATE whatsapp.webhook_logs

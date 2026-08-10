@@ -32,7 +32,7 @@ The `organization_id` in the verified JWT SHALL be treated as the authoritative 
 
 ### Requirement: Optional PostgreSQL RLS policy for defense-in-depth
 
-The system MAY add PostgreSQL Row-Level Security policies on tenant-scoped tables using the `app.current_organization_id` session variable as an additional isolation layer.
+The system SHALL support an optional PostgreSQL Row-Level Security (RLS) defense-in-depth layer on tenant-scoped tables. When RLS policies are enabled, the system SHALL enforce row-level filtering based on the `app.current_organization_id` session variable. The system MAY expose RLS policy enablement as an opt-in deployment choice rather than a default; however, once enabled, enforcement SHALL follow the scenarios below.
 
 #### Scenario: RLS policy enforced by PostgreSQL
 

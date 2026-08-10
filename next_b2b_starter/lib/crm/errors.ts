@@ -19,7 +19,8 @@ export function toSpanishMutationError(error: unknown): string {
     return message && message.length > 0 ? message : "Ya existe un registro con los mismos datos.";
   }
   if (status && status >= 400 && status < 500) {
-    return "Solicitud inválida";
+    // The backend returns Spanish validation messages; surface them verbatim.
+    return message && message.length > 0 ? message : "Solicitud inválida";
   }
   return "Error de conexión";
 }

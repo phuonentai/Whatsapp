@@ -57,7 +57,13 @@ func TestGetCatalogReturnsPlaybooksWithAppliedGuiones(t *testing.T) {
 		{
 			Playbook: &domain.Playbook{Key: "comercio", Name: "Comercio & E-commerce", Vertical: "retail", Description: "desc"},
 			Applied:  &domain.OrganizationPlaybook{PlaybookKey: "comercio", AppliedAt: "2026-01-01"},
-			Guiones:  []domain.Guion{{ID: "saludo", Titulo: "Saludo", Mensaje: "Hola"}},
+			Guiones: []domain.Guion{
+				{ID: "saludo", Titulo: "Saludo", Mensaje: "Hola"},
+				{ID: "confirmar-pedido", Titulo: "Confirmar pedido", Pasos: []domain.GuionPaso{
+					{ID: "detalle", Titulo: "Detalle", Mensaje: "¿Qué quieres?"},
+					{ID: "direccion", Titulo: "Dirección", Mensaje: "¿A qué dirección?"},
+				}},
+			},
 		},
 		{
 			Playbook: &domain.Playbook{Key: "talleres", Name: "Talleres & Reparación", Vertical: "talleres", Description: "desc"},
@@ -77,8 +83,19 @@ func TestGetCatalogReturnsPlaybooksWithAppliedGuiones(t *testing.T) {
 	require.Len(t, body.Data, 2)
 	assert.Equal(t, "comercio", body.Data[0]["key"])
 	assert.Equal(t, true, body.Data[0]["applied"])
-	assert.Len(t, body.Data[0]["guiones"], 1)
-	assert.Equal(t, "saludo", body.Data[0]["guiones"].([]any)[0].(map[string]any)["id"])
+	guiones := body.Data[0]["guiones"].([]any)
+	require.Len(t, guiones, 2)
+	singleShot := guiones[0].(map[string]any)
+	assert.Equal(t, "saludo", singleShot["id"])
+	_, hasPasos := singleShot["pasos"]
+	assert.False(t, hasPasos, "single-shot guion must not expose a pasos key")
+	sequence := guiones[1].(map[string]any)
+	assert.Equal(t, "confirmar-pedido", sequence["id"])
+	pasos := sequence["pasos"].([]any)
+	require.Len(t, pasos, 2)
+	assert.Equal(t, "detalle", pasos[0].(map[string]any)["id"])
+	assert.Equal(t, "¿Qué quieres?", pasos[0].(map[string]any)["mensaje"])
+	assert.Equal(t, "direccion", pasos[1].(map[string]any)["id"])
 	assert.Equal(t, false, body.Data[1]["applied"])
 	_, hasGuiones := body.Data[1]["guiones"]
 	assert.False(t, hasGuiones, "non-applied playbook must not expose guiones")

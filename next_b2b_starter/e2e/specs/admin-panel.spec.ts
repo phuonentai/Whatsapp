@@ -48,7 +48,7 @@ test.describe("Settings views", () => {
     await expect(page.getByRole("heading", { name: /audit log/i })).toBeVisible();
     const log = await admin.getAuditLog();
     expect(log).not.toBeNull();
-    await expect(admin.page.locator("text=Read-only record of activity")).toBeVisible();
+    await expect(admin.page.locator("text=Read-only record of activity").first()).toBeVisible();
   });
 
   test("audit view does not offer mutation controls", async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe("Workspace name edit", () => {
     await expect(page.locator("#workspace-name")).toBeVisible();
     await page.fill("#workspace-name", "Workspace E2E");
     await page.getByRole("button", { name: /guardar/i }).click();
-    await expect(page.locator("text=Workspace E2E")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace E2E" })).toBeVisible();
   });
 });
 
@@ -100,7 +100,6 @@ test.describe("Member role management", () => {
   test("member list exposes role control for manageable members", async ({ page }) => {
     await admin.gotoSettings("members");
     await expect(page.getByRole("heading", { name: /team roster/i })).toBeVisible();
-    const roleSelect = page.locator('[aria-label^="Change role for"]').first();
-    expect((await roleSelect.count()) > 0).toBe(true);
+    await expect(page.locator('[aria-label^="Change role for"]').first()).toBeVisible();
   });
 });

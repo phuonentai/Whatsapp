@@ -158,6 +158,9 @@ func (m *mockCompanyRepo) GetByID(ctx context.Context, orgID, companyID int32) (
 	}
 	return nil, errors.New("company not found")
 }
+func (m *mockCompanyRepo) GetByNit(ctx context.Context, orgID int32, nit string) (*domain.Company, error) {
+	return nil, errors.New("company not found")
+}
 func (m *mockCompanyRepo) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
 	return nil, nil
 }
@@ -192,7 +195,7 @@ func (m *mockConvRepo) UpdateLastMessageAt(ctx context.Context, orgID, convID in
 func (m *mockConvRepo) UpdateStatus(ctx context.Context, orgID, convID int32, status domain.ConversationStatus) (*domain.Conversation, error) {
 	return nil, nil
 }
-func (m *mockConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*domain.ConversationWithContact, error) {
+func (m *mockConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*domain.ConversationWithContact, error) {
 	return nil, nil
 }
 
@@ -248,4 +251,20 @@ func newTestService(repo *mockInvoiceRepo, provider *mockProvider) (*invoicingSe
 		logger:     nopLogger{},
 	}
 	return svc, out
+}
+
+func (m *mockContactRepo) UpsertByIGUser(ctx context.Context, c *domain.Contact) (*domain.Contact, error) {
+	return c, nil
+}
+
+func (m *mockContactRepo) GetByIGUser(ctx context.Context, orgID int32, igUserID string) (*domain.Contact, error) {
+	return nil, domain.ErrContactNotFound
+}
+
+func (m *mockContactRepo) UpdateInstagramProfile(ctx context.Context, orgID, contactID int32, username, avatarURL, displayName string) (*domain.Contact, error) {
+	return nil, domain.ErrContactNotFound
+}
+
+func (m *mockConvRepo) GetActiveByContactChannel(ctx context.Context, orgID, contactID int32, channel string) (*domain.Conversation, error) {
+	return m.GetActiveByContact(ctx, orgID, contactID)
 }

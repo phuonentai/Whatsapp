@@ -15,10 +15,13 @@ import {
 import { usePipelinesQuery, useDealsQuery } from "@/lib/hooks/queries/use-crm-queries";
 import { useMoveDealStage, useDeleteDeal } from "@/lib/hooks/mutations/use-crm-mutations";
 import { useFeature } from "@/lib/hooks/use-entitlement";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import type { DealDto, PipelineStageDto } from "@/lib/api/api/dto/crm.dto";
+import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { DealDialog } from "@/components/crm/deal-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 interface DealCardProps {
   deal: DealDto;
@@ -157,6 +160,9 @@ export function DealKanban() {
   const moveStage = useMoveDealStage();
   const deleteMutation = useDeleteDeal();
   const canManage = useFeature("crm_deals");
+  const { hasPermission } = usePermissions();
+  const canExport = hasPermission("deal:export");
+  const [isExporting, setIsExporting] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -191,6 +197,18 @@ export function DealKanban() {
     setDeleting(null);
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await crmRepository.exportDeals();
+      toast.success("Negocios exportados");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al exportar negocios");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
@@ -215,6 +233,12 @@ export function DealKanban() {
             }}
           >
             Nuevo negocio
+          </Button>
+        )}
+        {canManage && canExport && (
+          <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+            <Download className="mr-2 h-4 w-4" />
+            {isExporting ? "Exportando..." : "Exportar"}
           </Button>
         )}
       </div>

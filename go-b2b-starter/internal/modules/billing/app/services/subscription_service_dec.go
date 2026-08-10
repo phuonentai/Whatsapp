@@ -6,6 +6,7 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/routing"
+	payments "github.com/moasq/go-b2b-starter/internal/modules/payments/app/services"
 	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 )
@@ -96,14 +97,15 @@ type BillingService interface {
 }
 
 type billingService struct {
-	repo            domain.SubscriptionRepository
-	aiRepo          domain.AiUsageRepository
-	orgAdapter      domain.OrganizationAdapter
-	billingProvider domain.BillingProvider
-	mpProvider      domain.BillingProvider
-	resolver        routing.BillingProviderResolver
-	moduleService   registryServices.ModuleService
-	logger          logger.Logger
+	repo               domain.SubscriptionRepository
+	aiRepo             domain.AiUsageRepository
+	orgAdapter         domain.OrganizationAdapter
+	billingProvider    domain.BillingProvider
+	mpProvider         domain.BillingProvider
+	resolver           routing.BillingProviderResolver
+	moduleService      registryServices.ModuleService
+	logger             logger.Logger
+	paymentEventHandler payments.PaymentEventHandler
 }
 
 func NewBillingService(
@@ -115,15 +117,17 @@ func NewBillingService(
 	resolver routing.BillingProviderResolver,
 	moduleService registryServices.ModuleService,
 	logger logger.Logger,
+	paymentEventHandler payments.PaymentEventHandler,
 ) BillingService {
 	return &billingService{
-		repo:            repo,
-		aiRepo:          aiRepo,
-		orgAdapter:      orgAdapter,
-		billingProvider: billingProvider,
-		mpProvider:      mpProvider,
-		resolver:        resolver,
-		moduleService:   moduleService,
-		logger:          logger,
+		repo:               repo,
+		aiRepo:             aiRepo,
+		orgAdapter:         orgAdapter,
+		billingProvider:    billingProvider,
+		mpProvider:         mpProvider,
+		resolver:           resolver,
+		moduleService:      moduleService,
+		logger:             logger,
+		paymentEventHandler: paymentEventHandler,
 	}
 }

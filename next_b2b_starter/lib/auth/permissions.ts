@@ -38,6 +38,11 @@ export const PERMISSIONS = {
 
   // Audit
   AUDIT_VIEW: "audit:view",
+
+  // CRM bulk export
+  CONTACT_EXPORT: "contact:export",
+  DEAL_EXPORT: "deal:export",
+  ACTIVITY_EXPORT: "activity:export",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

@@ -134,7 +134,10 @@ export async function getActiveSubscription(
       reason: isActive ? undefined : "NO_ACTIVE_SUBSCRIPTION",
     };
   } catch (error) {
-    console.error("[Polar] Failed to load subscription", error);
+    // Expected graceful-degradation path (e.g. placeholder credentials in dev).
+    // warn-level keeps the Next.js dev overlay quiet; the caller surfaces the
+    // UNKNOWN_ERROR state to the UI instead.
+    console.warn("[Polar] Failed to load subscription", error);
     return {
       subscription: null,
       customer,

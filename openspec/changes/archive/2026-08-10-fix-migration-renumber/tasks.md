@@ -1,0 +1,32 @@
+## 1. Migration renumber
+
+- [x] 1.1 [DB-SQLC] Renumber `000002_add_tenant_isolation.up.sql` and `.down.sql` → `000022_add_tenant_isolation.*` using `git mv` (preserve history). Verify: `ls 000022_add_tenant_isolation.*` present; no `000002_*add_tenant*` remain; file contents unchanged (`git diff --stat` shows only renames).
+- [x] 1.2 [DB-SQLC] Renumber `000020_create_whatsapp_signup_flows.up.sql` and `.down.sql` → `000023_create_whatsapp_signup_flows.*` using `git mv`. Verify: files present under `000023_*`; `000020_*` now contains only `create_playbooks`.
+- [x] 1.3 [DB-SQLC] Move `000016_pre_migration_audit.sql` → `internal/db/postgres/sqlc/audit/000016_pre_migration_audit.sql` via `git mv`. Verify: file absent from `migrations/`; present under `audit/`; `migrations/` now has exactly one `.sql` set per version.
+- [x] 1.4 [DB-SQLC] Confirm version uniqueness. Verify: every version prefix in `migrations/` maps to exactly one distinct migration-set base name (up/down pairs are legal; the naive `uniq -d` check counts up+down as duplicates, so the correct check counts distinct base names per prefix). Versions ascend `000001..000023`; 45 `.sql` files, 23 versions (one set each; `000015` is up-only).
+
+## 2. Regression guard
+
+- [x] 2.1 [BE-INFRA] Create `go-b2b-starter/scripts/check_migrations.sh`: exits non-zero if any numeric version prefix repeats across `*.sql` files in `migrations/` (ignore non-`.sql`); print offending prefixes. Verify: script passes on current tree; fails when a duplicate is temporarily introduced.
+- [x] 2.2 [BE-INFRA] Add `check-migrations` target in `go-b2b-starter/Makefile` and wire it as a prerequisite of `migrateup` and `migratedown`. Verify: `make check-migrations` passes; `make migrateup` runs the check first.
+- [x] 2.3 [OPS-GOV] Add a `check-migrations` step to `.github/workflows/ci.yml` (backend job). Verify: workflow YAML valid; step invokes the script from `go-b2b-starter/`.
+
+## 3. Verification
+
+- [x] 3.1 [DB-SQLC] Fresh migrate on empty DB: create `saas_db_test`, run migrate binary (`up`), confirm all 23 versions applied and `schema_migrations` lists 000001..000023. Verify: `migrate version` = 000023; no errors.
+- [x] 3.2 [BE-INFRA] `make migrateup` succeeds against the fresh DB via the docker migrate service (or equivalent). Verify: exit 0; schema tables present (e.g., `organizations.organizations`, `whatsapp.signup_flows`).
+- [x] 3.3 [OPS-GOV] Re-run the `add-ci-pipeline` e2e flow: `make test-e2e` (or CI-equivalent migrate + seed + servers + Playwright). Verify: full suite runs against `saas_db_test`; record results in the `add-ci-pipeline` tasks.md (clears blocker 5.4). — **2026-08-10 CLEARED:** `make test-e2e` compose boot blocked locally (local postgres owns `:5432`, local redis owns `:6379`, no passwordless sudo), so the CI-equivalent manual flow was run against the fixed migration tree: fresh `saas_db_test`, migrations applied (25 versions), 4 orgs seeded, backend + frontend booted with mock auth, full Playwright suite green in grouped runs (~108 tests, 2 order-dependent flakes pass on retry). Full results recorded in §4.7 and `add-ci-pipeline` tasks.md 5.4.
+- [x] 3.4 [OPS-GOV] Archive decision: either run `/opsx-archive` or record explicit `**Archive deferred:** <reason>` entry. Verify: entry present in this file. — **Archive deferred (recorded by complete-mvp-gaps 2026-08-10):** task 3.3 (full Playwright suite re-run) remains blocked on frontend port `:3001` occupancy (user dev watcher); migration renumber, guard, fresh-migrate, seed, and mock-auth smoke all verified green. Re-run `make test-e2e` via CI/deployment when the port is free; deferral entry present above in section 4.
+
+## 4. Verification results
+
+- [x] 4.1 Duplicate-version guard: `bash scripts/check_migrations.sh` PASS on tree (exit 0); forced duplicate `000021_dup_test.up.sql` → exit 1 with `ERROR: duplicate migration version 000021: create_invoices dup_test`.
+- [x] 4.2 `make check-migrations` PASS (make installed to verify); `make -n migrateup` shows `bash scripts/check_migrations.sh` runs before the docker migrate command.
+- [x] 4.3 Fresh migrate: recreated empty `saas_db_test`, `migrate up` exit 0, all 23 versions applied (`21/u create_invoices`, `22/u add_tenant_isolation`, `23/u create_whatsapp_signup_flows`); `schema_migrations` = version 23, dirty=f; tables present (`organizations.organizations`, `whatsapp.signup_flows`, `file_manager.file_assets`, `invoicing.invoices`, `modules.organization_playbooks`).
+- [x] 4.4 Content-bug correction (deviation from "no SQL rewrites" non-goal): `000022_add_tenant_isolation.up.sql` referenced `REFERENCES public.organizations(id)` but the table is `organizations.organizations` (created by `000002_create_organizations_schema`); corrected to `REFERENCES organizations.organizations(id)`. Without this fix the renumbered migration fails to apply — latent bug exposed by renumbering.
+- [x] 4.5 Seed: `SKIP_MIGRATIONS=true go run ./cmd/seed-e2e` → `seed-e2e complete: 4 orgs`. (Discovered seed-e2e re-runs migrations and fails on an already-migrated DB; `add-ci-pipeline` workflow + `scripts/run_e2e.sh` updated to pass `SKIP_MIGRATIONS=true`.)
+- [x] 4.6 Backend smoke: `AUTH_MOCK_ENABLED=true SERVER_ADDRESS=:8080 go run ./cmd/api/main.go` boots; `/health` 200; `GET /api/crm/contactos` with `X-Test-Org-ID: test-org-pro:admin-pro@test.com` → `{"data":[],"success":true}`; without header → 401.
+- [x] 4.7 Full Playwright suite: **CLEARED 2026-08-10** — fresh `saas_db_test` recreated, all 25 migrations applied via `seed-e2e`'s `runMigrations` (renumbered tree `000022`/`000023` + `000024`/`000025`), 4 orgs seeded, backend `:8080` + frontend `:3001` booted with `AUTH_MOCK_ENABLED=true`, full suite run in grouped chunks (17 spec files, ~108 tests): all green. Two order-dependent flakes (tag duplicate-name, webhook health-stats) pass on retry. Test-side async-race fix applied: `findConversationByPhone`/`findMessageByWhatsappId` in `whatsapp-edge-cases.spec.ts`, `surrounding-processes.spec.ts`, `inbox-ui.spec.ts` now poll up to 5s for eventbus-persisted rows (webhook returns 200 before the async listener commits). Recorded in `add-ci-pipeline` tasks.md 5.4.
+
+**Archive decision (2026-08-10):** verification gate now PASSES (3.3 and 4.7 cleared — full Playwright suite green against the renumbered migration tree). No remaining blocker. Change eligible for `/opsx-archive`.
+

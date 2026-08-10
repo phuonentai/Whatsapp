@@ -1,7 +1,37 @@
-import { apiClient } from "../client/api-client";
+import { apiClient, resolveAccessToken } from "../client/api-client";
 import type { ContactDto, CompanyDto, DealDto, PipelineDto, ActivityDto, TagDto, EntitlementDto } from "../dto/crm.dto";
 
 const BASE = "/crm";
+
+export interface ImportSummaryDto {
+  importados: number;
+  omitidos: number;
+  errores: { fila: number; razon: string }[];
+}
+
+// CSV endpoints stream a file, so they cannot use the JSON unwrapping ApiClient.
+// Fetch + blob carries the Stytch session token in the request headers (a bare
+// window.location navigation cannot attach it).
+async function downloadCSV(endpoint: string, filename: string): Promise<void> {
+  const token = await resolveAccessToken();
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(`${apiClient.getBaseUrl()}${endpoint}`, {
+    headers,
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`API Error ${response.status}: no se pudo descargar el archivo`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // The backend wraps all CRM responses in a { data, success } envelope.
 // Unwrap it so callers receive the payload directly (matches EntitlementDto
@@ -71,4 +101,36 @@ export const crmRepository = {
     unwrap(apiClient.post<Envelope<null>>(`${BASE}/etiquetas/entity/${entityType}/${entityId}`, { tag_id: tagId })),
   untagEntity: (entityType: string, entityId: number, tagId: number) =>
     unwrap(apiClient.delete<Envelope<null>>(`${BASE}/etiquetas/entity/${entityType}/${entityId}/${tagId}`)),
+
+  exportContacts: () => downloadCSV(`${BASE}/export/contactos.csv`, "contactos.csv"),
+  exportCompanies: () => downloadCSV(`${BASE}/export/empresas.csv`, "empresas.csv"),
+  exportDeals: () => downloadCSV(`${BASE}/export/negocios.csv`, "negocios.csv"),
+  exportActivities: () => downloadCSV(`${BASE}/export/actividades.csv`, "actividades.csv"),
+
+  downloadImportTemplate: () => downloadCSV(`${BASE}/import/contactos/template.csv`, "plantilla-contactos.csv"),
+
+  importContacts: async (file: File): Promise<ImportSummaryDto> => {
+    const token = await resolveAccessToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${apiClient.getBaseUrl()}${BASE}/import/contactos`, {
+      method: "POST",
+      headers,
+      body: form,
+      credentials: "include",
+    });
+    if (!response.ok) {
+      let message = `Error ${response.status}`;
+      try {
+        const err = await response.json();
+        if (typeof err?.message === "string") message = err.message;
+      } catch {
+        // non-JSON error body
+      }
+      throw new Error(message);
+    }
+    const body = await response.json();
+    return (body?.data ?? body) as ImportSummaryDto;
+  },
 };

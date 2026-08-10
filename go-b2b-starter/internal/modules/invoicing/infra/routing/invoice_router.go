@@ -33,11 +33,12 @@ func (r *StaticResolver) GetInvoicingProvider(ctx context.Context, organizationI
 // without changing the invoicing service.
 type InvoiceRouter struct {
 	siigoAdapter domain.InvoicingProvider
+	noopProvider domain.InvoicingProvider
 	resolver     ProviderResolver
 }
 
 func NewInvoiceRouter(siigoAdapter domain.InvoicingProvider, resolver ProviderResolver) domain.InvoicingProvider {
-	return &InvoiceRouter{siigoAdapter: siigoAdapter, resolver: resolver}
+	return &InvoiceRouter{siigoAdapter: siigoAdapter, noopProvider: NewNoopProvider(), resolver: resolver}
 }
 
 func (r *InvoiceRouter) resolveProvider(ctx context.Context, orgID int32) (domain.InvoicingProvider, error) {
@@ -48,6 +49,9 @@ func (r *InvoiceRouter) resolveProvider(ctx context.Context, orgID int32) (domai
 	switch provider {
 	case "", "siigo":
 		return r.siigoAdapter, nil
+	case "none":
+		// Explicit no-provider state: no-op, not an error.
+		return r.noopProvider, nil
 	default:
 		return nil, fmt.Errorf("unsupported invoicing provider: %s", provider)
 	}

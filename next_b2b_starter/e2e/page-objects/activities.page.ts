@@ -22,7 +22,7 @@ export class ActivitiesPage {
     await this.page.fill('input[name="asunto"]', data.subject);
     if (data.content) await this.page.fill('textarea[name="contenido"]', data.content);
     await this.page.getByRole("button", { name: /guardar|crear/i }).click();
-    await this.page.waitForResponse((res) => res.url().includes("/api/crm/actividades") && res.ok());
+    await this.page.waitForResponse((res) => res.url().includes("/api/crm/actividades") && res.request().method() === "POST" && res.ok());
   }
 
   async getActivity(subject: string): Promise<Locator | null> {
@@ -35,8 +35,4 @@ export class ActivitiesPage {
     }
   }
 
-  async filterByType(type: string) {
-    await this.page.selectOption('select[data-testid="activity-type-filter"]', type);
-    await this.page.waitForTimeout(300);
-  }
 }

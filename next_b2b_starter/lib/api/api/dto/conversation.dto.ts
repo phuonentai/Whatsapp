@@ -2,6 +2,7 @@ export interface ConversationDto {
   id: number;
   organization_id: number;
   contact_id: number;
+  channel: string;
   status: string;
   last_message_at?: string;
   metadata?: Record<string, unknown>;
@@ -9,6 +10,8 @@ export interface ConversationDto {
   updated_at: string;
   contact_phone: string;
   contact_display_name: string;
+  contact_instagram_username?: string;
+  contact_avatar_url?: string;
 }
 
 export interface MessageDto {
@@ -16,7 +19,8 @@ export interface MessageDto {
   organization_id: number;
   conversation_id: number;
   contact_id: number;
-  whatsapp_message_id?: string;
+  channel: string;
+  provider_message_id?: string;
   direction: string;
   message_type: string;
   content?: string;

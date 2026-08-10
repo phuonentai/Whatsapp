@@ -35,12 +35,13 @@ export function TagPicker({ entityType, entityId }: { entityType: string; entity
         {(entityTags ?? []).map((tag) => (
           <span
             key={tag.id}
+            data-testid="entity-tag"
             className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs"
             style={{ backgroundColor: tag.color || "#e5e7eb", color: "#1f2937" }}
           >
             {tag.nombre}
             <button
-              aria-label={`Quitar etiqueta ${tag.nombre}`}
+              aria-label="Quitar"
               onClick={() => handleDetach(tag.id)}
               className="text-gray-500 hover:text-red-600"
             >

@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the activity entity with organization scoping, typed activity categories, performed_by attribution, and tenant-safe storage for CRM history tracking.
+
+## Requirements
 
 ### Requirement: Activity entity with organization scoping
 

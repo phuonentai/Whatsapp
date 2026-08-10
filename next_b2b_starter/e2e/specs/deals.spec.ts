@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { DealsKanbanPage } from "../page-objects/deals-kanban.page";
 import { apiRequest } from "../helpers/api";
+import { uniqueColombianPhone } from "../helpers/phones";
 
 test.describe("Negocios", () => {
   let dealsPage: DealsKanbanPage;
@@ -20,18 +21,16 @@ test.describe("Negocios", () => {
     expect(card).not.toBeNull();
 
     await dealsPage.delete(name);
-    const deleted = await dealsPage.getCard(name);
-    expect(deleted).toBeNull();
+    await expect(dealsPage.board.locator(`[data-testid="deal-card"]:has-text("${name}")`)).toHaveCount(0);
   });
 
-  test("moves deal between stages", async ({ page }) => {
+  test("moves deal between stages", async () => {
     await dealsPage.goto();
 
     const name = `Stage Deal ${Date.now()}`;
     await dealsPage.create({ name, amount: "3000000" });
 
     await dealsPage.moveToStage(name, "Calificado");
-    await page.waitForTimeout(500);
 
     const card = await dealsPage.getCard(name);
     expect(card).not.toBeNull();
@@ -54,7 +53,6 @@ test.describe("Negocios", () => {
     await page.waitForURL(/view=negocios$/);
 
     await dealsPage.moveToStage(name, "Calificado");
-    await page.waitForTimeout(500);
     await card!.click();
     await page.waitForURL(/view=negocios&id=\d+/);
     await expect(page.locator("text=Etapa cambiada")).toBeVisible();
@@ -95,7 +93,7 @@ test.describe("Negocios", () => {
 
     const ts = Date.now();
     const companyName = `Linked Company ${ts}`;
-    const contactPhone = `+57310${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `Linked Contact ${ts}`;
 
     // Create company
@@ -105,7 +103,9 @@ test.describe("Negocios", () => {
     await page.fill('input[name="name"]', companyName);
     await page.fill('input[name="nit"]', `${ts}`);
     await page.getByRole("button", { name: /guardar|crear/i }).click();
-    await page.waitForResponse((res) => res.url().includes("/api/crm/empresas") && res.ok());
+    await page.waitForResponse(
+      (res) => res.url().includes("/api/crm/empresas") && res.request().method() === "POST" && res.ok()
+    );
 
     // Create contact
     await page.goto("/dashboard/crm?view=contactos");
@@ -114,18 +114,33 @@ test.describe("Negocios", () => {
     await page.fill('input[name="phone"]', contactPhone);
     await page.fill('input[name="display_name"]', contactName);
     await page.getByRole("button", { name: /guardar|crear/i }).click();
-    await page.waitForResponse((res) => res.url().includes("/api/crm/contactos") && res.ok());
+    await page.waitForResponse(
+      (res) => res.url().includes("/api/crm/contactos") && res.request().method() === "POST" && res.ok()
+    );
 
     // Create deal linked to both
-    const companies = await apiRequest<{ data?: { id: number; nombre: string }[] }>("/crm/empresas");
-    const companyList = Array.isArray(companies) ? companies : companies.data ?? [];
-    const company = companyList.find((c: { nombre: string }) => c.nombre === companyName);
-    expect(company).toBeDefined();
+    await expect
+      .poll(async () => {
+        const companies = await apiRequest<{ data?: { id: number; name: string }[] }>("/crm/empresas");
+        const companyList = Array.isArray(companies) ? companies : companies.data ?? [];
+        return companyList.find((c: { name: string }) => c.name === companyName);
+      }, { timeout: 10000 })
+      .toBeDefined();
 
-    const contacts = await apiRequest<{ data?: { id: number; phone: string }[] }>("/crm/contactos");
+    await expect
+      .poll(async () => {
+        const contacts = await apiRequest<{ data?: { id: number; phone_number: string }[] }>("/crm/contactos");
+        const contactList = Array.isArray(contacts) ? contacts : contacts.data ?? [];
+        return contactList.find((c: { phone_number: string }) => c.phone_number === contactPhone);
+      }, { timeout: 10000 })
+      .toBeDefined();
+
+    const companies = await apiRequest<{ data?: { id: number; name: string }[] }>("/crm/empresas");
+    const companyList = Array.isArray(companies) ? companies : companies.data ?? [];
+    const company = companyList.find((c: { name: string }) => c.name === companyName);
+    const contacts = await apiRequest<{ data?: { id: number; phone_number: string }[] }>("/crm/contactos");
     const contactList = Array.isArray(contacts) ? contacts : contacts.data ?? [];
-    const contact = contactList.find((c: { phone: string }) => c.phone === contactPhone);
-    expect(contact).toBeDefined();
+    const contact = contactList.find((c: { phone_number: string }) => c.phone_number === contactPhone);
 
     await dealsPage.goto();
     const dealName = `Linked Deal ${ts}`;
@@ -135,7 +150,17 @@ test.describe("Negocios", () => {
     await page.selectOption('select[name="company_id"], #company_id', String(company.id));
     await page.selectOption('select[name="contact_id"], #contact_id', String(contact.id));
     await page.getByRole("button", { name: /guardar|crear/i }).click();
-    await page.waitForResponse((res) => res.url().includes("/api/crm/negocios") && res.ok());
+
+    // Poll the API for the persisted deal instead of waitForResponse: the Next
+    // dev server can drop the POST under parallel load, and waitForResponse
+    // then hangs until the per-test timeout even though the save succeeded.
+    await expect
+      .poll(async () => {
+        const deals = await apiRequest<{ data?: { id: number; nombre: string }[] }>("/crm/negocios");
+        const dealList = Array.isArray(deals) ? deals : deals.data ?? [];
+        return dealList.find((d: { nombre: string }) => d.nombre === dealName);
+      }, { timeout: 30000 })
+      .toBeDefined();
 
     const card = await dealsPage.getCard(dealName);
     expect(card).not.toBeNull();

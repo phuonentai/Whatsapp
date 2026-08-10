@@ -7,8 +7,8 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/infra/graphapi"
-	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
+	"github.com/moasq/go-b2b-starter/internal/platform/outbox"
 )
 
 type Module struct {
@@ -23,10 +23,10 @@ func (m *Module) RegisterDependencies() error {
 	if err := m.container.Provide(func(
 		configRepo domain.ConfigRepository,
 		logRepo domain.WebhookLogRepository,
-		eventBus eventbus.EventBus,
+		outboxRepo outbox.Repository,
 		log logger.Logger,
 	) services.WebhookService {
-		return services.NewWebhookService(configRepo, logRepo, eventBus, log)
+		return services.NewWebhookService(configRepo, logRepo, outboxRepo, log)
 	}); err != nil {
 		return err
 	}

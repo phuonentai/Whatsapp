@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines Stytch-compliant signup: native invite organization bootstrap, no owner_password field, and structured error codes.
+
+## Requirements
 
 ### Requirement: Organization bootstrap uses Stytch native invite flow
 

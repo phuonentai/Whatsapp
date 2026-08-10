@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// Channel identifies the messaging provider a conversation belongs to.
+const (
+	ChannelWhatsapp  = "whatsapp"
+	ChannelInstagram = "instagram"
+)
+
 // AgentRepository persists the agent pipeline state and compliance data.
 // All methods are scoped by organization_id (Stytch-org FK pattern).
 type AgentRepository interface {
@@ -35,8 +41,9 @@ type AgentRepository interface {
 
 	// Contact/conversation resolution (idempotent, mirrors CRM upsert patterns)
 	ResolveContact(ctx context.Context, orgID int32, phoneNumber, displayName string, lastMessageAt time.Time) (*ContactRef, error)
+	ResolveContactByIGUser(ctx context.Context, orgID int32, igUserID, displayName string, lastMessageAt time.Time) (*ContactRef, error)
 	GetContactRef(ctx context.Context, orgID, contactID int32) (*ContactRef, error)
-	ResolveConversation(ctx context.Context, orgID, contactID int32, lastMessageAt time.Time) (*ConversationRef, error)
+	ResolveConversation(ctx context.Context, orgID, contactID int32, channel string, lastMessageAt time.Time) (*ConversationRef, error)
 	GetConversationRef(ctx context.Context, orgID, conversationID int32) (*ConversationRef, error)
 	ListConversationsByContact(ctx context.Context, orgID, contactID int32) ([]*ConversationRef, error)
 	ListMessagesByConversation(ctx context.Context, orgID, conversationID int32, limit, offset int32) ([]*MessageRef, error)
@@ -85,6 +92,6 @@ type MessageRef struct {
 	MessageType       string
 	Content           string
 	Status            string
-	WhatsAppMessageID string
+	ProviderMessageID string
 	CreatedAt         time.Time
 }

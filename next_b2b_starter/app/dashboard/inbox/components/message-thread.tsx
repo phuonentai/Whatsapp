@@ -35,7 +35,7 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6">
+    <div data-testid="message-thread" className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6">
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -81,9 +81,15 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
                   )}
                 >
                   {formatTime(msg.chatTimestamp || msg.createdAt)}
-                  {msg.direction === "outbound" && msg.status === "sent" && " · ✓"}
-                  {msg.direction === "outbound" && msg.status === "delivered" && " · ✓✓"}
-                  {msg.direction === "outbound" && msg.status === "read" && " · ✓✓"}
+                  {msg.direction === "outbound" &&
+                    msg.channel === "whatsapp" &&
+                    msg.status === "sent" && " · ✓"}
+                  {msg.direction === "outbound" &&
+                    msg.channel === "whatsapp" &&
+                    msg.status === "delivered" && " · ✓✓"}
+                  {msg.direction === "outbound" &&
+                    msg.channel === "whatsapp" &&
+                    msg.status === "read" && " · ✓✓"}
                 </p>
               </div>
             </div>

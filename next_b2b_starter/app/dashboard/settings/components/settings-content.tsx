@@ -14,6 +14,7 @@ import {
   Bot,
   ShieldCheck,
   MessageCircle,
+  Instagram,
   ScrollText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -28,6 +29,8 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { useWhatsAppConfigQuery } from "@/lib/hooks/queries/use-whatsapp-config-query";
 import { WhatsAppConfigSection } from "./whatsapp-config-section";
+import { useInstagramConfigQuery } from "@/lib/hooks/queries/use-instagram-config-query";
+import { InstagramConfigSection } from "./instagram-config-section";
 import {
   Card,
   CardContent,
@@ -63,7 +66,7 @@ interface SettingsContentProps {
   // No props required - component fetches its own data
 }
 
-type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp";
+type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp" | "instagram";
 
 interface OverviewSection {
   key: Exclude<SettingsView, "overview">;
@@ -108,6 +111,10 @@ const DETAIL_META: Record<Exclude<SettingsView, "overview">, { title: string; de
     title: "Messaging",
     description: "Connect and manage your WhatsApp Business integration.",
   },
+  instagram: {
+    title: "Instagram",
+    description: "Connect and manage your Instagram DMs integration.",
+  },
 };
 
 function parseViewParam(raw: string | null): SettingsView | null {
@@ -121,7 +128,8 @@ function parseViewParam(raw: string | null): SettingsView | null {
     normalized === "ai" ||
     normalized === "compliance" ||
     normalized === "audit" ||
-    normalized === "whatsapp"
+    normalized === "whatsapp" ||
+    normalized === "instagram"
   ) {
     return normalized as SettingsView;
   }
@@ -286,7 +294,8 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         (requestedView === "ai" && canManageMembers) ||
         (requestedView === "compliance" && canManageMembers) ||
         (requestedView === "audit" && canViewAudit) ||
-        (requestedView === "whatsapp" && canManageMembers);
+        (requestedView === "whatsapp" && canManageMembers) ||
+        (requestedView === "instagram" && canManageMembers);
       if (isAllowed) {
         setViewStack((stack) =>
           stack[stack.length - 1] === requestedView ? stack : ["overview", requestedView]
@@ -306,7 +315,8 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     (currentView === "members" ||
       currentView === "ai" ||
       currentView === "compliance" ||
-      currentView === "whatsapp") &&
+      currentView === "whatsapp" ||
+      currentView === "instagram") &&
     !canManageMembers &&
     viewStack[viewStack.length - 1] !== "overview"
   ) {
@@ -358,6 +368,7 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     if (requested === "compliance" && !canManageMembers) return;
     if (requested === "audit" && !canViewAudit) return;
     if (requested === "whatsapp" && !canManageMembers) return;
+    if (requested === "instagram" && !canManageMembers) return;
 
     // Intentionally syncs the view stack from the URL query param (deep links,
     // refresh, back/forward). Cannot be derived during render without losing the
@@ -434,6 +445,10 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   });
 
   const { data: whatsappConfig } = useWhatsAppConfigQuery({
+    enabled: permissionsReady && canManageMembers,
+  });
+
+  const { data: instagramConfig } = useInstagramConfigQuery({
     enabled: permissionsReady && canManageMembers,
   });
 
@@ -585,6 +600,19 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         helper: whatsAppHelper,
         icon: MessageCircle,
       });
+
+      const instagramValue = instagramConfig?.igUsername || "Not connected";
+      const instagramHelper = instagramConfig
+        ? `${instagramConfig.isActive ? "Active" : "Paused"} — manage your connection.`
+        : "Connect Instagram to receive DMs";
+      sections.push({
+        key: "instagram",
+        title: "Instagram",
+        description: "Connect and manage your Instagram DMs integration.",
+        value: instagramValue,
+        helper: instagramHelper,
+        icon: Instagram,
+      });
     }
 
     if (canViewAudit) {
@@ -613,6 +641,7 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     subscriptionErrorMessage,
     canViewAudit,
     whatsappConfig,
+    instagramConfig,
   ]);
 
   // Handle invite member
@@ -801,6 +830,18 @@ export function SettingsContent({}: SettingsContentProps = {}) {
           );
         }
         return <WhatsAppConfigSection />;
+      case "instagram":
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Access restricted</AlertTitle>
+              <AlertDescription>
+                You don&apos;t have permission to manage the Instagram integration.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <InstagramConfigSection />;
       default:
         return null;
     }

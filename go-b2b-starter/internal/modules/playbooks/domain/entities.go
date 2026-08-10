@@ -48,8 +48,17 @@ type EtapaTemplate struct {
 	Probabilidad int32  `json:"probabilidad"`
 }
 
-// Guion is a WhatsApp message script surfaced as a quick reply.
+// Guion is a WhatsApp message script surfaced as a quick reply. A guion is
+// either a single-shot message (Mensaje) or a scripted sequence (Pasos).
 type Guion struct {
+	ID      string      `json:"id"`
+	Titulo  string      `json:"titulo"`
+	Mensaje string      `json:"mensaje,omitempty"`
+	Pasos   []GuionPaso `json:"pasos,omitempty"`
+}
+
+// GuionPaso is one ordered step of a scripted sequence.
+type GuionPaso struct {
 	ID      string `json:"id"`
 	Titulo  string `json:"titulo"`
 	Mensaje string `json:"mensaje"`

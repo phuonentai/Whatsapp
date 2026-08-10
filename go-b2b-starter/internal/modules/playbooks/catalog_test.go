@@ -40,11 +40,24 @@ func TestCatalogPlaybooksAreCompleteAndValid(t *testing.T) {
 			}
 			assert.GreaterOrEqual(t, len(payload.Tags), 1, "at least one tag")
 			assert.GreaterOrEqual(t, len(payload.Guiones), 1, "at least one guion")
+			sequenceCount := 0
 			for _, guion := range payload.Guiones {
 				assert.NotEmpty(t, guion.ID)
 				assert.NotEmpty(t, guion.Titulo)
-				assert.NotEmpty(t, guion.Mensaje)
+				if len(guion.Pasos) > 0 {
+					sequenceCount++
+					assert.Empty(t, guion.Mensaje, "sequence guion must not carry a single-shot mensaje")
+					assert.GreaterOrEqual(t, len(guion.Pasos), 2, "sequence must have 2+ steps")
+					for _, paso := range guion.Pasos {
+						assert.NotEmpty(t, paso.ID)
+						assert.NotEmpty(t, paso.Titulo)
+						assert.NotEmpty(t, paso.Mensaje)
+					}
+					continue
+				}
+				assert.NotEmpty(t, guion.Mensaje, "single-shot guion requires mensaje")
 			}
+			assert.GreaterOrEqual(t, sequenceCount, 1, "each vertical ships at least one scripted sequence")
 			for moduleKey, preset := range payload.ModuleConfigs {
 				assert.Equal(t, "tickets", moduleKey, "only the shipped tickets module may be referenced")
 				sla, ok := preset["sla_hours"].(map[string]any)

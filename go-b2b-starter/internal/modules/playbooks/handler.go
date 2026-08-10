@@ -52,11 +52,23 @@ func (h *Handler) GetCatalog(c *gin.Context) {
 			item["applied_at"] = entry.Applied.AppliedAt
 			guiones := make([]map[string]any, 0, len(entry.Guiones))
 			for _, guion := range entry.Guiones {
-				guiones = append(guiones, map[string]any{
+				item := map[string]any{
 					"id":      guion.ID,
 					"titulo":  guion.Titulo,
 					"mensaje": guion.Mensaje,
-				})
+				}
+				if len(guion.Pasos) > 0 {
+					pasos := make([]map[string]any, 0, len(guion.Pasos))
+					for _, paso := range guion.Pasos {
+						pasos = append(pasos, map[string]any{
+							"id":      paso.ID,
+							"titulo":  paso.Titulo,
+							"mensaje": paso.Mensaje,
+						})
+					}
+					item["pasos"] = pasos
+				}
+				guiones = append(guiones, item)
 			}
 			item["guiones"] = guiones
 		}

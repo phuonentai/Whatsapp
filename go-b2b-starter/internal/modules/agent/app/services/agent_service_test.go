@@ -17,15 +17,15 @@ import (
 // ---------- mocks ----------
 
 type mockRepo struct {
-	settings   *domain.AgentSettings
-	flow       *domain.ConversationFlow
-	contact    *domain.ContactRef
-	conv       *domain.ConversationRef
-	suggestions []*domain.Suggestion
-	actions    []*domain.AgentAction
-	sentToday  int64
+	settings     *domain.AgentSettings
+	flow         *domain.ConversationFlow
+	contact      *domain.ContactRef
+	conv         *domain.ConversationRef
+	suggestions  []*domain.Suggestion
+	actions      []*domain.AgentAction
+	sentToday    int64
 	consentCalls []domain.ConsentStatus
-	superseded bool
+	superseded   bool
 }
 
 func newMockRepo() *mockRepo {
@@ -134,7 +134,10 @@ func (m *mockRepo) GetContactRef(ctx context.Context, orgID, contactID int32) (*
 	}
 	return m.contact, nil
 }
-func (m *mockRepo) ResolveConversation(ctx context.Context, orgID, contactID int32, lastMessageAt time.Time) (*domain.ConversationRef, error) {
+func (m *mockRepo) ResolveContactByIGUser(ctx context.Context, orgID int32, igUserID, displayName string, lastMessageAt time.Time) (*domain.ContactRef, error) {
+	return m.contact, nil
+}
+func (m *mockRepo) ResolveConversation(ctx context.Context, orgID, contactID int32, channel string, lastMessageAt time.Time) (*domain.ConversationRef, error) {
 	return m.conv, nil
 }
 func (m *mockRepo) GetConversationRef(ctx context.Context, orgID, conversationID int32) (*domain.ConversationRef, error) {
@@ -279,10 +282,10 @@ type billingInterface interface {
 
 func inEvent(content string) *whatsappEvents.MessageReceived {
 	return &whatsappEvents.MessageReceived{
-		OrganizationID: 42,
-		MessageSID:     "wamid-1",
-		From:           "+573001234567",
-		Content:        content,
+		OrganizationID:    42,
+		MessageSID:        "wamid-1",
+		From:              "+573001234567",
+		Content:           content,
 		WhatsAppTimestamp: time.Now(),
 	}
 }

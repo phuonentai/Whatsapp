@@ -8,6 +8,7 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent"
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/app/services"
+	igEvents "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 )
@@ -29,15 +30,24 @@ func Init(container *dig.Container) error {
 		bus eventbus.EventBus,
 		agentService services.AgentService,
 	) error {
-		return bus.Subscribe(whatsappEvents.MessageReceivedEventType, func(ctx context.Context, event eventbus.Event) error {
+		if err := bus.Subscribe(whatsappEvents.MessageReceivedEventType, func(ctx context.Context, event eventbus.Event) error {
 			msgEvent, ok := event.(*whatsappEvents.MessageReceived)
 			if !ok {
 				return fmt.Errorf("unexpected event type: %T", event)
 			}
 			return agentService.HandleMessageReceived(ctx, msgEvent)
+		}); err != nil {
+			return err
+		}
+		return bus.Subscribe(igEvents.MessageReceivedEventType, func(ctx context.Context, event eventbus.Event) error {
+			msgEvent, ok := event.(*igEvents.MessageReceived)
+			if !ok {
+				return fmt.Errorf("unexpected event type: %T", event)
+			}
+			return agentService.HandleInstagramMessageReceived(ctx, msgEvent)
 		})
 	}); err != nil {
-		return fmt.Errorf("failed to subscribe to whatsapp events: %w", err)
+		return fmt.Errorf("failed to subscribe to inbound message events: %w", err)
 	}
 
 	return nil

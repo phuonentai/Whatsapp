@@ -276,7 +276,7 @@ func (r *agentRepository) CountMessagesSentToday(ctx context.Context, orgID int3
 func (r *agentRepository) ResolveContact(ctx context.Context, orgID int32, phoneNumber, displayName string, lastMessageAt time.Time) (*domain.ContactRef, error) {
 	row, err := r.store.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgID,
-		PhoneNumber:    phoneNumber,
+		PhoneNumber:    helpers.ToPgText(phoneNumber),
 		DisplayName:    helpers.ToPgText(displayName),
 		AvatarUrl:      pgtype.Text{},
 		Metadata:       []byte(`{}`),
@@ -284,6 +284,24 @@ func (r *agentRepository) ResolveContact(ctx context.Context, orgID int32, phone
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve contact: %w", err)
+	}
+	return mapContactRef(&row), nil
+}
+
+// ResolveContactByIGUser resolves an Instagram contact by IG-scoped user id,
+// creating it with source='instagram' and a NULL phone when absent.
+func (r *agentRepository) ResolveContactByIGUser(ctx context.Context, orgID int32, igUserID, displayName string, lastMessageAt time.Time) (*domain.ContactRef, error) {
+	row, err := r.store.UpsertContactByIGUser(ctx, sqlc.UpsertContactByIGUserParams{
+		OrganizationID:    orgID,
+		InstagramUserID:   helpers.ToPgText(igUserID),
+		InstagramUsername: pgtype.Text{},
+		DisplayName:       helpers.ToPgText(displayName),
+		AvatarUrl:         pgtype.Text{},
+		Metadata:          []byte(`{}`),
+		LastMessageAt:     helpers.ToPgTimestamp(lastMessageAt),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve instagram contact: %w", err)
 	}
 	return mapContactRef(&row), nil
 }
@@ -302,12 +320,16 @@ func (r *agentRepository) GetContactRef(ctx context.Context, orgID, contactID in
 	return mapContactRef(&row), nil
 }
 
-func (r *agentRepository) ResolveConversation(ctx context.Context, orgID, contactID int32, lastMessageAt time.Time) (*domain.ConversationRef, error) {
+func (r *agentRepository) ResolveConversation(ctx context.Context, orgID, contactID int32, channel string, lastMessageAt time.Time) (*domain.ConversationRef, error) {
+	if channel == "" {
+		channel = domain.ChannelWhatsapp
+	}
 	// Idempotent insert of an active conversation; on conflict, fall back to
 	// the existing active conversation (same pattern as CRMService).
 	row, err := r.store.InsertActiveConversationIdempotent(ctx, sqlc.InsertActiveConversationIdempotentParams{
 		OrganizationID: orgID,
 		ContactID:      contactID,
+		Channel:        channel,
 		LastMessageAt:  helpers.ToPgTimestamp(lastMessageAt),
 		Metadata:       []byte(`{}`),
 	})
@@ -317,6 +339,7 @@ func (r *agentRepository) ResolveConversation(ctx context.Context, orgID, contac
 	existing, err2 := r.store.GetActiveConversationByContact(ctx, sqlc.GetActiveConversationByContactParams{
 		ContactID:      contactID,
 		OrganizationID: orgID,
+		Channel:        channel,
 	})
 	if err2 != nil {
 		return nil, fmt.Errorf("failed to resolve conversation: %w", err)
@@ -492,7 +515,7 @@ func mapContactRef(row *sqlc.CrmContact) *domain.ContactRef {
 	return &domain.ContactRef{
 		ID:              row.ID,
 		OrganizationID:  row.OrganizationID,
-		PhoneNumber:     row.PhoneNumber,
+		PhoneNumber:     helpers.FromPgText(row.PhoneNumber),
 		DisplayName:     helpers.FromPgText(row.DisplayName),
 		Email:           helpers.FromPgText(row.Email),
 		TipoDocumento:   helpers.FromPgText(row.TipoDocumento),
@@ -522,7 +545,7 @@ func mapMessageRef(row *sqlc.CrmMessage) *domain.MessageRef {
 		MessageType:       row.MessageType,
 		Content:           row.Content.String,
 		Status:            row.Status,
-		WhatsAppMessageID: row.WhatsappMessageID.String,
+		ProviderMessageID: helpers.FromPgText(row.ProviderMessageID),
 		CreatedAt:         row.CreatedAt.Time,
 	}
 }

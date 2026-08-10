@@ -14,8 +14,9 @@ import { ContactDetail } from "@/components/crm/contact-detail";
 import { CompanyDetail } from "@/components/crm/company-detail";
 import { DealDetail } from "@/components/crm/deal-detail";
 import { TicketsPanel } from "@/components/tickets/tickets-panel";
+import { CampaignManager } from "@/components/crm/campaign-manager";
 
-type Tab = "contactos" | "empresas" | "negocios" | "actividad" | "etiquetas" | "pipelines" | "tickets";
+type Tab = "contactos" | "empresas" | "negocios" | "actividad" | "etiquetas" | "pipelines" | "tickets" | "campañas";
 
 const TAB_LABELS: Record<Tab, { label: string; feature?: string; upgradePlan?: string; module?: string }> = {
   contactos: { label: "Contactos" },
@@ -25,6 +26,7 @@ const TAB_LABELS: Record<Tab, { label: string; feature?: string; upgradePlan?: s
   etiquetas: { label: "Etiquetas", feature: "crm_tags", upgradePlan: "Enterprise" },
   pipelines: { label: "Pipelines", feature: "crm_deals", upgradePlan: "Pro" },
   tickets: { label: "Tickets", feature: "tickets_module", upgradePlan: "Tickets", module: "tickets" },
+  "campañas": { label: "Campañas", feature: "crm_campaigns", upgradePlan: "Campañas", module: "campaigns" },
 };
 
 export function CRMPage() {
@@ -118,6 +120,9 @@ export function CRMPage() {
       )}
       {view === "tickets" && (
         entitlement?.funcionalidades?.tickets_module ? <TicketsPanel /> : <UpgradeBanner feature="Tickets" plan="Tickets" />
+      )}
+      {view === "campañas" && (
+        entitlement?.funcionalidades?.crm_campaigns ? <CampaignManager /> : <UpgradeBanner feature="Campañas" plan="Campañas" />
       )}
     </div>
   );

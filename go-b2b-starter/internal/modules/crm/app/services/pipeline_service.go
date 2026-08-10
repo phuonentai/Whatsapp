@@ -19,25 +19,25 @@ type PipelineService interface {
 }
 
 type CreatePipelineRequest struct {
-	Nombre string
-	Orden  int32
+	Nombre string `json:"nombre"`
+	Orden  int32  `json:"orden"`
 }
 type UpdatePipelineRequest struct {
-	ID     int32
-	Nombre string
-	Orden  int32
+	ID     int32  `json:"id"`
+	Nombre string `json:"nombre"`
+	Orden  int32  `json:"orden"`
 }
 type CreateStageRequest struct {
-	Nombre       string
-	Orden        int32
-	Color        string
-	Probabilidad *int32
+	Nombre       string `json:"nombre"`
+	Orden        int32  `json:"orden"`
+	Color        string `json:"color"`
+	Probabilidad *int32 `json:"probabilidad"`
 }
 type UpdateStageRequest struct {
-	Nombre       string
-	Orden        int32
-	Color        string
-	Probabilidad *int32
+	Nombre       string `json:"nombre"`
+	Orden        int32  `json:"orden"`
+	Color        string `json:"color"`
+	Probabilidad *int32 `json:"probabilidad"`
 }
 
 type pipelineService struct {
@@ -56,16 +56,25 @@ func NewPipelineService(
 
 func (s *pipelineService) GetOrCreateDefault(ctx context.Context, orgID int32) (*domain.PipelineWithStages, error) {
 	pipelines, err := s.pipelineRepo.List(ctx, orgID)
-	if err != nil { return nil, err }
-	if len(pipelines) > 0 { return pipelines[0], nil }
+	if err != nil {
+		return nil, err
+	}
+	if len(pipelines) > 0 {
+		return pipelines[0], nil
+	}
 
 	p, err := s.pipelineRepo.Create(ctx, &domain.Pipeline{
 		OrganizationID: orgID, Nombre: "Pipeline de Ventas", EsPredeterminado: true, Orden: 1,
 	})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	defaultStages := []struct {
-		Nombre string; Orden int32; Color string; Probabilidad int32
+		Nombre       string
+		Orden        int32
+		Color        string
+		Probabilidad int32
 	}{
 		{"Prospección", 1, "#6B7280", 10},
 		{"Calificado", 2, "#3B82F6", 25},
@@ -81,7 +90,9 @@ func (s *pipelineService) GetOrCreateDefault(ctx context.Context, orgID int32) (
 			PipelineID: p.ID, Nombre: st.Nombre, Orden: st.Orden,
 			Color: st.Color, Probabilidad: &prob,
 		})
-		if err != nil { continue }
+		if err != nil {
+			continue
+		}
 		etapas = append(etapas, *stage)
 	}
 	return &domain.PipelineWithStages{Pipeline: *p, Etapas: etapas}, nil

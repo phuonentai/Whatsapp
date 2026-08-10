@@ -136,6 +136,12 @@ func (r *stytchMemberRepository) ListMembers(ctx context.Context, organizationID
 		return nil, domain.ErrAuthOrganizationIDRequired
 	}
 
+	if r.client == nil {
+		// Development mode: placeholder credentials mean no Stytch client.
+		// Fail cleanly instead of nil-pointer dereferencing.
+		return nil, domain.ErrAuthConnection
+	}
+
 	params := &members.SearchParams{
 		OrganizationIds: []string{organizationID},
 	}

@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+// Channel identifies the messaging provider a conversation/message belongs to.
+const (
+	ChannelWhatsapp  = "whatsapp"
+	ChannelInstagram = "instagram"
+)
+
 type ConversationStatus string
 
 const (
@@ -14,6 +20,7 @@ type Conversation struct {
 	ID             int32                  `json:"id"`
 	OrganizationID int32                  `json:"organization_id"`
 	ContactID      int32                  `json:"contact_id"`
+	Channel        string                 `json:"channel"`
 	Status         ConversationStatus     `json:"status"`
 	LastMessageAt  *time.Time             `json:"last_message_at,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
@@ -34,6 +41,8 @@ func (c *Conversation) IsWithin24HourWindow() bool {
 
 type ConversationWithContact struct {
 	Conversation
-	ContactPhone       string `json:"contact_phone"`
-	ContactDisplayName string `json:"contact_display_name"`
+	ContactPhone             string `json:"contact_phone"`
+	ContactDisplayName       string `json:"contact_display_name"`
+	ContactInstagramUsername string `json:"contact_instagram_username,omitempty"`
+	ContactAvatarURL         string `json:"contact_avatar_url,omitempty"`
 }

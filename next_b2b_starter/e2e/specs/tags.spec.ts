@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { TagsPage } from "../page-objects/tags.page";
+import { uniqueColombianPhone } from "../helpers/phones";
 
 test.describe("Etiquetas", () => {
   let tagsPage: TagsPage;
@@ -19,8 +20,7 @@ test.describe("Etiquetas", () => {
     expect(tag).not.toBeNull();
 
     await tagsPage.delete(name);
-    const deleted = await tagsPage.getTag(name);
-    expect(deleted).toBeNull();
+    await expect(tagsPage.tagList.locator(`text="${name}"`)).toHaveCount(0);
   });
 
   test("duplicate tag name shows error", async ({ page }) => {
@@ -30,7 +30,7 @@ test.describe("Etiquetas", () => {
     await tagsPage.newTagButton.click();
     await page.fill('input[name="nombre"]', name);
     await page.getByRole("button", { name: /guardar|crear/i }).click();
-    const error = page.locator("text=ya existe,text=duplicado");
+    const error = page.locator("text=ya existe");
     await expect(error).toBeVisible();
   });
 
@@ -38,7 +38,7 @@ test.describe("Etiquetas", () => {
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-enterprise:admin-enterprise@test.com" });
 
     const ts = Date.now();
-    const contactPhone = `+57312${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `Tagged Contact ${ts}`;
     const dealName = `Tagged Deal ${ts}`;
     const tagName = `Entity Tag ${ts}`;
@@ -89,7 +89,7 @@ test.describe("Etiquetas", () => {
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-enterprise:admin-enterprise@test.com" });
 
     const ts = Date.now();
-    const contactPhone = `+57313${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `Untag Contact ${ts}`;
     const tagName = `Untag Tag ${ts}`;
 

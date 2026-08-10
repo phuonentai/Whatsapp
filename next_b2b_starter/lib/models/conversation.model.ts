@@ -1,9 +1,12 @@
 export type ConversationStatus = "active" | "closed" | "archived";
 
+export type Channel = "whatsapp" | "instagram";
+
 export interface Conversation {
   id: number;
   organizationId: number;
   contactId: number;
+  channel: Channel;
   status: ConversationStatus;
   lastMessageAt?: string;
   metadata?: Record<string, unknown>;
@@ -11,6 +14,8 @@ export interface Conversation {
   updatedAt: string;
   contactPhone: string;
   contactDisplayName: string;
+  contactInstagramUsername?: string;
+  contactAvatarUrl?: string;
 }
 
 export interface ConversationListResponse {
@@ -23,7 +28,8 @@ export interface Message {
   organizationId: number;
   conversationId: number;
   contactId: number;
-  whatsappMessageId?: string;
+  channel: Channel;
+  providerMessageId?: string;
   direction: "inbound" | "outbound";
   messageType: string;
   content?: string;

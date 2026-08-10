@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the tag entity with organization scoping and attach and detach operations across contacts, companies, and deals.
+
+## Requirements
 
 ### Requirement: Tag entity with organization scoping
 

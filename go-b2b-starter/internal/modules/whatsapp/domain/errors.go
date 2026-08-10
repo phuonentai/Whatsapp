@@ -11,6 +11,7 @@ var (
 	ErrInvalidSignature        = errors.New("invalid webhook signature")
 	ErrUnknownPhoneNumber      = errors.New("unknown phone number ID")
 	ErrWebhookVerificationFail = errors.New("webhook verification failed")
+	ErrDuplicateDelivery       = errors.New("duplicate webhook delivery")
 
 	ErrSignupNotFound         = errors.New("signup flow not found")
 	ErrSignupCodeRequired     = errors.New("authorization code is required")

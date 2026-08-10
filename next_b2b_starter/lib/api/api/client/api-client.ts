@@ -107,6 +107,32 @@ export class ApiClient {
       ...(options.headers as Record<string, string> | undefined),
     };
 
+    // Mock-auth E2E: forward the X-Test-Org-ID identity on calls so the
+    // backend mock middleware can resolve the org/account. The backend prefers
+    // this header over the Bearer token, and the mock JWT adapter cannot
+    // resolve a real org on its own. Works both server-side (next/headers) and
+    // client-side (document cookie set by the e2e storage state).
+    if (
+      process.env.AUTH_MOCK_ENABLED === "true" &&
+      !headers["X-Test-Org-ID"]
+    ) {
+      try {
+        let mockOrgId: string | null = null;
+        if (typeof window === "undefined") {
+          const { cookies } = await import("next/headers");
+          mockOrgId = (await cookies()).get("X-Test-Org-ID")?.value ?? null;
+        } else {
+          mockOrgId =
+            document.cookie.match(/(?:^|; )X-Test-Org-ID=([^;]*)/)?.[1] ?? null;
+        }
+        if (mockOrgId) {
+          headers["X-Test-Org-ID"] = mockOrgId;
+        }
+      } catch {
+        // cookies() unavailable (non-request context) — ignore.
+      }
+    }
+
     const { skipAuth, ...restOptions } = options;
     const { params: _params, ...fetchOptions } = restOptions;
     const shouldAttachAuth = !skipAuth && !headers["Authorization"];

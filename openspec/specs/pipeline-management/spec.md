@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines pipeline and pipeline stage entities with organization scoping, Spanish names, and a default pipeline auto-seeded with Colombian stages.
+
+## Requirements
 
 ### Requirement: Pipeline entity with organization scoping
 

@@ -30,7 +30,8 @@ type Message struct {
 	OrganizationID    int32                  `json:"organization_id"`
 	ConversationID    int32                  `json:"conversation_id"`
 	ContactID         int32                  `json:"contact_id"`
-	WhatsAppMessageID string                 `json:"whatsapp_message_id,omitempty"`
+	Channel           string                 `json:"channel"`
+	ProviderMessageID string                 `json:"provider_message_id,omitempty"`
 	Direction         MessageDirection       `json:"direction"`
 	MessageType       MessageType            `json:"message_type"`
 	Content           string                 `json:"content,omitempty"`

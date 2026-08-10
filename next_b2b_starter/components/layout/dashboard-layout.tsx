@@ -68,7 +68,16 @@ export function DashboardLayout({
 
     const profile = auth.profile;
     const roles = auth.roles;
-    const granted = auth.permissions;
+    let granted = auth.permissions;
+
+    // Expand wildcard grants (`*:*`) into the full known permission set so
+    // downstream literal `includes(...)` checks work. The mock auth backend
+    // issues `*:*` for admin roles (mirrors getServerPermissions).
+    if (granted.includes("*:*")) {
+      granted = Array.from(
+        new Set([...granted, ...Object.values(PERMISSIONS)])
+      );
+    }
 
     return {
       profile,

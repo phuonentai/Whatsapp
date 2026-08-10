@@ -22,7 +22,7 @@ func NewInvoiceRepository(store sqlc.Store) domain.InvoiceRepository {
 
 func (r *invoiceRepository) GetByDeal(ctx context.Context, orgID, dealID int32) (*domain.Invoice, error) {
 	row, err := r.store.GetInvoiceByDeal(ctx, sqlc.GetInvoiceByDealParams{
-		OrganizationID: orgID, DealID: dealID,
+		OrganizationID: orgID, DealID: helpers.ToPgInt4(dealID),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -47,7 +47,7 @@ func (r *invoiceRepository) GetByExternalID(ctx context.Context, externalID stri
 func (r *invoiceRepository) Insert(ctx context.Context, inv *domain.Invoice) (*domain.Invoice, error) {
 	row, err := r.store.InsertInvoice(ctx, sqlc.InsertInvoiceParams{
 		OrganizationID: inv.OrganizationID,
-		DealID:         inv.DealID,
+		DealID:         helpers.ToPgInt4(inv.DealID),
 		ExternalID:     helpers.ToPgText(inv.ExternalID),
 		Cufe:           helpers.ToPgText(inv.Cufe),
 		Status:         string(inv.Status),
@@ -112,7 +112,7 @@ func mapInvoice(row *sqlc.InvoicingInvoice) *domain.Invoice {
 	inv := &domain.Invoice{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
-		DealID:         row.DealID,
+		DealID:         helpers.FromPgInt4(row.DealID),
 		ExternalID:     helpers.FromPgText(row.ExternalID),
 		Cufe:           helpers.FromPgText(row.Cufe),
 		Status:         domain.InvoiceStatus(row.Status),

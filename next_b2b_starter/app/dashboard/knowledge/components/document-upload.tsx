@@ -140,6 +140,12 @@ export function DocumentUpload({
         </Alert>
       )}
 
+      {error && (
+        <Alert variant="destructive" className="border-red-200 bg-red-50 mb-4">
+          <AlertDescription className="text-red-700">{error}</AlertDescription>
+        </Alert>
+      )}
+
       <div
         {...getRootProps()}
         className={cn(

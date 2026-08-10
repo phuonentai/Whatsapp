@@ -51,6 +51,7 @@ func (r *fileMetadataRepository) Create(ctx context.Context, file *domain.FileAs
 		MimeType:         file.ContentType,
 		FileCategoryID:   categoryID,
 		FileContextID:    contextID,
+		OrganizationID:   file.OrganizationID,
 		IsPublic:         pgtype.Bool{Bool: file.IsPublic, Valid: true},
 		EntityType:       pgtype.Text{String: file.EntityType, Valid: file.EntityType != ""},
 		EntityID:         pgtype.Int4{Int32: file.EntityID, Valid: file.EntityID != 0},

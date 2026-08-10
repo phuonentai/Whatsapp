@@ -21,8 +21,8 @@ export class PipelinesPage {
     await this.page.fill('input[name="nombre"]', data.name);
     for (const stage of data.stages) {
       await this.page.getByRole("button", { name: /agregar etapa/i }).click();
-      await this.page.fill('input[name="stage_name"]:last', stage.name);
-      await this.page.fill('input[name="stage_color"]:last', stage.color);
+      await this.page.locator('input[name="stage_name"]').last().fill(stage.name);
+      await this.page.locator('input[name="stage_color"]').last().fill(stage.color);
     }
     await this.page.getByRole("button", { name: /guardar|crear/i }).click();
   }

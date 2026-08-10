@@ -50,6 +50,52 @@ export function buildWhatsAppTextPayload(opts: {
 }
 
 /**
+ * Build a WhatsApp Cloud API webhook payload for an echo message
+ * (sent from the organization's own WhatsApp Business app).
+ */
+export function buildEchoTextPayload(opts: {
+  phoneNumberId: string;
+  from: string;
+  body: string;
+  messageId?: string;
+  timestamp?: string;
+}): string {
+  const messageId = opts.messageId ?? `wamid.echo.${Date.now()}.${Math.random().toString(36).slice(2, 10)}`;
+  const timestamp = opts.timestamp ?? String(Math.floor(Date.now() / 1000));
+  const payload = {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "0",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: {
+                display_phone_number: "15550123456",
+                phone_number_id: opts.phoneNumberId,
+              },
+              messages: [
+                {
+                  from: opts.from,
+                  id: messageId,
+                  timestamp,
+                  text: { body: opts.body },
+                  type: "text",
+                  origin: { type: "echo" },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+  return JSON.stringify(payload);
+}
+
+/**
  * HMAC-SHA256 sign a raw webhook body with the org's webhook secret,
  * producing the `x-hub-signature-256: sha256=<hex>` header value.
  */
@@ -77,6 +123,10 @@ export async function deliverWebhook(
       ...(opts.phoneNumberId ? { "X-Test-Phone-Number-ID": opts.phoneNumberId } : {}),
     },
     body,
+    // Guard against the Next dev server dropping connections under parallel
+    // load: a stalled fetch must reject (AbortError) instead of hanging the
+    // test until the per-test timeout.
+    signal: AbortSignal.timeout(10_000),
   });
   let json: unknown = null;
   try {
@@ -114,6 +164,7 @@ export async function seedWhatsAppConfig(opts: {
     method: "PUT",
     body: {
       phone_number_id: opts.phoneNumberId,
+      business_phone: "15550123456",
       webhook_secret: opts.webhookSecret,
       verify_token: opts.verifyToken,
       access_token: opts.accessToken ?? "TEST_ACCESS_TOKEN",
@@ -122,4 +173,33 @@ export async function seedWhatsAppConfig(opts: {
     orgSlug: "test-org-pro",
     email: "admin-pro@test.com",
   });
+}
+
+/**
+ * Set the `is_active` flag on the org's WhatsApp config to a desired state
+ * via the management API. Reads the current config, then PATCH-toggles until
+ * the flag matches. Used to exercise the inactive-config edge case (inactive
+ * configs resolve to no organization and return 404).
+ */
+export async function setConfigActive(opts: {
+  phoneNumberId: string;
+  isActive: boolean;
+}): Promise<void> {
+  const orgSlug = "test-org-pro";
+  const email = "admin-pro@test.com";
+
+  let current = await apiRequest<{ is_active?: boolean }>("/v1/whatsapp/config", {
+    orgSlug,
+    email,
+  });
+
+  let guard = 0;
+  while ((current.is_active ?? false) !== opts.isActive && guard < 5) {
+    current = await apiRequest<{ is_active?: boolean }>("/v1/whatsapp/config/toggle", {
+      method: "PATCH",
+      orgSlug,
+      email,
+    });
+    guard += 1;
+  }
 }

@@ -1,11 +1,14 @@
 import { apiClient } from "../client/api-client";
 import { ConversationDto, MessageDto } from "../dto/conversation.dto";
-import type { Conversation, Message, ConversationStatus } from "@/lib/models/conversation.model";
+import type { Conversation, Message, ConversationStatus, Channel } from "@/lib/models/conversation.model";
 
 class ConversationRepository {
-  async listConversations(params?: { status?: string; limit?: number; offset?: number }): Promise<Conversation[]> {
+  async listConversations(
+    params?: { status?: string; channel?: Channel; limit?: number; offset?: number }
+  ): Promise<Conversation[]> {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.channel) searchParams.set("channel", params.channel);
     if (params?.limit) searchParams.set("limit", String(params.limit));
     if (params?.offset) searchParams.set("offset", String(params.offset));
     const qs = searchParams.toString();
@@ -47,6 +50,7 @@ class ConversationRepository {
       id: dto.id,
       organizationId: dto.organization_id,
       contactId: dto.contact_id,
+      channel: (dto.channel as Channel) ?? "whatsapp",
       status: dto.status as ConversationStatus,
       lastMessageAt: dto.last_message_at,
       metadata: dto.metadata,
@@ -54,6 +58,8 @@ class ConversationRepository {
       updatedAt: dto.updated_at,
       contactPhone: dto.contact_phone,
       contactDisplayName: dto.contact_display_name,
+      contactInstagramUsername: dto.contact_instagram_username,
+      contactAvatarUrl: dto.contact_avatar_url,
     };
   }
 
@@ -63,7 +69,8 @@ class ConversationRepository {
       organizationId: dto.organization_id,
       conversationId: dto.conversation_id,
       contactId: dto.contact_id,
-      whatsappMessageId: dto.whatsapp_message_id,
+      channel: (dto.channel as Channel) ?? "whatsapp",
+      providerMessageId: dto.provider_message_id,
       direction: dto.direction as "inbound" | "outbound",
       messageType: dto.message_type,
       content: dto.content,

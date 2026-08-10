@@ -35,7 +35,7 @@ type invoicingService struct {
 // PaymentLinker supplies the payment link appended to invoice notifications.
 // Returns "" when unavailable (e.g. MercadoPago not configured for the org).
 type PaymentLinker interface {
-	PaymentLink(ctx context.Context, orgID int32) (string, error)
+	PaymentLink(ctx context.Context, orgID, dealID int32, amountCOP int64) (string, error)
 }
 
 func NewInvoicingService(
@@ -262,8 +262,9 @@ func (s *invoicingService) notify(ctx context.Context, inv *domain.Invoice) {
 	}
 
 	paymentLink := ""
-	if s.paymentLinker != nil {
-		paymentLink, _ = s.paymentLinker.PaymentLink(ctx, inv.OrganizationID)
+	if s.paymentLinker != nil && inv.Amount != nil {
+		amountCOP := int64(*inv.Amount)
+		paymentLink, _ = s.paymentLinker.PaymentLink(ctx, inv.OrganizationID, inv.DealID, amountCOP)
 	}
 
 	msg := fmt.Sprintf("Factura %s · estado: %s", inv.ExternalID, inv.Status)
@@ -301,4 +302,4 @@ func (s *invoicingService) recordActivity(ctx context.Context, orgID, dealID int
 
 type noopPaymentLinker struct{}
 
-func (noopPaymentLinker) PaymentLink(ctx context.Context, orgID int32) (string, error) { return "", nil }
+func (noopPaymentLinker) PaymentLink(ctx context.Context, orgID, dealID int32, amountCOP int64) (string, error) { return "", nil }

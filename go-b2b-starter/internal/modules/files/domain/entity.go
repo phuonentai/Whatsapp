@@ -10,6 +10,7 @@ import (
 type FileAsset struct {
 	ID               int32                     `json:"id"`   // Database ID
 	UUID             uuid.UUID                 `json:"uuid"` // UUID for external reference
+	OrganizationID   int32                     `json:"organization_id"`
 	Filename         string                    `json:"filename"`
 	OriginalFilename string                    `json:"original_filename"`
 	Size             int64                     `json:"size"`
@@ -29,11 +30,12 @@ type FileAsset struct {
 }
 
 type FileUploadRequest struct {
-	Filename    string                   `json:"filename"`
-	Size        int64                    `json:"size"`
-	ContentType string                   `json:"content_type"`
-	Context     files.FileContext `json:"context"`
-	Metadata    map[string]any           `json:"metadata,omitempty"`
+	Filename       string                   `json:"filename"`
+	Size           int64                    `json:"size"`
+	ContentType    string                   `json:"content_type"`
+	OrganizationID int32                    `json:"organization_id"`
+	Context        files.FileContext `json:"context"`
+	Metadata       map[string]any           `json:"metadata,omitempty"`
 }
 
 type FileSearchFilter struct {

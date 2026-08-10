@@ -370,11 +370,48 @@ func (s *memberService) ListOrganizationMembers(
 	// Retrieve members from repository (no pagination limit)
 	members, err := s.authMemberRepo.ListMembers(ctx, orgID, 0, 0)
 	if err != nil {
-		s.logger.Error("failed to list organization members", loggerDomain.Fields{
-			"org_id": orgID,
-			"error":  err.Error(),
-		})
-		return nil, fmt.Errorf("failed to list members: %w", err)
+		// Development mode: the Stytch client is nil (placeholder credentials).
+		// Fall back to local accounts so the members endpoint still works.
+		if !errors.Is(err, domain.ErrAuthConnection) {
+			s.logger.Error("failed to list organization members", loggerDomain.Fields{
+				"org_id": orgID,
+				"error":  err.Error(),
+			})
+			return nil, fmt.Errorf("failed to list members: %w", err)
+		}
+
+		localOrgID, lerr := s.resolveLocalOrganizationID(ctx, orgID)
+		if lerr != nil {
+			s.logger.Error("failed to resolve local organization for member list", loggerDomain.Fields{
+				"org_id": orgID,
+				"error":  lerr.Error(),
+			})
+			return nil, fmt.Errorf("failed to list members: %w", lerr)
+		}
+
+		accounts, aerr := s.localAccountRepo.ListByOrganization(ctx, localOrgID)
+		if aerr != nil {
+			s.logger.Error("failed to list local accounts", loggerDomain.Fields{
+				"org_id": localOrgID,
+				"error":  aerr.Error(),
+			})
+			return nil, fmt.Errorf("failed to list members: %w", aerr)
+		}
+
+		members = make([]*domain.AuthMember, 0, len(accounts))
+		for _, account := range accounts {
+			members = append(members, &domain.AuthMember{
+				MemberID:       account.StytchMemberID,
+				OrganizationID: orgID,
+				Email:          account.Email,
+				Name:           account.FullName,
+				Roles:          []string{account.Role},
+				Status:         account.Status,
+				EmailVerified:  account.StytchEmailVerified,
+				CreatedAt:      account.CreatedAt,
+				UpdatedAt:      account.UpdatedAt,
+			})
+		}
 	}
 
 	// Convert domain members to response info

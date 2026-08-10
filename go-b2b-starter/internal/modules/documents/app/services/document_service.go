@@ -50,11 +50,12 @@ func (s *documentService) UploadDocument(ctx context.Context, orgID int32, req *
 
 	// Upload file using file manager
 	fileReq := &filedomain.FileUploadRequest{
-		Filename:    req.FileName,
-		Size:        req.FileSize,
-		ContentType: req.ContentType,
-		Context:     filemanager.ContextGeneral,
-		Metadata:    req.Metadata,
+		Filename:       req.FileName,
+		Size:           req.FileSize,
+		ContentType:    req.ContentType,
+		OrganizationID: orgID,
+		Context:        filemanager.ContextGeneral,
+		Metadata:       req.Metadata,
 	}
 
 	fileAsset, err := s.fileService.UploadFile(ctx, fileReq, content)

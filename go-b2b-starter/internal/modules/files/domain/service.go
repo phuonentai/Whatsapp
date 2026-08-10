@@ -69,6 +69,7 @@ func (s *fileService) UploadFile(ctx context.Context, req *FileUploadRequest, co
 
 	// Create file asset
 	fileAsset := &FileAsset{
+		OrganizationID:   req.OrganizationID,
 		Filename:         sanitizedFilename,
 		OriginalFilename: req.Filename, // Keep original for reference
 		Size:             req.Size,

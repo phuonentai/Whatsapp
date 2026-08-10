@@ -2,7 +2,10 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
@@ -25,19 +28,25 @@ func (r *companyRepository) Create(ctx context.Context, company *domain.Company)
 		Notes: helpers.ToPgText(company.Notes), Metadata: helpers.ToJSONB(company.Metadata),
 		OwnerAccountID: helpers.ToPgInt4Ptr(company.OwnerAccountID),
 	})
-	if err != nil { return nil, fmt.Errorf("failed to create company: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to create company: %w", err)
+	}
 	return mapCrmCompany(&result), nil
 }
 
 func (r *companyRepository) GetByID(ctx context.Context, orgID, companyID int32) (*domain.CompanyWithCounts, error) {
 	result, err := r.store.GetCompanyByID(ctx, sqlc.GetCompanyByIDParams{ID: companyID, OrganizationID: orgID})
-	if err != nil { return nil, fmt.Errorf("failed to get company: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to get company: %w", err)
+	}
 	return &domain.CompanyWithCounts{Company: *mapCompanyByIDRow(&result), TotalContactos: int32(result.TotalContactos), TotalNegocios: int32(result.TotalNegocios)}, nil
 }
 
 func (r *companyRepository) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
 	results, err := r.store.ListCompaniesByOrganization(ctx, sqlc.ListCompaniesByOrganizationParams{OrganizationID: orgID, Limit: limit, Offset: offset})
-	if err != nil { return nil, fmt.Errorf("failed to list companies: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to list companies: %w", err)
+	}
 	companies := make([]*domain.CompanyWithCounts, len(results))
 	for i := range results {
 		companies[i] = &domain.CompanyWithCounts{Company: *mapCompanyListRow(&results[i]), TotalContactos: int32(results[i].TotalContactos), TotalNegocios: int32(results[i].TotalNegocios)}
@@ -47,12 +56,28 @@ func (r *companyRepository) List(ctx context.Context, orgID int32, limit, offset
 
 func (r *companyRepository) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
 	results, err := r.store.SearchCompanies(ctx, sqlc.SearchCompaniesParams{OrganizationID: orgID, Column2: helpers.ToPgText(query), Limit: limit, Offset: offset})
-	if err != nil { return nil, fmt.Errorf("failed to search companies: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to search companies: %w", err)
+	}
 	companies := make([]*domain.CompanyWithCounts, len(results))
 	for i := range results {
 		companies[i] = &domain.CompanyWithCounts{Company: *mapCompanySearchRow(&results[i]), TotalContactos: int32(results[i].TotalContactos), TotalNegocios: int32(results[i].TotalNegocios)}
 	}
 	return companies, nil
+}
+
+func (r *companyRepository) GetByNit(ctx context.Context, orgID int32, nit string) (*domain.Company, error) {
+	result, err := r.store.GetCompanyByNit(ctx, sqlc.GetCompanyByNitParams{
+		OrganizationID: orgID,
+		Nit:            helpers.ToPgText(nit),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrCompanyNotFound
+		}
+		return nil, fmt.Errorf("failed to get company by nit: %w", err)
+	}
+	return mapCrmCompany(&result), nil
 }
 
 func (r *companyRepository) Update(ctx context.Context, company *domain.Company) (*domain.Company, error) {
@@ -65,7 +90,9 @@ func (r *companyRepository) Update(ctx context.Context, company *domain.Company)
 		Column11: helpers.ToPgText(company.Address), Column12: helpers.ToPgText(company.Notes),
 		Column13: helpers.ToJSONB(company.Metadata), OwnerAccountID: helpers.ToPgInt4Ptr(company.OwnerAccountID),
 	})
-	if err != nil { return nil, fmt.Errorf("failed to update company: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("failed to update company: %w", err)
+	}
 	return mapCrmCompany(&result), nil
 }
 
@@ -82,7 +109,7 @@ func mapCrmCompany(c *sqlc.CrmCompany) *domain.Company {
 		Phone: helpers.FromPgText(c.Phone), Address: helpers.FromPgText(c.Address),
 		Notes: helpers.FromPgText(c.Notes), Metadata: helpers.FromJSONB(c.Metadata),
 		OwnerAccountID: helpers.FromPgInt4Ptr(c.OwnerAccountID),
-		CreatedAt: c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
+		CreatedAt:      c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
 	}
 }
 
@@ -95,7 +122,7 @@ func mapCompanyByIDRow(r *sqlc.GetCompanyByIDRow) *domain.Company {
 		Phone: helpers.FromPgText(r.Phone), Address: helpers.FromPgText(r.Address),
 		Notes: helpers.FromPgText(r.Notes), Metadata: helpers.FromJSONB(r.Metadata),
 		OwnerAccountID: helpers.FromPgInt4Ptr(r.OwnerAccountID),
-		CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
+		CreatedAt:      r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
 	}
 }
 
@@ -108,7 +135,7 @@ func mapCompanyListRow(r *sqlc.ListCompaniesByOrganizationRow) *domain.Company {
 		Phone: helpers.FromPgText(r.Phone), Address: helpers.FromPgText(r.Address),
 		Notes: helpers.FromPgText(r.Notes), Metadata: helpers.FromJSONB(r.Metadata),
 		OwnerAccountID: helpers.FromPgInt4Ptr(r.OwnerAccountID),
-		CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
+		CreatedAt:      r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
 	}
 }
 
@@ -121,6 +148,6 @@ func mapCompanySearchRow(r *sqlc.SearchCompaniesRow) *domain.Company {
 		Phone: helpers.FromPgText(r.Phone), Address: helpers.FromPgText(r.Address),
 		Notes: helpers.FromPgText(r.Notes), Metadata: helpers.FromJSONB(r.Metadata),
 		OwnerAccountID: helpers.FromPgInt4Ptr(r.OwnerAccountID),
-		CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
+		CreatedAt:      r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
 	}
 }

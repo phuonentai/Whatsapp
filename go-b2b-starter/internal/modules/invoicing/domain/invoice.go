@@ -56,4 +56,6 @@ type InvoiceRequest struct {
 	Amount         *float64
 	Currency       string
 	Description    string
+	// Number is optional; supplied only in manual numbering mode.
+	Number string
 }

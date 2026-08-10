@@ -8,9 +8,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	config "github.com/moasq/go-b2b-starter/internal/platform/server/config"
 	"github.com/moasq/go-b2b-starter/internal/platform/server/logging"
 	"github.com/moasq/go-b2b-starter/internal/platform/server/middleware"
+	"github.com/moasq/go-b2b-starter/internal/platform/redis"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,12 +25,16 @@ type HTTPServer struct {
 	registrars       map[string][]RouteRegistrar
 	namedMiddlewares map[string]MiddlewareFunc
 	ipProtection     *middleware.IPProtection
+	db               *pgxpool.Pool
+	redisClient      redis.Client
 }
 
 func NewHTTPServer(
 	config *config.Config,
 	router *gin.Engine,
 	logger *logging.Logger,
+	db *pgxpool.Pool,
+	redisClient redis.Client,
 ) Server {
 	if config.IsProd() {
 		gin.SetMode(gin.ReleaseMode)
@@ -43,6 +50,8 @@ func NewHTTPServer(
 		registrars:       make(map[string][]RouteRegistrar),
 		namedMiddlewares: make(map[string]MiddlewareFunc),
 		ipProtection:     ipProtection,
+		db:               db,
+		redisClient:      redisClient,
 	}
 
 	server.setupMiddleware()

@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5/pgtype"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestCrossTenantAssignedToRejected(t *testing.T) {
 
 	contact, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573001111001",
+		PhoneNumber:    pgtype.Text{String: "+573001111001", Valid: true},
 		DisplayName:    helpers.ToPgText("A"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -69,10 +70,10 @@ func TestCrossTenantDealAssignedToRejected(t *testing.T) {
 	_, accB := createOrgWithAccount(t, ctx, q)
 
 	pipeline, err := q.CreatePipeline(ctx, sqlc.CreatePipelineParams{
-		OrganizationID: orgA,
-		Nombre:         "P Cross",
+		OrganizationID:   orgA,
+		Nombre:           "P Cross",
 		EsPredeterminado: false,
-		Orden:           0,
+		Orden:            0,
 	})
 	if err != nil {
 		t.Fatalf("seed pipeline: %v", err)
@@ -107,7 +108,7 @@ func TestCrossTenantRealizadaPorRejected(t *testing.T) {
 
 	contact, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573001111002",
+		PhoneNumber:    pgtype.Text{String: "+573001111002", Valid: true},
 		DisplayName:    helpers.ToPgText("B"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -136,7 +137,7 @@ func TestCrossTenantParentLinksRejected(t *testing.T) {
 
 	contactB, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgB,
-		PhoneNumber:    "+573001111003",
+		PhoneNumber:    pgtype.Text{String: "+573001111003", Valid: true},
 		DisplayName:    helpers.ToPgText("C"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -153,6 +154,7 @@ func TestCrossTenantParentLinksRejected(t *testing.T) {
 	convB, err := q.CreateConversation(ctx, sqlc.CreateConversationParams{
 		OrganizationID: orgB,
 		ContactID:      contactB.ID,
+		Channel:        "whatsapp",
 		Status:         "active",
 	})
 	if err != nil {
@@ -162,7 +164,7 @@ func TestCrossTenantParentLinksRejected(t *testing.T) {
 	// contact in org A linked to company of org B
 	contactA, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573001111004",
+		PhoneNumber:    pgtype.Text{String: "+573001111004", Valid: true},
 		DisplayName:    helpers.ToPgText("D"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -182,6 +184,7 @@ func TestCrossTenantParentLinksRejected(t *testing.T) {
 	_, err = q.CreateConversation(ctx, sqlc.CreateConversationParams{
 		OrganizationID: orgA,
 		ContactID:      contactB.ID,
+		Channel:        "whatsapp",
 		Status:         "active",
 	})
 	if !isPgError(err, "23503") {
@@ -193,7 +196,8 @@ func TestCrossTenantParentLinksRejected(t *testing.T) {
 		OrganizationID:    orgA,
 		ConversationID:    convB.ID,
 		ContactID:         contactB.ID,
-		WhatsappMessageID: helpers.ToPgText("wamid-cross-conv"),
+		Channel:           "whatsapp",
+		ProviderMessageID: helpers.ToPgText("wamid-cross-conv"),
 		Direction:         "inbound",
 		MessageType:       "text",
 		Content:           helpers.ToPgText("hi"),

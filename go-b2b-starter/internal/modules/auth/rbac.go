@@ -145,6 +145,9 @@ var (
 			PermOrgManage,
 			PermTicketView,
 			PermTicketManage,
+			PermContactExport,
+			PermDealExport,
+			PermActivityExport,
 		},
 	}
 )

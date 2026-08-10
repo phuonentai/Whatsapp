@@ -190,8 +190,12 @@ export const queryKeys = {
     tags: () => [...queryKeys.crm.all, "tags"] as const,
     entityTags: (entityType: string, entityId: number) =>
       [...queryKeys.crm.all, "entityTags", entityType, entityId] as const,
+    segments: () => [...queryKeys.crm.all, "segments"] as const,
+    segmentPreview: (id: number) => [...queryKeys.crm.all, "segments", "preview", id] as const,
+    campaigns: () => [...queryKeys.crm.all, "campaigns"] as const,
+    campaignRecipients: (id: number) => [...queryKeys.crm.all, "campaigns", id, "recipients"] as const,
     entitlement: () => [...queryKeys.crm.all, "entitlement"] as const,
-    conversations: (params?: { status?: string; limit?: number; offset?: number }) =>
+    conversations: (params?: { status?: string; channel?: string; limit?: number; offset?: number }) =>
       [...queryKeys.crm.all, "conversations", params] as const,
     messages: (conversationId: number) =>
       [...queryKeys.crm.all, "messages", conversationId] as const,
@@ -223,6 +227,12 @@ export const queryKeys = {
   whatsappConfig: {
     all: ["whatsappConfig"] as const,
     detail: () => [...queryKeys.whatsappConfig.all, "detail"] as const,
+  },
+
+  instagramConfig: {
+    all: ["instagramConfig"] as const,
+    detail: () => [...queryKeys.instagramConfig.all, "detail"] as const,
+    health: () => [...queryKeys.instagramConfig.all, "health"] as const,
   },
 
   /**

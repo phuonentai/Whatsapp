@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	crmServices "github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	crmEvents "github.com/moasq/go-b2b-starter/internal/modules/crm/domain/events"
 	invdomain "github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
 )
@@ -155,7 +156,10 @@ func TestDealStageListener_OnlyTriggersOnFacturado(t *testing.T) {
 	svc.contactRepo = &mockContactRepo{contacts: map[int32]*domain.Contact{11: {ID: 11, PhoneNumber: "+573001234567"}}}
 	svc.convRepo = &mockConvRepo{byContact: map[int32]*domain.Conversation{11: {ID: 3, ContactID: 11}}}
 
-	listener := NewDealStageListener(svc, nopLogger{})
+	connRepo := newMockConnectionRepo()
+	seedConnection(connRepo, 7, invdomain.ConnStatusLive)
+
+	listener := NewDealStageListener(svc, NewConnectionService(connRepo, nil, nil, nopLogger{}), &mockActivitySvc{}, nopLogger{})
 	evt := func(stage string) *crmEvents.DealStageChanged {
 		return &crmEvents.DealStageChanged{OrganizationID: 7, DealID: 99, NewStageName: stage}
 	}
@@ -173,4 +177,71 @@ func TestDealStageListener_OnlyTriggersOnFacturado(t *testing.T) {
 	if provider.createCalls != 1 {
 		t.Fatalf("expected 1 invoice for facturado, got %d", provider.createCalls)
 	}
+}
+
+func TestDealStageListener_GatedOnLiveConnection(t *testing.T) {
+	repo := newMockInvoiceRepo()
+	provider := &mockProvider{
+		customer: &invdomain.CustomerRef{ExternalID: "cust-1"},
+		created:  &invdomain.Invoice{OrganizationID: 7, DealID: 99, Status: invdomain.InvoiceStatusPending},
+	}
+	svc, _ := newTestService(repo, provider)
+	svc.dealRepo = &mockDealRepo{deals: map[int32]*domain.DealWithRefs{99: dealWithContact()}}
+
+	activities := &trackingActivitySvc{}
+
+	// Not-live states: none (no row), connected, paused, invoicing_disabled.
+	for _, status := range []invdomain.ConnectionStatus{
+		invdomain.ConnStatusNone,
+		invdomain.ConnStatusConnected,
+		invdomain.ConnStatusPaused,
+		invdomain.ConnStatusInvoicingDisabled,
+	} {
+		connRepo := newMockConnectionRepo()
+		if status != invdomain.ConnStatusNone {
+			seedConnection(connRepo, 7, status)
+		}
+		listener := NewDealStageListener(svc, NewConnectionService(connRepo, nil, nil, nopLogger{}), activities, nopLogger{})
+
+		evt := &crmEvents.DealStageChanged{OrganizationID: 7, DealID: 99, NewStageName: InvoicingStageName}
+		if err := listener.HandleStageChanged(context.Background(), evt); err != nil {
+			t.Fatalf("state %s must not error: %v", status, err)
+		}
+		if provider.createCalls != 0 {
+			t.Fatalf("state %s must not call provider, got %d calls", status, provider.createCalls)
+		}
+	}
+
+	// The gating activity was recorded (once per event).
+	if activities.calls != 4 {
+		t.Fatalf("expected 4 inactive-activity records, got %d", activities.calls)
+	}
+	if len(repo.byDeal) != 0 {
+		t.Fatal("no invoice may be stored for non-live organizations")
+	}
+}
+
+type trackingActivitySvc struct {
+	calls int
+}
+
+func (m *trackingActivitySvc) Create(ctx context.Context, orgID int32, req *crmServices.CreateActivityRequest) (*domain.Activity, error) {
+	m.calls++
+	return &domain.Activity{}, nil
+}
+
+func (m *trackingActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
+	return nil, nil
+}
+
+func (m *trackingActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
+	return nil, nil
+}
+
+func (m *trackingActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
+	return nil, nil
+}
+
+func (m *trackingActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
+	return nil, nil
 }

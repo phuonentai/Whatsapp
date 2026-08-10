@@ -166,8 +166,25 @@ func ParsePayload(raw []byte) (*domain.PlaybookPayload, error) {
 		seen[etapa.Orden] = true
 	}
 	for _, guion := range payload.Guiones {
-		if guion.ID == "" || guion.Titulo == "" || guion.Mensaje == "" {
-			return nil, fmt.Errorf("%w: guion incompleto (id/titulo/mensaje requeridos)", domain.ErrInvalidPlaybookPayload)
+		if guion.ID == "" || guion.Titulo == "" {
+			return nil, fmt.Errorf("%w: guion incompleto (id/titulo requeridos)", domain.ErrInvalidPlaybookPayload)
+		}
+		if len(guion.Pasos) > 0 {
+			if len(guion.Pasos) < 2 {
+				return nil, fmt.Errorf("%w: el guion %q debe tener al menos 2 pasos", domain.ErrInvalidPlaybookPayload, guion.ID)
+			}
+			if guion.Mensaje != "" {
+				return nil, fmt.Errorf("%w: el guion %q no puede tener mensaje y pasos a la vez", domain.ErrInvalidPlaybookPayload, guion.ID)
+			}
+			for i, paso := range guion.Pasos {
+				if paso.ID == "" || paso.Titulo == "" || paso.Mensaje == "" {
+					return nil, fmt.Errorf("%w: paso %d del guion %q incompleto (id/titulo/mensaje requeridos)", domain.ErrInvalidPlaybookPayload, i, guion.ID)
+				}
+			}
+			continue
+		}
+		if guion.Mensaje == "" {
+			return nil, fmt.Errorf("%w: guion %q debe tener mensaje o pasos", domain.ErrInvalidPlaybookPayload, guion.ID)
 		}
 	}
 	return &payload, nil

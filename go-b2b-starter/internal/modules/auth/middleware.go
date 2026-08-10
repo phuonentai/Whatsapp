@@ -160,13 +160,26 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 			if mockOrgId != "" {
 				parts := strings.SplitN(mockOrgId, ":", 2)
 				if len(parts) == 2 {
+					role := roleFromMockEmail(parts[1])
+					var perms []Permission
+					if role == RoleAdmin {
+						// Admins keep the wildcard grant (equivalent to every
+						// known permission after frontend expansion).
+						perms = []Permission{NewPermission("*", "*")}
+					} else {
+						// Non-admin identities get explicit permissions scoped
+						// to their role so org:manage-gated surfaces (invite,
+						// module toggles, member roles, suggestion approve,
+						// whatsapp/subscription config) are restricted in e2e.
+						perms = mockPermissionsForRole(role)
+					}
 					identity := &Identity{
 						UserID:         "mock-" + parts[1],
 						Email:          parts[1],
 						EmailVerified:  true,
 						OrganizationID: parts[0],
-						Roles:          []Role{RoleAdmin},
-						Permissions:    []Permission{NewPermission("*", "*")},
+						Roles:          []Role{role},
+						Permissions:    perms,
 						ExpiresAt:      time.Now().Add(24 * time.Hour),
 					}
 					SetIdentity(c, identity)
@@ -199,6 +212,79 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// roleFromMockEmail derives an RBAC role from the seeded e2e email convention
+// "<role>-<name>@test.com" (see cmd/seed-e2e). Unknown prefixes default to
+// admin so existing mock identities keep full access.
+func roleFromMockEmail(email string) Role {
+	before, _, ok := strings.Cut(email, "@")
+	if !ok {
+		return RoleAdmin
+	}
+	prefix, _, ok := strings.Cut(before, "-")
+	if !ok {
+		return RoleAdmin
+	}
+	switch strings.ToLower(prefix) {
+	case "member":
+		return RoleMember
+	case "manager":
+		return RoleManager
+	default:
+		return RoleAdmin
+	}
+}
+
+// mockPermissionsForRole returns the explicit permission set issued to
+// non-admin mock identities. It mirrors the full permission vocabulary the
+// application and frontend use, minus org:manage, so org-admin-only surfaces
+// (member invite, module toggles, member role changes, suggestion approve,
+// whatsapp/subscription config) are gated correctly under mock auth.
+func mockPermissionsForRole(role Role) []Permission {
+	perms := []Permission{
+		PermResourceView,
+		PermResourceCreate,
+		PermResourceEdit,
+		PermResourceDelete,
+		PermResourceApprove,
+		PermOrgView,
+		PermOrgManage,
+		PermTicketView,
+		PermTicketManage,
+		PermContactExport,
+		PermDealExport,
+		PermActivityExport,
+		NewPermission("contact", "view"),
+		NewPermission("contact", "manage"),
+		NewPermission("contact", "delete"),
+		NewPermission("deal", "view"),
+		NewPermission("deal", "manage"),
+		NewPermission("pipeline", "view"),
+		NewPermission("pipeline", "manage"),
+		NewPermission("invoice", "view"),
+		NewPermission("invoice", "create"),
+		NewPermission("invoice", "upload"),
+		NewPermission("invoice", "delete"),
+		NewPermission("approvals", "view"),
+		NewPermission("approvals", "approve"),
+		NewPermission("duplicates", "view"),
+		NewPermission("duplicates", "resolve"),
+		NewPermission("payment", "schedule"),
+		NewPermission("payment", "export"),
+		NewPermission("payment", "execute"),
+		NewPermission("audit", "view"),
+	}
+	if role != RoleAdmin {
+		filtered := perms[:0]
+		for _, p := range perms {
+			if p != PermOrgManage {
+				filtered = append(filtered, p)
+			}
+		}
+		return filtered
+	}
+	return perms
 }
 
 // RequireOrganization returns middleware that resolves org/account from Identity.

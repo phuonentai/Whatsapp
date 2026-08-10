@@ -41,6 +41,7 @@ import { getPlanById, getPlanByProductId } from "@/lib/polar/plans";
 import { useProductsQuery } from "@/lib/hooks/queries/use-products-query";
 import { useAiUsageQuery } from "@/lib/hooks/queries/use-ai-usage-query";
 import { cancelSubscription } from "@/lib/actions/billing/cancel-subscription";
+import { cancelMPSubscription } from "@/lib/actions/billing/cancel-mp-subscription";
 import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
 
 interface SubscriptionTabProps {
@@ -70,6 +71,7 @@ export function SubscriptionTab({
   const isActive = Boolean(state?.isActive);
   const showInactive = !isActive || state?.reason === "NO_ACTIVE_SUBSCRIPTION";
   const canInteract = billingConfigured && !isPlanChangePending && actionState === "idle";
+  const mercadopagoEnabled = isMercadoPagoEnabled();
 
   const { data: products } = useProductsQuery();
   const { data: aiUsage } = useAiUsageQuery(!showInactive);
@@ -194,7 +196,7 @@ export function SubscriptionTab({
             {plan?.name ?? "Custom plan"}
           </h3>
           <p className="text-sm text-gray-600">
-            {planPrice ? `${planPrice} • billed monthly` : "Billed via Polar"}
+            {planPrice ? `${planPrice} • billed monthly` : `Billed via ${mercadopagoEnabled ? "MercadoPago" : "Polar"}`}
           </p>
         </div>
         <Badge className={statusDisplay.className}>{statusDisplay.label}</Badge>
@@ -412,7 +414,7 @@ export function SubscriptionTab({
         }}
         subscriptionState={state}
         onPlanChangePending={(pending) => setPlanChangePending(pending)}
-        mercadopagoEnabled={isMercadoPagoEnabled()}
+        mercadopagoEnabled={mercadopagoEnabled}
       />
 
       <Dialog
@@ -490,11 +492,14 @@ export function SubscriptionTab({
     setActionError(null);
     setActionState(cancel ? "cancelling" : "resuming");
 
+    const subscriptionId = state.subscription.id;
+
     startTransition(async () => {
       try {
-        const result = await cancelSubscription({
-          cancelAtPeriodEnd: cancel,
-        });
+        const result =
+          cancel && mercadopagoEnabled
+            ? await cancelMPSubscription({ subscriptionId })
+            : await cancelSubscription({ cancelAtPeriodEnd: cancel });
 
         if (!result.success) {
           throw new Error(result.error);

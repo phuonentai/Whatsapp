@@ -133,6 +133,12 @@ func (r *stytchOrganizationRepository) UpdateOrganization(ctx context.Context, o
 		return nil, domain.ErrAuthOrganizationDisplayNameRequired
 	}
 
+	if r.client == nil {
+		// Development mode: placeholder credentials mean no Stytch client.
+		// Fail cleanly instead of nil-pointer dereferencing.
+		return nil, domain.ErrAuthConnection
+	}
+
 	var resp *organizations.UpdateResponse
 	err := r.client.Run(ctx, func() error {
 		var callErr error

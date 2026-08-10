@@ -3,12 +3,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Download, Upload } from "lucide-react";
 import { useContactsQuery } from "@/lib/hooks/queries/use-crm-queries";
 import { useDeleteContact } from "@/lib/hooks/mutations/use-crm-mutations";
 import { useFeature } from "@/lib/hooks/use-entitlement";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import type { ContactDto } from "@/lib/api/api/dto/crm.dto";
+import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { ContactDialog } from "@/components/crm/contact-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
+import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
 import { Button } from "@/components/ui/button";
 
 export function ContactTable() {
@@ -16,11 +20,27 @@ export function ContactTable() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<ContactDto | null>(null);
   const [deleting, setDeleting] = useState<ContactDto | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const canManage = useFeature("crm_contacts_manage");
+  const { hasPermission } = usePermissions();
+  const canExport = hasPermission("contact:export");
   const { data: contacts, isLoading } = useContactsQuery({ lead_status: filterStatus || undefined });
   const deleteMutation = useDeleteContact();
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await crmRepository.exportContacts();
+      toast.success("Contactos exportados");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al exportar contactos");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -70,6 +90,18 @@ export function ContactTable() {
             }}
           >
             Nuevo contacto
+          </Button>
+        )}
+        {canExport && (
+          <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+            <Download className="mr-2 h-4 w-4" />
+            {isExporting ? "Exportando..." : "Exportar"}
+          </Button>
+        )}
+        {canManage && (
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar
           </Button>
         )}
       </div>
@@ -140,13 +172,15 @@ export function ContactTable() {
               </td>
             </tr>
           ))}
-          {(!filtered || filtered.length === 0) && (
-            <tr><td colSpan={8} className="p-4 text-center text-gray-400">No hay contactos</td></tr>
-          )}
         </tbody>
       </table>
 
+      {(!filtered || filtered.length === 0) && (
+        <div className="p-4 text-center text-gray-400">No hay contactos</div>
+      )}
+
       <ContactDialog open={dialogOpen} onOpenChange={setDialogOpen} contact={editing} />
+      <ContactImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(next) => !next && setDeleting(null)}

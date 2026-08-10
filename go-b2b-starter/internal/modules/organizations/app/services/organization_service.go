@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
@@ -98,7 +99,11 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, orgID int3
 	// On Stytch failure, reject the update so the local row never drifts from the auth provider.
 	if org.StytchOrgID != "" && req.Name != org.Name {
 		if _, err := s.authOrgRepo.UpdateOrganization(ctx, org.StytchOrgID, req.Name); err != nil {
-			return nil, fmt.Errorf("failed to sync organization display name to auth provider: %w", err)
+			// Development mode: the Stytch client is nil (placeholder credentials).
+			// Skip the auth-provider sync; the local row is authoritative in mock mode.
+			if !errors.Is(err, domain.ErrAuthConnection) {
+				return nil, fmt.Errorf("failed to sync organization display name to auth provider: %w", err)
+			}
 		}
 	}
 

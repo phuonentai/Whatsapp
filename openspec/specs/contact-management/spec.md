@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the contact entity with extended profile fields including Colombian document types, company association, and team member assignment.
+
+## Requirements
 
 ### Requirement: Contact has extended profile fields including Colombian document types
 

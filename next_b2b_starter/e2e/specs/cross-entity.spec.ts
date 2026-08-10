@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { uniqueColombianPhone } from "../helpers/phones";
 
 test.describe("Cross-Entity Workflow", () => {
   test("full workflow: company → contact → deal → tag → activity", async ({ page }) => {
@@ -8,7 +9,7 @@ test.describe("Cross-Entity Workflow", () => {
 
     const ts = Date.now();
     const companyName = `WF Company ${ts}`;
-    const contactPhone = `+57300${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `WF Contact ${ts}`;
     const dealName = `WF Deal ${ts}`;
     const tagName = `WF Tag ${ts}`;
@@ -55,7 +56,7 @@ test.describe("Cross-Entity Workflow", () => {
 
     // 5. Create activity
     await page.goto("/dashboard/crm?view=actividad");
-    await page.waitForSelector('[data-testid="activity-timeline"]');
+    await expect(page.locator('[data-testid="activity-timeline"]')).toBeVisible();
     await page.getByRole("button", { name: /nueva actividad/i }).click();
     await page.selectOption('select[name="tipo"]', "nota");
     await page.fill('input[name="asunto"]', activitySubject);
@@ -70,7 +71,7 @@ test.describe("Cross-Entity Workflow", () => {
     });
 
     const ts = Date.now();
-    const contactPhone = `+57302${ts}`;
+    const contactPhone = uniqueColombianPhone();
     const contactName = `Detail Contact ${ts}`;
     const tagName = `Detail Tag ${ts}`;
     const noteSubject = `Detail Note ${ts}`;

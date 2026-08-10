@@ -61,10 +61,15 @@ export function DealDialog({ open, onOpenChange, deal, pipelineId, stages }: Dea
         moneda: deal?.moneda ?? "COP",
         company_id: deal?.company_id != null ? String(deal.company_id) : "",
         contact_id: deal?.contact_id != null ? String(deal.contact_id) : "",
-        stage_id: deal?.stage_id != null ? String(deal.stage_id) : "",
+        stage_id:
+          deal?.stage_id != null
+            ? String(deal.stage_id)
+            : stages.length > 0
+              ? String(stages[0].id)
+              : "",
       });
     }
-  }, [open, deal, reset]);
+  }, [open, deal, reset, stages]);
 
   const onSubmit = handleSubmit(async (values) => {
     const payload = {

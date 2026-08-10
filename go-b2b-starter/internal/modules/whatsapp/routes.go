@@ -56,6 +56,10 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		mgmt.GET("/signup/status",
 			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.HandleSignupStatus)
+
+		mgmt.POST("/config/logs/:id/replay",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleReplayLog)
 	}
 }
 

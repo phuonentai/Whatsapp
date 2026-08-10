@@ -24,13 +24,16 @@ create-migration:
 	@echo "Migration created in $(MIGRATION_DIR) with name $(MIGRATION_NAME)"
 
 # Apply all up migrations
-# Apply all up migrations
-migrateup:
+migrateup: check-migrations
 	@docker compose -f $(COMPOSE_FILE) run --rm cli migrate -path $(MIGRATION_DIR) -database "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable" -verbose up
 
 # Apply all down migrations
-migratedown:
+migratedown: check-migrations
 	@docker compose -f $(COMPOSE_FILE) run --rm cli migrate -path $(MIGRATION_DIR) -database "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable" -verbose down
+
+# Fail if any migration version is duplicated in the migrations directory
+check-migrations:
+	@bash scripts/check_migrations.sh
 
 sqlc:
 	@docker compose -f $(COMPOSE_FILE) run --rm -w /workspace/$(SQLC_DIR) cli sqlc generate
@@ -70,6 +73,10 @@ test:
 test-integration:
 	go test -count=1 -tags integration ./internal/db/postgres/sqlc/integration/...
 
+# Run the offline e2e suite (boots backend :8080 + frontend :3001 against saas_db_test)
+test-e2e:
+	@bash scripts/run_e2e.sh
+
 # Clear RBAC and JWKS caches from Redis
 clear-rbac-cache:
 	@echo "Clearing RBAC and JWKS Redis caches..."
@@ -80,6 +87,7 @@ clear-rbac-cache:
 
 .PHONY: \
     build \
+    check-migrations \
     clear-rbac-cache \
     create-migration \
     create-module \

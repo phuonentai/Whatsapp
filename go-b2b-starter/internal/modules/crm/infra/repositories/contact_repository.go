@@ -20,7 +20,7 @@ func NewContactRepository(store sqlc.Store) domain.ContactRepository {
 func (r *contactRepository) UpsertByPhone(ctx context.Context, contact *domain.Contact) (*domain.Contact, error) {
 	params := sqlc.UpsertContactParams{
 		OrganizationID: contact.OrganizationID,
-		PhoneNumber:    contact.PhoneNumber,
+		PhoneNumber:    helpers.ToPgText(contact.PhoneNumber),
 		DisplayName:    helpers.ToPgText(contact.DisplayName),
 		AvatarUrl:      helpers.ToPgText(contact.AvatarURL),
 		Metadata:       helpers.ToJSONB(contact.Metadata),
@@ -43,10 +43,50 @@ func (r *contactRepository) GetByID(ctx context.Context, orgID, contactID int32)
 }
 
 func (r *contactRepository) GetByPhone(ctx context.Context, orgID int32, phoneNumber string) (*domain.Contact, error) {
-	params := sqlc.GetContactByPhoneParams{OrganizationID: orgID, PhoneNumber: phoneNumber}
+	params := sqlc.GetContactByPhoneParams{OrganizationID: orgID, PhoneNumber: helpers.ToPgText(phoneNumber)}
 	result, err := r.store.GetContactByPhone(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contact by phone: %w", err)
+	}
+	return r.mapToDomain(&result), nil
+}
+
+func (r *contactRepository) UpsertByIGUser(ctx context.Context, contact *domain.Contact) (*domain.Contact, error) {
+	params := sqlc.UpsertContactByIGUserParams{
+		OrganizationID:    contact.OrganizationID,
+		InstagramUserID:   helpers.ToPgText(contact.InstagramUserID),
+		InstagramUsername: helpers.ToPgText(contact.InstagramUsername),
+		DisplayName:       helpers.ToPgText(contact.DisplayName),
+		AvatarUrl:         helpers.ToPgText(contact.AvatarURL),
+		Metadata:          helpers.ToJSONB(contact.Metadata),
+		LastMessageAt:     helpers.ToPgTimestampPtr(contact.LastMessageAt),
+	}
+	result, err := r.store.UpsertContactByIGUser(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert instagram contact: %w", err)
+	}
+	return r.mapToDomain(&result), nil
+}
+
+func (r *contactRepository) GetByIGUser(ctx context.Context, orgID int32, igUserID string) (*domain.Contact, error) {
+	params := sqlc.GetContactByIGUserParams{OrganizationID: orgID, InstagramUserID: helpers.ToPgText(igUserID)}
+	result, err := r.store.GetContactByIGUser(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contact by IG user: %w", err)
+	}
+	return r.mapToDomain(&result), nil
+}
+
+func (r *contactRepository) UpdateInstagramProfile(ctx context.Context, orgID, contactID int32, username, avatarURL, displayName string) (*domain.Contact, error) {
+	result, err := r.store.UpdateContactInstagramProfile(ctx, sqlc.UpdateContactInstagramProfileParams{
+		ID:                contactID,
+		OrganizationID:    orgID,
+		InstagramUsername: helpers.ToPgText(username),
+		AvatarUrl:         helpers.ToPgText(avatarURL),
+		DisplayName:       helpers.ToPgText(displayName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update instagram profile: %w", err)
 	}
 	return r.mapToDomain(&result), nil
 }
@@ -129,23 +169,26 @@ func (r *contactRepository) Delete(ctx context.Context, orgID, contactID int32) 
 
 func (r *contactRepository) mapToDomain(c *sqlc.CrmContact) *domain.Contact {
 	return &domain.Contact{
-		ID:              c.ID,
-		OrganizationID:  c.OrganizationID,
-		PhoneNumber:     c.PhoneNumber,
-		DisplayName:     helpers.FromPgText(c.DisplayName),
-		Email:           helpers.FromPgText(c.Email),
-		CompanyID:       helpers.FromPgInt4Ptr(c.CompanyID),
-		Source:          domain.ContactSource(c.Source),
-		LeadStatus:      domain.LeadStatus(c.LeadStatus),
-		JobTitle:        helpers.FromPgText(c.JobTitle),
-		AssignedTo:      helpers.FromPgInt4Ptr(c.AssignedTo),
-		TipoDocumento:   domain.TipoDocumento(helpers.FromPgText(c.TipoDocumento)),
-		NumeroDocumento: helpers.FromPgText(c.NumeroDocumento),
-		AvatarURL:       helpers.FromPgText(c.AvatarUrl),
-		Metadata:        helpers.FromJSONB(c.Metadata),
-		IsBlocked:       c.IsBlocked,
-		LastMessageAt:   helpers.FromPgTimestampPtr(c.LastMessageAt),
-		CreatedAt:       c.CreatedAt.Time,
-		UpdatedAt:       c.UpdatedAt.Time,
+		ID:                c.ID,
+		OrganizationID:    c.OrganizationID,
+		PhoneNumber:       helpers.FromPgText(c.PhoneNumber),
+		InstagramUserID:   helpers.FromPgText(c.InstagramUserID),
+		InstagramUsername: helpers.FromPgText(c.InstagramUsername),
+		DisplayName:       helpers.FromPgText(c.DisplayName),
+		Email:             helpers.FromPgText(c.Email),
+		CompanyID:         helpers.FromPgInt4Ptr(c.CompanyID),
+		Source:            domain.ContactSource(c.Source),
+		LeadStatus:        domain.LeadStatus(c.LeadStatus),
+		JobTitle:          helpers.FromPgText(c.JobTitle),
+		AssignedTo:        helpers.FromPgInt4Ptr(c.AssignedTo),
+		TipoDocumento:     domain.TipoDocumento(helpers.FromPgText(c.TipoDocumento)),
+		NumeroDocumento:   helpers.FromPgText(c.NumeroDocumento),
+		AvatarURL:         helpers.FromPgText(c.AvatarUrl),
+		Metadata:          helpers.FromJSONB(c.Metadata),
+		IsBlocked:         c.IsBlocked,
+		ConsentStatus:     c.ConsentStatus,
+		LastMessageAt:     helpers.FromPgTimestampPtr(c.LastMessageAt),
+		CreatedAt:         c.CreatedAt.Time,
+		UpdatedAt:         c.UpdatedAt.Time,
 	}
 }

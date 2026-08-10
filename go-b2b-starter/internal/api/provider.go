@@ -4,6 +4,7 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent"
+	"github.com/moasq/go-b2b-starter/internal/modules/analytics"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive"
@@ -31,6 +32,7 @@ type moduleRoutes struct {
 	TicketsRoutes       *tickets.Routes
 	PlaybooksRoutes     *playbooks.Routes
 	AgentRoutes         *agent.Routes
+	AnalyticsRoutes     *analytics.Routes
 }
 
 func Init(container *dig.Container) error {
@@ -57,6 +59,7 @@ func registerAPI(container *dig.Container) error {
 		ticketsRoutes *tickets.Routes,
 		playbooksRoutes *playbooks.Routes,
 		agentRoutes *agent.Routes,
+		analyticsRoutes *analytics.Routes,
 	) *moduleRoutes {
 		return &moduleRoutes{
 			OrganizationRoutes:  organizationRoutes,
@@ -71,6 +74,7 @@ func registerAPI(container *dig.Container) error {
 			TicketsRoutes:       ticketsRoutes,
 			PlaybooksRoutes:     playbooksRoutes,
 			AgentRoutes:         agentRoutes,
+			AnalyticsRoutes:     analyticsRoutes,
 		}
 	}); err != nil {
 		return err
@@ -92,6 +96,7 @@ func registerAPI(container *dig.Container) error {
 		srv.RegisterRoutes(modules.TicketsRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.PlaybooksRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.AgentRoutes.Routes, server.ApiPrefix)
+		srv.RegisterRoutes(modules.AnalyticsRoutes.Routes, server.ApiPrefix)
 	})
 }
 
@@ -121,5 +126,8 @@ func setupDependencies(container *dig.Container) error {
 	}
 	// Playbooks module (registered in bootstrap before billing; kept in sync
 	// here for API wiring only — do NOT re-register dependencies here).
+	if err := analytics.NewProvider(container).RegisterDependencies(); err != nil {
+		return err
+	}
 	return nil
 }

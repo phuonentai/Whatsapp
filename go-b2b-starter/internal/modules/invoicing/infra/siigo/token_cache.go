@@ -5,69 +5,85 @@ import (
 	"time"
 )
 
-// tokenCache is a TTL-bounded, single-flight in-memory cache for the OAuth2
-// access token. Tokens MUST live only here (never in PostgreSQL or logs).
-type tokenCache struct {
-	mu       sync.Mutex
-	refresh  func() (string, error)
+// tokenEntry is one organization's cached OAuth2 access token.
+type tokenEntry struct {
 	token    string
 	expires  time.Time
 	fetching bool
 }
 
-func newTokenCache(refresh func() (string, error)) *tokenCache {
-	return &tokenCache{refresh: refresh}
+// tokenCache is a per-organization, TTL-bounded, single-flight in-memory cache
+// for OAuth2 access tokens. Tokens MUST live only here (never in PostgreSQL or
+// logs). Keys are organization ids; a nil refresh provider falls back to the
+// adapter's env credentials under key 0.
+type tokenCache struct {
+	mu      sync.Mutex
+	refresh func(orgID int32) (string, error)
+	entries map[int32]*tokenEntry
 }
 
-// Get returns a valid cached token, refreshing (single-flight) if expired.
-func (c *tokenCache) Get() (string, error) {
+func newTokenCache(refresh func(orgID int32) (string, error)) *tokenCache {
+	return &tokenCache{refresh: refresh, entries: map[int32]*tokenEntry{}}
+}
+
+// Get returns a valid cached token for the org, refreshing (single-flight) if
+// expired or missing.
+func (c *tokenCache) Get(orgID int32) (string, error) {
 	c.mu.Lock()
-	if c.token != "" && time.Now().Before(c.expires) {
-		tok := c.token
+	entry, ok := c.entries[orgID]
+	if !ok {
+		entry = &tokenEntry{}
+		c.entries[orgID] = entry
+	}
+	if entry.token != "" && time.Now().Before(entry.expires) {
+		tok := entry.token
 		c.mu.Unlock()
 		return tok, nil
 	}
-	if c.fetching {
+	if entry.fetching {
 		c.mu.Unlock()
-		// Another caller is refreshing; wait for it to finish.
+		// Another caller is refreshing this org's token; wait for it.
 		for {
 			c.mu.Lock()
-			if !c.fetching {
+			if !entry.fetching {
 				break
 			}
 			c.mu.Unlock()
 			time.Sleep(10 * time.Millisecond)
 		}
-		if c.token != "" {
-			tok := c.token
+		if entry.token != "" {
+			tok := entry.token
 			c.mu.Unlock()
 			return tok, nil
 		}
 		// Refresh failed; fall through and retry ourselves.
 	}
-	c.fetching = true
+	entry.fetching = true
 	c.mu.Unlock()
 
-	token, err := c.refresh()
+	token, err := c.refresh(orgID)
 	if err != nil {
 		c.mu.Lock()
-		c.fetching = false
+		entry.fetching = false
 		c.mu.Unlock()
 		return "", err
 	}
 
 	c.mu.Lock()
-	c.token = token
-	c.expires = time.Now().Add(TokenTTL)
-	c.fetching = false
+	entry.token = token
+	entry.expires = time.Now().Add(TokenTTL)
+	entry.fetching = false
 	c.mu.Unlock()
 	return token, nil
 }
 
-// invalidate clears a cached token so the next call refreshes (used on 401).
-func (c *tokenCache) invalidate() {
+// invalidate clears the org's cached token so the next call refreshes (used on
+// 401 responses).
+func (c *tokenCache) invalidate(orgID int32) {
 	c.mu.Lock()
-	c.token = ""
-	c.expires = time.Time{}
+	if entry, ok := c.entries[orgID]; ok {
+		entry.token = ""
+		entry.expires = time.Time{}
+	}
 	c.mu.Unlock()
 }

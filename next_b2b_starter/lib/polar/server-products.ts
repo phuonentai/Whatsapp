@@ -159,7 +159,10 @@ export async function fetchProducts(): Promise<FetchProductsResult> {
       products: transformedProducts,
     };
   } catch (error) {
-    console.error("[Polar Products] Failed to fetch products", {
+    // Expected graceful-degradation path (e.g. placeholder credentials in dev).
+    // warn-level keeps the Next.js dev overlay quiet; the caller handles the
+    // error return value.
+    console.warn("[Polar Products] Failed to fetch products", {
       error: error instanceof Error ? error.message : String(error),
       organizationId: profile.organization?.organization_id,
     });

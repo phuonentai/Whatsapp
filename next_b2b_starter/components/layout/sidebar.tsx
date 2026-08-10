@@ -16,6 +16,7 @@ import {
   BookOpen,
   Inbox,
   Contact,
+  BarChart3,
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import type { ServerPermissions } from "@/lib/auth/server-permissions";
@@ -63,6 +64,13 @@ const mainNavigation: NavigationItem[] = [
     href: "/dashboard/knowledge",
     icon: BookOpen,
     // No permission required - everyone can access knowledge base
+  },
+  {
+    name: "Reportes",
+    href: "/dashboard/reportes",
+    icon: BarChart3,
+    // Module-gated: the analytics module grants the analytics_module feature.
+    entitlementKeys: ["analytics_module"],
   },
 ];
 

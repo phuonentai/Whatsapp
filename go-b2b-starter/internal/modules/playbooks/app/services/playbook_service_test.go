@@ -190,6 +190,82 @@ func TestApplyRejectsInvalidPayload(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrInvalidPlaybookPayload)
 }
 
+func TestApplyAcceptsSequenceGuion(t *testing.T) {
+	payload := testPlaybookPayload(t, nil)
+	payload.Guiones = []domain.Guion{{
+		ID: "g1", Titulo: "Confirmar pedido",
+		Pasos: []domain.GuionPaso{
+			{ID: "p1", Titulo: "Detalle", Mensaje: "¿Qué quieres?"},
+			{ID: "p2", Titulo: "Dirección", Mensaje: "¿A qué dirección?"},
+		},
+	}}
+	pb := testPlaybook(t, payload, nil)
+	svc, _, applyRepo := newTestService(pb, &fakeModuleSvc{})
+
+	_, err := svc.Apply(context.Background(), 1, "comercio")
+	require.NoError(t, err)
+	assert.Equal(t, 1, applyRepo.applied["comercio"])
+}
+
+func TestApplyRejectsSequenceWithSingleStep(t *testing.T) {
+	payload := testPlaybookPayload(t, nil)
+	payload.Guiones = []domain.Guion{{
+		ID: "g1", Titulo: "Confirmar pedido",
+		Pasos: []domain.GuionPaso{{ID: "p1", Titulo: "Único", Mensaje: "Solo un paso"}},
+	}}
+	pb := testPlaybook(t, payload, nil)
+	svc, _, applyRepo := newTestService(pb, &fakeModuleSvc{})
+
+	_, err := svc.Apply(context.Background(), 1, "comercio")
+	require.ErrorIs(t, err, domain.ErrInvalidPlaybookPayload)
+	assert.Zero(t, applyRepo.applied["comercio"])
+}
+
+func TestApplyRejectsIncompleteSequenceStep(t *testing.T) {
+	payload := testPlaybookPayload(t, nil)
+	payload.Guiones = []domain.Guion{{
+		ID: "g1", Titulo: "Confirmar pedido",
+		Pasos: []domain.GuionPaso{
+			{ID: "p1", Titulo: "Detalle", Mensaje: "¿Qué quieres?"},
+			{ID: "p2", Titulo: "", Mensaje: "Falta titulo"},
+		},
+	}}
+	pb := testPlaybook(t, payload, nil)
+	svc, _, applyRepo := newTestService(pb, &fakeModuleSvc{})
+
+	_, err := svc.Apply(context.Background(), 1, "comercio")
+	require.ErrorIs(t, err, domain.ErrInvalidPlaybookPayload)
+	assert.Zero(t, applyRepo.applied["comercio"])
+}
+
+func TestApplyRejectsGuionWithMensajeAndPasos(t *testing.T) {
+	payload := testPlaybookPayload(t, nil)
+	payload.Guiones = []domain.Guion{{
+		ID: "g1", Titulo: "Confirmar pedido", Mensaje: "Hola",
+		Pasos: []domain.GuionPaso{
+			{ID: "p1", Titulo: "Detalle", Mensaje: "¿Qué quieres?"},
+			{ID: "p2", Titulo: "Dirección", Mensaje: "¿A qué dirección?"},
+		},
+	}}
+	pb := testPlaybook(t, payload, nil)
+	svc, _, applyRepo := newTestService(pb, &fakeModuleSvc{})
+
+	_, err := svc.Apply(context.Background(), 1, "comercio")
+	require.ErrorIs(t, err, domain.ErrInvalidPlaybookPayload)
+	assert.Zero(t, applyRepo.applied["comercio"])
+}
+
+func TestApplyRejectsGuionWithoutMensajeOrPasos(t *testing.T) {
+	payload := testPlaybookPayload(t, nil)
+	payload.Guiones = []domain.Guion{{ID: "g1", Titulo: "Vacío"}}
+	pb := testPlaybook(t, payload, nil)
+	svc, _, applyRepo := newTestService(pb, &fakeModuleSvc{})
+
+	_, err := svc.Apply(context.Background(), 1, "comercio")
+	require.ErrorIs(t, err, domain.ErrInvalidPlaybookPayload)
+	assert.Zero(t, applyRepo.applied["comercio"])
+}
+
 func TestApplyRejectsInvalidModuleConfigPreset(t *testing.T) {
 	payload := testPlaybookPayload(t, map[string]map[string]any{
 		"tickets": {"sla_hours": "no-un-numero"},

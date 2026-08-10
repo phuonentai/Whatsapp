@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the company entity with organization scoping, Colombian-specific fields, and an owner assignment.
+
+## Requirements
 
 ### Requirement: Company entity with organization scoping
 

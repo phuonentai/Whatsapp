@@ -43,3 +43,8 @@ func (c *redisClient) Exists(ctx context.Context, key string) (bool, error) {
 	result, err := c.rdb.Exists(ctx, key).Result()
 	return result > 0, err
 }
+
+// Ping reports whether Redis is reachable (used by readiness probes).
+func (c *redisClient) Ping(ctx context.Context) error {
+	return c.rdb.Ping(ctx).Err()
+}

@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the deal entity with organization scoping, a Spanish status lifecycle, and financial fields in Colombian pesos.
+
+## Requirements
 
 ### Requirement: Deal entity with organization scoping
 

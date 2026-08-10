@@ -8,15 +8,15 @@ import (
 )
 
 type ConversationService interface {
-	ListConversations(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*domain.ConversationWithContact, error)
+	ListConversations(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*domain.ConversationWithContact, error)
 	GetConversation(ctx context.Context, orgID, convID int32) (*domain.ConversationWithContact, error)
 	UpdateStatus(ctx context.Context, orgID, convID int32, status domain.ConversationStatus) (*domain.Conversation, error)
 	ListMessages(ctx context.Context, orgID, convID int32, limit, offset int32) ([]*domain.Message, error)
 }
 
 type conversationService struct {
-	convRepo domain.ConversationRepository
-	msgRepo  domain.MessageRepository
+	convRepo    domain.ConversationRepository
+	msgRepo     domain.MessageRepository
 	contactRepo domain.ContactRepository
 }
 
@@ -24,14 +24,17 @@ func NewConversationService(convRepo domain.ConversationRepository, msgRepo doma
 	return &conversationService{convRepo: convRepo, msgRepo: msgRepo, contactRepo: contactRepo}
 }
 
-func (s *conversationService) ListConversations(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*domain.ConversationWithContact, error) {
+func (s *conversationService) ListConversations(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*domain.ConversationWithContact, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	return s.convRepo.ListByOrganization(ctx, orgID, limit, offset, statusFilter)
+	if channelFilter != domain.ChannelWhatsapp && channelFilter != domain.ChannelInstagram {
+		channelFilter = ""
+	}
+	return s.convRepo.ListByOrganization(ctx, orgID, limit, offset, statusFilter, channelFilter)
 }
 
 func (s *conversationService) GetConversation(ctx context.Context, orgID, convID int32) (*domain.ConversationWithContact, error) {

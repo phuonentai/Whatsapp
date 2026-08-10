@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -144,6 +145,43 @@ func (h *Handler) HandleGetConfigHealth(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, stats)
+}
+
+// HandleReplayLog re-enqueues the events of a stored webhook log from its
+// raw payload (operator recovery action for lost/dead-lettered events).
+func (h *Handler) HandleReplayLog(c *gin.Context) {
+	reqCtx := auth.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	logID, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_log_id",
+			"webhook log id must be an integer",
+		))
+		return
+	}
+
+	count, err := h.webhookService.Replay(c.Request.Context(), orgID, int32(logID))
+	if err != nil {
+		if errors.Is(err, whatsappDomain.ErrWebhookLogNotFound) {
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"webhook_log_not_found",
+				"Webhook log not found for this organization",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError,
+			"replay_failed",
+			err.Error(),
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"replayed_events": count})
 }
 
 type UpsertConfigRequest struct {

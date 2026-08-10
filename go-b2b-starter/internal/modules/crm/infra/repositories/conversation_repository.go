@@ -35,9 +35,14 @@ func (r *conversationRepository) GetByID(ctx context.Context, orgID, convID int3
 }
 
 func (r *conversationRepository) GetActiveByContact(ctx context.Context, orgID, contactID int32) (*domain.Conversation, error) {
+	return r.GetActiveByContactChannel(ctx, orgID, contactID, domain.ChannelWhatsapp)
+}
+
+func (r *conversationRepository) GetActiveByContactChannel(ctx context.Context, orgID, contactID int32, channel string) (*domain.Conversation, error) {
 	params := sqlc.GetActiveConversationByContactParams{
 		ContactID:      contactID,
 		OrganizationID: orgID,
+		Channel:        channel,
 	}
 
 	result, err := r.store.GetActiveConversationByContact(ctx, params)
@@ -52,6 +57,7 @@ func (r *conversationRepository) Create(ctx context.Context, conv *domain.Conver
 	params := sqlc.CreateConversationParams{
 		OrganizationID: conv.OrganizationID,
 		ContactID:      conv.ContactID,
+		Channel:        channelOrDefault(conv.Channel),
 		Status:         string(conv.Status),
 		LastMessageAt:  helpers.ToPgTimestampPtr(conv.LastMessageAt),
 		Metadata:       helpers.ToJSONB(conv.Metadata),
@@ -69,6 +75,7 @@ func (r *conversationRepository) EnsureActive(ctx context.Context, conv *domain.
 	params := sqlc.InsertActiveConversationIdempotentParams{
 		OrganizationID: conv.OrganizationID,
 		ContactID:      conv.ContactID,
+		Channel:        channelOrDefault(conv.Channel),
 		LastMessageAt:  helpers.ToPgTimestampPtr(conv.LastMessageAt),
 		Metadata:       helpers.ToJSONB(conv.Metadata),
 	}
@@ -76,7 +83,7 @@ func (r *conversationRepository) EnsureActive(ctx context.Context, conv *domain.
 	result, err := r.store.InsertActiveConversationIdempotent(ctx, params)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			existing, getErr := r.GetActiveByContact(ctx, conv.OrganizationID, conv.ContactID)
+			existing, getErr := r.GetActiveByContactChannel(ctx, conv.OrganizationID, conv.ContactID, channelOrDefault(conv.Channel))
 			if getErr != nil {
 				return nil, fmt.Errorf("failed to fetch active conversation after idempotent insert: %w", getErr)
 			}
@@ -118,12 +125,13 @@ func (r *conversationRepository) UpdateStatus(ctx context.Context, orgID, convID
 	return r.mapToDomain(&result), nil
 }
 
-func (r *conversationRepository) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter string) ([]*domain.ConversationWithContact, error) {
+func (r *conversationRepository) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*domain.ConversationWithContact, error) {
 	params := sqlc.ListConversationsByOrganizationParams{
 		OrganizationID: orgID,
 		Limit:          limit,
 		Offset:         offset,
 		Column4:        statusFilter,
+		Column5:        channelFilter,
 	}
 
 	results, err := r.store.ListConversationsByOrganization(ctx, params)
@@ -138,14 +146,17 @@ func (r *conversationRepository) ListByOrganization(ctx context.Context, orgID i
 				ID:             row.ID,
 				OrganizationID: row.OrganizationID,
 				ContactID:      row.ContactID,
+				Channel:        row.Channel,
 				Status:         domain.ConversationStatus(row.Status),
 				LastMessageAt:  helpers.FromPgTimestampPtr(row.LastMessageAt),
 				Metadata:       helpers.FromJSONB(row.Metadata),
 				CreatedAt:      row.CreatedAt.Time,
 				UpdatedAt:      row.UpdatedAt.Time,
 			},
-			ContactPhone:       helpers.FromPgText(row.ContactPhone),
-			ContactDisplayName: helpers.FromPgText(row.ContactDisplayName),
+			ContactPhone:             helpers.FromPgText(row.ContactPhone),
+			ContactDisplayName:       helpers.FromPgText(row.ContactDisplayName),
+			ContactInstagramUsername: helpers.FromPgText(row.ContactInstagramUsername),
+			ContactAvatarURL:         helpers.FromPgText(row.ContactAvatarUrl),
 		}
 	}
 
@@ -157,10 +168,18 @@ func (r *conversationRepository) mapToDomain(c *sqlc.CrmConversation) *domain.Co
 		ID:             c.ID,
 		OrganizationID: c.OrganizationID,
 		ContactID:      c.ContactID,
+		Channel:        c.Channel,
 		Status:         domain.ConversationStatus(c.Status),
 		LastMessageAt:  helpers.FromPgTimestampPtr(c.LastMessageAt),
 		Metadata:       helpers.FromJSONB(c.Metadata),
 		CreatedAt:      c.CreatedAt.Time,
 		UpdatedAt:      c.UpdatedAt.Time,
 	}
+}
+
+func channelOrDefault(channel string) string {
+	if channel == "" {
+		return domain.ChannelWhatsapp
+	}
+	return channel
 }

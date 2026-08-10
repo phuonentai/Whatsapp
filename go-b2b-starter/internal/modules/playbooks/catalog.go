@@ -38,7 +38,11 @@ var catalog = []domain.Playbook{
 			},
 			"guiones": []map[string]any{
 				{"id": "saludo", "titulo": "Saludo", "mensaje": "¡Hola! Gracias por escribirnos. ¿En qué podemos ayudarte hoy?"},
-				{"id": "confirmar-pedido", "titulo": "Confirmar pedido", "mensaje": "¡Claro! Confirmamos tu pedido. ¿Quieres que te enviemos el link de pago?"},
+				{"id": "confirmar-pedido", "titulo": "Confirmar pedido", "pasos": []map[string]any{
+					{"id": "detalle", "titulo": "Detalle del pedido", "mensaje": "¡Perfecto! ¿Qué producto(s) quieres y en qué cantidad?"},
+					{"id": "direccion", "titulo": "Dirección", "mensaje": "¿A qué dirección lo enviamos? ¿Algún punto de referencia?"},
+					{"id": "link-pago", "titulo": "Link de pago", "mensaje": "Te enviamos el link de pago: puedes pagar con PSE, Nequi o tarjeta. Cuando esté confirmado, lo despachamos."},
+				}},
 				{"id": "link-pago", "titulo": "Link de pago", "mensaje": "Aquí está tu link de pago: puedes pagar con PSE, Nequi o tarjeta. Cuando esté confirmado, lo despachamos."},
 				{"id": "entrega", "titulo": "En entrega", "mensaje": "¡Tu pedido va en camino! Te avisamos cuando esté listo para entregar."},
 				{"id": "seguimiento", "titulo": "Seguimiento post-venta", "mensaje": "¡Hola! ¿Cómo te fue con tu compra? Si tienes alguna duda, aquí estamos."},
@@ -75,7 +79,11 @@ var catalog = []domain.Playbook{
 				{"id": "bienvenida", "titulo": "Bienvenida", "mensaje": "¡Bienvenido! ¿Quieres ver el menú del día o hacer una reserva?"},
 				{"id": "menu", "titulo": "Enviar menú", "mensaje": "Claro, te compartimos el menú. ¿Qué te gustaría pedir?"},
 				{"id": "confirmar-pedido", "titulo": "Confirmar pedido", "mensaje": "¡Perfecto! Tu pedido está confirmado. Te avisamos cuando esté en camino."},
-				{"id": "domicilio", "titulo": "Domicilio en camino", "mensaje": "Tu pedido va en camino. ¡Que lo disfrutes!"},
+				{"id": "domicilio", "titulo": "Domicilio", "pasos": []map[string]any{
+					{"id": "confirmar", "titulo": "Confirmar pedido", "mensaje": "¡Perfecto! Tu pedido está confirmado y en preparación."},
+					{"id": "en-camino", "titulo": "En camino", "mensaje": "Tu pedido va en camino. ¡Que lo disfrutes!"},
+					{"id": "follow-up", "titulo": "Seguimiento", "mensaje": "¡Esperamos que todo esté delicioso! ¿Quieres pedir algo más o dejamos algo para tu próxima visita?"},
+				}},
 				{"id": "reserva", "titulo": "Confirmar reserva", "mensaje": "¡Reserva confirmada! Te esperamos. Si necesitas cambiar la hora, escríbenos."},
 				{"id": "queja", "titulo": "Atención de queja", "mensaje": "Lamentamos mucho lo sucedido. Vamos a revisarlo de inmediato y te damos una solución."},
 			},
@@ -108,7 +116,11 @@ var catalog = []domain.Playbook{
 			},
 			"guiones": []map[string]any{
 				{"id": "horarios", "titulo": "Horarios disponibles", "mensaje": "¡Hola! Claro, te contamos los horarios disponibles. ¿Cuál te queda mejor?"},
-				{"id": "confirmar-cita", "titulo": "Confirmar cita", "mensaje": "¡Tu cita está confirmada! Te enviamos un recordatorio antes de la cita."},
+				{"id": "confirmar-cita", "titulo": "Confirmar cita", "pasos": []map[string]any{
+					{"id": "fecha", "titulo": "Fecha", "mensaje": "¡Claro! ¿Qué día te queda bien para agendar?"},
+					{"id": "hora", "titulo": "Hora", "mensaje": "Perfecto. ¿A qué hora te queda mejor?"},
+					{"id": "confirmacion", "titulo": "Confirmación", "mensaje": "¡Tu cita está confirmada! Te enviamos un recordatorio antes de la cita. Si necesitas reprogramar, escríbenos."},
+				}},
 				{"id": "recordatorio", "titulo": "Recordatorio", "mensaje": "¡Hola! Te recordamos tu cita de mañana. Si necesitas reprogramar, escríbenos."},
 				{"id": "post-servicio", "titulo": "Seguimiento post-servicio", "mensaje": "¡Esperamos que hayas tenido una excelente experiencia! ¿Te gustaría agendar tu próxima visita?"},
 				{"id": "bono", "titulo": "Bonos y paquetes", "mensaje": "Tenemos bonos y paquetes con descuento. ¿Quieres más información?"},
@@ -143,7 +155,11 @@ var catalog = []domain.Playbook{
 			},
 			"guiones": []map[string]any{
 				{"id": "captura", "titulo": "Captura de lead", "mensaje": "¡Gracias por escribirnos! Cuéntanos brevemente qué necesitas y un asesor te atiende."},
-				{"id": "cotizacion", "titulo": "Cotización", "mensaje": "Claro, te preparamos la cotización. Te la enviamos hoy. ¿Quieres incluir algo más?"},
+				{"id": "cotizacion", "titulo": "Cotización", "pasos": []map[string]any{
+					{"id": "necesidad", "titulo": "Necesidad", "mensaje": "Claro, con gusto te cotizamos. Cuéntanos brevemente qué necesitas."},
+					{"id": "alcance", "titulo": "Alcance", "mensaje": "Perfecto. ¿Hay algún plazo o alcance específico que debamos tener en cuenta?"},
+					{"id": "propuesta", "titulo": "Propuesta", "mensaje": "Te preparamos la cotización y te la enviamos hoy. ¿Quieres incluir algo más?"},
+				}},
 				{"id": "propuesta", "titulo": "Propuesta", "mensaje": "Aquí está la propuesta completa. ¿Tienes alguna duda o ajuste que quieras hacer?"},
 				{"id": "seguimiento", "titulo": "Seguimiento", "mensaje": "¡Hola! Te escribimos para saber si tuviste oportunidad de revisar la propuesta."},
 				{"id": "cliente-activo", "titulo": "Bienvenida de cliente", "mensaje": "¡Bienvenido! A partir de ahora este será nuestro canal de comunicación."},
@@ -178,7 +194,11 @@ var catalog = []domain.Playbook{
 			},
 			"guiones": []map[string]any{
 				{"id": "recepcion", "titulo": "Recepción", "mensaje": "¡Hola! Recibimos tu vehículo o equipo. Te avisamos con el diagnóstico."},
-				{"id": "cotizacion", "titulo": "Cotización", "mensaje": "Te enviamos la cotización. Confírmala para iniciar el trabajo."},
+				{"id": "cotizacion", "titulo": "Cotización", "pasos": []map[string]any{
+					{"id": "sintoma", "titulo": "Síntoma", "mensaje": "¡Hola! Cuéntanos qué falla presenta el vehículo o equipo para hacer el diagnóstico."},
+					{"id": "cotizacion", "titulo": "Cotización", "mensaje": "Te enviamos la cotización con el detalle del trabajo."},
+					{"id": "aprobacion", "titulo": "Aprobación", "mensaje": "Confírmala para iniciar el trabajo. El trabajo tiene garantía."},
+				}},
 				{"id": "aprobado", "titulo": "Trabajo aprobado", "mensaje": "¡Gracias por confirmar! Estamos trabajando en ello."},
 				{"id": "listo", "titulo": "Aviso de entrega", "mensaje": "¡Tu vehículo o equipo está listo! ¿Cuándo quieres recogerlo?"},
 				{"id": "garantia", "titulo": "Garantía", "mensaje": "Tranquilo, el trabajo tiene garantía. Agendamos una revisión."},

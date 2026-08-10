@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5/pgtype"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -24,7 +25,7 @@ func TestAccountDeletionNullsAssignments(t *testing.T) {
 
 	contact, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573002222001",
+		PhoneNumber:    pgtype.Text{String: "+573002222001", Valid: true},
 		DisplayName:    helpers.ToPgText("C1"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -117,7 +118,7 @@ func TestContactDeletionCascadesConversationsAndMessages(t *testing.T) {
 
 	contact, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573002222002",
+		PhoneNumber:    pgtype.Text{String: "+573002222002", Valid: true},
 		DisplayName:    helpers.ToPgText("C2"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})
@@ -127,6 +128,7 @@ func TestContactDeletionCascadesConversationsAndMessages(t *testing.T) {
 	conv, err := q.CreateConversation(ctx, sqlc.CreateConversationParams{
 		OrganizationID: orgA,
 		ContactID:      contact.ID,
+		Channel:        "whatsapp",
 		Status:         "active",
 	})
 	if err != nil {
@@ -136,7 +138,8 @@ func TestContactDeletionCascadesConversationsAndMessages(t *testing.T) {
 		OrganizationID:    orgA,
 		ConversationID:    conv.ID,
 		ContactID:         contact.ID,
-		WhatsappMessageID: helpers.ToPgText("wamid-del-1"),
+		Channel:           "whatsapp",
+		ProviderMessageID: helpers.ToPgText("wamid-del-1"),
 		Direction:         "inbound",
 		MessageType:       "text",
 		Content:           helpers.ToPgText("hi"),
@@ -182,7 +185,7 @@ func TestCompanyDeletionNullsCompanyID(t *testing.T) {
 
 	contact, err := q.UpsertContact(ctx, sqlc.UpsertContactParams{
 		OrganizationID: orgA,
-		PhoneNumber:    "+573002222003",
+		PhoneNumber:    pgtype.Text{String: "+573002222003", Valid: true},
 		DisplayName:    helpers.ToPgText("C3"),
 		LastMessageAt:  helpers.ToPgTimestampPtr(nil),
 	})

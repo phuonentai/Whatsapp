@@ -56,6 +56,22 @@ services:
     restart: unless-stopped
 
   # =============================================================================
+  # Database Migration - one-shot job (must run before backend)
+  # =============================================================================
+  migrate:
+    image: migrate/migrate:v4.18.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./go-b2b-starter/internal/db/postgres/sqlc/migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      - "up"
+    restart: "no"
+
+  # =============================================================================
   # Backend - Go API server
   # =============================================================================
   backend:
@@ -76,11 +92,19 @@ services:
       - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN:-}
     expose:
       - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/readyz >/dev/null 2>&1 || curl -fsS http://localhost:8080/readyz >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   # =============================================================================
@@ -106,8 +130,14 @@ services:
   # =============================================================================
   redis:
     image: redis:alpine
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
