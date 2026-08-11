@@ -77,6 +77,10 @@ func (f *fakeNumerationConnSvc) IsLive(ctx context.Context, orgID int32) (bool, 
 	return false, nil
 }
 
+func (f *fakeNumerationConnSvc) StatusAll(ctx context.Context) ([]*domain.OrgConnection, error) {
+	return nil, nil
+}
+
 func TestNumeration_ConfirmStoresSnapshotAndAdvances(t *testing.T) {
 	reader := &fakeNumerationReader{info: domain.NumerationInfo{Mode: domain.NumerationAuto}}
 	repo := newFakeNumerationRepo()

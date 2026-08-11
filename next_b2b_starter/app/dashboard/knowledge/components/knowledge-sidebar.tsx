@@ -18,6 +18,8 @@ interface KnowledgeSidebarProps {
   isSessionsLoading?: boolean;
   isDocumentsLoading?: boolean;
   isDocumentsFetching?: boolean;
+  isDocumentsError?: boolean;
+  onRetryDocuments?: () => void;
   onSelectSession: (sessionId: number) => void;
   onNewChat: () => void;
   onUploadDocument: (file: File, title: string) => Promise<void>;
@@ -33,6 +35,8 @@ export function KnowledgeSidebar({
   isSessionsLoading,
   isDocumentsLoading,
   isDocumentsFetching,
+  isDocumentsError,
+  onRetryDocuments,
   onSelectSession,
   onNewChat,
   onUploadDocument,
@@ -89,6 +93,8 @@ export function KnowledgeSidebar({
             documents={documents}
             isLoading={isDocumentsLoading}
             isFetching={isDocumentsFetching}
+            isError={isDocumentsError}
+            onRetry={onRetryDocuments}
             onUpload={onUploadDocument}
             onDelete={onDeleteDocument}
             onRefresh={onRefreshDocuments}
@@ -173,6 +179,8 @@ function SourcesTab({
   documents,
   isLoading,
   isFetching,
+  isError,
+  onRetry,
   onUpload,
   onDelete,
   onRefresh,
@@ -181,6 +189,8 @@ function SourcesTab({
   documents: Document[];
   isLoading?: boolean;
   isFetching?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onUpload: (file: File, title: string) => Promise<void>;
   onDelete: (documentId: number) => Promise<void>;
   onRefresh: () => void;
@@ -210,6 +220,8 @@ function SourcesTab({
           documents={documents}
           isLoading={isLoading}
           isFetching={isFetching}
+          isError={isError}
+          onRetry={onRetry}
           onDelete={onDelete}
           onRefresh={onRefresh}
           compact={true}

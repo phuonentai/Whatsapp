@@ -11,10 +11,10 @@ import (
 
 type ActivityService interface {
 	Create(ctx context.Context, orgID int32, req *CreateActivityRequest) (*domain.Activity, error)
-	ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error)
-	ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error)
-	ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error)
-	ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error)
+	ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (ListResult[*domain.ActivityWithActor], error)
+	ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error)
+	ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error)
+	ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error)
 }
 
 type CreateActivityRequest struct {
@@ -62,15 +62,47 @@ func (s *activityService) Create(ctx context.Context, orgID int32, req *CreateAc
 	}
 	return s.activityRepo.Create(ctx, a)
 }
-func (s *activityService) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return s.activityRepo.ListByOrganization(ctx, orgID, tipo, entityType, entityID, limit, offset)
+func (s *activityService) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (ListResult[*domain.ActivityWithActor], error) {
+	items, err := s.activityRepo.ListByOrganization(ctx, orgID, tipo, entityType, entityID, limit, offset)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	total, err := s.activityRepo.CountByOrganization(ctx, orgID, tipo, entityType, entityID)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	return ListResult[*domain.ActivityWithActor]{Items: items, Total: total}, nil
 }
-func (s *activityService) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return s.activityRepo.ListByContact(ctx, contactID, orgID, limit, offset)
+func (s *activityService) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error) {
+	items, err := s.activityRepo.ListByContact(ctx, contactID, orgID, limit, offset)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	total, err := s.activityRepo.CountByContact(ctx, contactID, orgID)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	return ListResult[*domain.ActivityWithActor]{Items: items, Total: total}, nil
 }
-func (s *activityService) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return s.activityRepo.ListByDeal(ctx, dealID, orgID, limit, offset)
+func (s *activityService) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error) {
+	items, err := s.activityRepo.ListByDeal(ctx, dealID, orgID, limit, offset)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	total, err := s.activityRepo.CountByDeal(ctx, dealID, orgID)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	return ListResult[*domain.ActivityWithActor]{Items: items, Total: total}, nil
 }
-func (s *activityService) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return s.activityRepo.ListByCompany(ctx, companyID, orgID, limit, offset)
+func (s *activityService) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (ListResult[*domain.ActivityWithActor], error) {
+	items, err := s.activityRepo.ListByCompany(ctx, companyID, orgID, limit, offset)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	total, err := s.activityRepo.CountByCompany(ctx, companyID, orgID)
+	if err != nil {
+		return ListResult[*domain.ActivityWithActor]{}, err
+	}
+	return ListResult[*domain.ActivityWithActor]{Items: items, Total: total}, nil
 }

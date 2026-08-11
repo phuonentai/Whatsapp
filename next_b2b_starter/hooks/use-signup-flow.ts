@@ -1,17 +1,19 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { signupRepository } from "@/lib/api/api/repositories/signup-repository";
 import {
+  SignupBusinessContext,
   SignupOrganization,
   SignupOwner,
   SignupResult,
 } from "@/lib/models/signup.model";
 
-export type SignupStep = "account" | "organization";
+export type SignupStep = "account" | "organization" | "business";
 
 interface UseSignupFlowState {
   step: SignupStep;
   owner: SignupOwner;
   organization: SignupOrganization;
+  business: SignupBusinessContext;
   isLoading: boolean;
   error: string | null;
   emailSent: boolean;
@@ -19,11 +21,13 @@ interface UseSignupFlowState {
   stepIndex: number;
   canContinueAccount: boolean;
   canContinueOrganization: boolean;
+  canContinueBusiness: boolean;
   goBack: () => void;
   goNext: () => void;
   sendMagicLink: () => Promise<void>;
   updateOwner: (updates: Partial<SignupOwner>) => void;
   updateOrganization: (updates: Partial<SignupOrganization>) => void;
+  updateBusiness: (updates: Partial<SignupBusinessContext>) => void;
   reset: () => void;
 }
 
@@ -37,12 +41,18 @@ const defaultOrganization: SignupOrganization = {
   industry: "Technology",
 };
 
+const defaultBusiness: SignupBusinessContext = {
+  whatsappReadiness: "planning",
+  businessGoal: "",
+};
+
 export function useSignupFlow(): UseSignupFlowState {
   const [step, setStep] = useState<SignupStep>("account");
   const [owner, setOwner] = useState<SignupOwner>(defaultOwner);
   const [organization, setOrganization] = useState<SignupOrganization>(
     defaultOrganization
   );
+  const [business, setBusiness] = useState<SignupBusinessContext>(defaultBusiness);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
@@ -57,6 +67,8 @@ export function useSignupFlow(): UseSignupFlowState {
         return 0;
       case "organization":
         return 1;
+      case "business":
+        return 2;
       default:
         return 0;
     }
@@ -76,10 +88,16 @@ export function useSignupFlow(): UseSignupFlowState {
     );
   }, [organization]);
 
+  const canContinueBusiness = useMemo(() => {
+    return business.businessGoal.trim().length >= 2;
+  }, [business]);
+
   const goBack = useCallback(() => {
     setError(null);
     if (step === "organization") {
       setStep("account");
+    } else if (step === "business") {
+      setStep("organization");
     }
   }, [step]);
 
@@ -87,8 +105,10 @@ export function useSignupFlow(): UseSignupFlowState {
     setError(null);
     if (step === "account" && canContinueAccount) {
       setStep("organization");
+    } else if (step === "organization" && canContinueOrganization) {
+      setStep("business");
     }
-  }, [step, canContinueAccount]);
+  }, [step, canContinueAccount, canContinueOrganization]);
 
   const updateOwner = useCallback((updates: Partial<SignupOwner>) => {
     setOwner((prev) => ({ ...prev, ...updates }));
@@ -100,9 +120,15 @@ export function useSignupFlow(): UseSignupFlowState {
     setError(null); // Clear error when user types
   }, []);
 
+  const updateBusiness = useCallback((updates: Partial<SignupBusinessContext>) => {
+    setBusiness((prev) => ({ ...prev, ...updates }));
+    setError(null); // Clear error when user types
+  }, []);
+
   const reset = useCallback(() => {
     setOwner(defaultOwner);
     setOrganization(defaultOrganization);
+    setBusiness(defaultBusiness);
     setStep("account");
     setError(null);
     setEmailSent(false);
@@ -149,6 +175,7 @@ export function useSignupFlow(): UseSignupFlowState {
     step,
     owner,
     organization,
+    business,
     isLoading,
     error,
     emailSent,
@@ -156,11 +183,13 @@ export function useSignupFlow(): UseSignupFlowState {
     stepIndex,
     canContinueAccount,
     canContinueOrganization,
+    canContinueBusiness,
     goBack,
     goNext,
     sendMagicLink,
     updateOwner,
     updateOrganization,
+    updateBusiness,
     reset,
   };
 }

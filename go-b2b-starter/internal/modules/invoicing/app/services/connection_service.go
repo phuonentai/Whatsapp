@@ -41,6 +41,8 @@ type ConnectionService interface {
 	ConfirmNumeration(ctx context.Context, orgID int32) (*domain.OrgConnection, error)
 	ConfirmSandboxOK(ctx context.Context, orgID int32) (*domain.OrgConnection, error)
 	IsLive(ctx context.Context, orgID int32) (bool, error)
+	// StatusAll lists every organization's connection (admin surface only).
+	StatusAll(ctx context.Context) ([]*domain.OrgConnection, error)
 }
 
 type connectionAction string
@@ -256,6 +258,10 @@ func (s *connectionService) transition(ctx context.Context, orgID int32, action 
 		return nil, err
 	}
 	return s.repo.UpdateStatus(ctx, orgID, next, "")
+}
+
+func (s *connectionService) StatusAll(ctx context.Context) ([]*domain.OrgConnection, error) {
+	return s.repo.ListAll(ctx)
 }
 
 func (s *connectionService) currentOrSynthetic(ctx context.Context, orgID int32) (*domain.OrgConnection, error) {

@@ -33,10 +33,17 @@ async function downloadCSV(endpoint: string, filename: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-// The backend wraps all CRM responses in a { data, success } envelope.
+// The backend wraps all CRM responses in a { data, success } envelope. For
+// paginated lists the envelope additionally carries a `total` count of rows
+// matching the active filters (ignoring limit/offset).
 // Unwrap it so callers receive the payload directly (matches EntitlementDto
 // and the component types).
-type Envelope<T> = { data?: T; success?: boolean };
+type Envelope<T> = { data?: T; success?: boolean; total?: number };
+
+export interface PaginatedListResult<T> {
+  items: T;
+  total: number;
+}
 
 async function unwrap<T>(request: Promise<Envelope<T> | T>): Promise<T> {
   const response = await request;
@@ -46,21 +53,30 @@ async function unwrap<T>(request: Promise<Envelope<T> | T>): Promise<T> {
   return response as T;
 }
 
+async function unwrapPaginated<T>(request: Promise<Envelope<T> | T>): Promise<PaginatedListResult<T>> {
+  const response = await request;
+  if (response !== null && typeof response === "object" && "data" in response) {
+    const env = response as Envelope<T>;
+    return { items: env.data as T, total: env.total ?? 0 };
+  }
+  return { items: response as T, total: 0 };
+}
+
 export const crmRepository = {
   getEntitlement: () => unwrap(apiClient.get<Envelope<EntitlementDto>>(`${BASE}/entitlement`)),
 
   listContacts: (params?: { source?: string; lead_status?: string; limit?: number; offset?: number }) =>
-    unwrap(apiClient.get<Envelope<ContactDto[]>>(`${BASE}/contactos`, { params })),
+    unwrapPaginated(apiClient.get<Envelope<ContactDto[]>>(`${BASE}/contactos`, { params })),
   searchContacts: (q: string, params?: { limit?: number; offset?: number }) =>
-    unwrap(apiClient.get<Envelope<ContactDto[]>>(`${BASE}/contactos/search`, { params: { q, ...params } })),
+    unwrapPaginated(apiClient.get<Envelope<ContactDto[]>>(`${BASE}/contactos/search`, { params: { q, ...params } })),
   getContact: (id: number) => unwrap(apiClient.get<Envelope<ContactDto>>(`${BASE}/contactos/${id}`)),
   createContact: (data: Partial<ContactDto>) => unwrap(apiClient.post<Envelope<ContactDto>>(`${BASE}/contactos`, data)),
   updateContact: (id: number, data: Partial<ContactDto>) => unwrap(apiClient.put<Envelope<ContactDto>>(`${BASE}/contactos/${id}`, data)),
   deleteContact: (id: number) => unwrap(apiClient.delete<Envelope<null>>(`${BASE}/contactos/${id}`)),
 
   listCompanies: (params?: { limit?: number; offset?: number }) =>
-    unwrap(apiClient.get<Envelope<CompanyDto[]>>(`${BASE}/empresas`, { params })),
-  searchCompanies: (q: string) => unwrap(apiClient.get<Envelope<CompanyDto[]>>(`${BASE}/empresas/search`, { params: { q } })),
+    unwrapPaginated(apiClient.get<Envelope<CompanyDto[]>>(`${BASE}/empresas`, { params })),
+  searchCompanies: (q: string) => unwrapPaginated(apiClient.get<Envelope<CompanyDto[]>>(`${BASE}/empresas/search`, { params: { q } })),
   getCompany: (id: number) => unwrap(apiClient.get<Envelope<CompanyDto>>(`${BASE}/empresas/${id}`)),
   createCompany: (data: Partial<CompanyDto>) => unwrap(apiClient.post<Envelope<CompanyDto>>(`${BASE}/empresas`, data)),
   updateCompany: (id: number, data: Partial<CompanyDto>) => unwrap(apiClient.put<Envelope<CompanyDto>>(`${BASE}/empresas/${id}`, data)),
@@ -84,11 +100,14 @@ export const crmRepository = {
     unwrap(apiClient.put<Envelope<{ id: number }>>(`${BASE}/pipelines/${pipelineId}/etapas/${stageId}`, data)),
 
   listActivities: (params?: { tipo?: string; limit?: number; offset?: number }) =>
-    unwrap(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades`, { params })),
+    unwrapPaginated(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades`, { params })),
   createActivity: (data: Partial<ActivityDto>) => unwrap(apiClient.post<Envelope<ActivityDto>>(`${BASE}/actividades`, data)),
-  listActivitiesByContact: (contactId: number) => unwrap(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/contacto/${contactId}`)),
-  listActivitiesByDeal: (dealId: number) => unwrap(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/negocio/${dealId}`)),
-  listActivitiesByCompany: (companyId: number) => unwrap(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/empresa/${companyId}`)),
+  listActivitiesByContact: (contactId: number) =>
+    unwrapPaginated(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/contacto/${contactId}`)),
+  listActivitiesByDeal: (dealId: number) =>
+    unwrapPaginated(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/negocio/${dealId}`)),
+  listActivitiesByCompany: (companyId: number) =>
+    unwrapPaginated(apiClient.get<Envelope<ActivityDto[]>>(`${BASE}/actividades/empresa/${companyId}`)),
 
   listTags: () => unwrap(apiClient.get<Envelope<TagDto[]>>(`${BASE}/etiquetas`)),
   createTag: (data: { nombre: string; color?: string }) => unwrap(apiClient.post<Envelope<TagDto>>(`${BASE}/etiquetas`, data)),

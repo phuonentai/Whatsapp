@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/documents/app/services"
 	_ "github.com/moasq/go-b2b-starter/internal/modules/documents/domain" // for swagger
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
@@ -34,7 +34,7 @@ func NewHandler(service services.DocumentService) *Handler {
 // @Failure 500 {object} httperr.HTTPError
 // @Router /example_documents/upload [post]
 func (h *Handler) UploadDocument(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,
@@ -96,7 +96,7 @@ func (h *Handler) UploadDocument(c *gin.Context) {
 // @Failure 500 {object} httperr.HTTPError
 // @Router /example_documents [get]
 func (h *Handler) ListDocuments(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,
@@ -151,7 +151,7 @@ func (h *Handler) DeleteDocument(c *gin.Context) {
 		return
 	}
 
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,

@@ -8,11 +8,12 @@ import { useCreateActivity, useUpdateContact } from "@/lib/hooks/mutations/use-c
 import { useFeature } from "@/lib/hooks/use-entitlement";
 import { ContactDialog } from "@/components/crm/contact-dialog";
 import { TagPicker } from "@/components/crm/tag-picker";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 
 export function ContactDetail({ id }: { id: number }) {
   const router = useRouter();
-  const { data: contact, isLoading } = useContactQuery(id);
+  const { data: contact, isLoading, isError, refetch, isRefetching } = useContactQuery(id);
   const { data: negocios } = useDealsQuery({ contact_id: id });
   const { data: activities } = useContactActivitiesQuery(id);
   const createActivity = useCreateActivity();
@@ -23,6 +24,18 @@ export function ContactDetail({ id }: { id: number }) {
   const [notaContenido, setNotaContenido] = useState("");
 
   if (isLoading) return <div className="text-gray-500">Cargando contacto...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar el contacto"
+        description="No se pudo cargar el contacto. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
+
   if (!contact) return <div className="text-gray-500">Contacto no encontrado</div>;
 
   const handleAddNote = () => {

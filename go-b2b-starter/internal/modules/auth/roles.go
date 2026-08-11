@@ -1,6 +1,8 @@
 package auth
 
-// Role represents a user role in the system.
+// Role constants. The Role type itself is defined in internal/platform/authcontext
+// and aliased here; this file keeps the role name constants and role-related
+// fallback helpers that depend on the RBAC fallback maps in rbac.go.
 //
 // Roles are assigned to users and determine their base permissions.
 // The application uses a three-tier RBAC system:
@@ -21,7 +23,6 @@ package auth
 // The auth provider (e.g., Stytch) is the source of truth for roles at runtime.
 // The definitions in rbac.go are used as a fallback when the auth provider
 // doesn't provide explicit permissions.
-type Role string
 
 // Core RBAC roles.
 //
@@ -62,18 +63,6 @@ const (
 	// Deprecated: Use RoleMember instead.
 	RoleEmployee Role = "employee"
 )
-
-// String returns the string representation of the role.
-func (r Role) String() string {
-	return string(r)
-}
-
-// IsValid checks if the role is a known role.
-func (r Role) IsValid() bool {
-	normalized := NormalizeRole(string(r))
-	roleInfo := GetRoleInfo(string(normalized))
-	return roleInfo != nil
-}
 
 // NormalizeRole converts legacy role names to current ones.
 //

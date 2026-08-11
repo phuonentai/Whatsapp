@@ -15,6 +15,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/analytics/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/analytics/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 )
 
@@ -51,7 +52,7 @@ func (p *stubFeatureProvider) GetEntitlement(ctx context.Context, orgID int32) (
 	return p.ent, nil
 }
 
-func newTestRouter(ent *features.Entitlement, identity *auth.Identity) *gin.Engine {
+func newTestRouter(ent *features.Entitlement, identity *authcontext.Identity) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	svc := services.NewSalesReportService(&stubRepo{
 		revenue:  []domain.RevenuePoint{{Periodo: "2026-07-01", MontoTotal: 350000}},
@@ -64,7 +65,7 @@ func newTestRouter(ent *features.Entitlement, identity *auth.Identity) *gin.Engi
 		if identity != nil {
 			auth.SetIdentity(c, identity)
 		}
-		auth.SetRequestContext(c, &auth.RequestContext{OrganizationID: 1, AccountID: 1})
+		authcontext.SetRequestContext(c, &authcontext.RequestContext{OrganizationID: 1, AccountID: 1})
 		if ent != nil {
 			features.SetEntitlement(c, ent)
 		}
@@ -80,13 +81,13 @@ func (testResolver) Get(name string) gin.HandlerFunc {
 	return func(c *gin.Context) { c.Next() }
 }
 
-func withPerms(perms ...string) *auth.Identity {
+func withPerms(perms ...string) *authcontext.Identity {
 	var ps []auth.Permission
 	for _, p := range perms {
 		resource, action := splitPerm(p)
 		ps = append(ps, auth.NewPermission(resource, action))
 	}
-	return &auth.Identity{UserID: "member-1", Permissions: ps}
+	return &authcontext.Identity{UserID: "member-1", Permissions: ps}
 }
 
 func splitPerm(p string) (string, string) {

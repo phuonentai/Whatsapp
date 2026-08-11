@@ -9,7 +9,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 )
 
@@ -27,7 +27,7 @@ func NewAccountHandler(orgService services.OrganizationService, logger logger.Lo
 
 // CreateAccount creates a new account in an organization
 func (h *AccountHandler) CreateAccount(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -58,7 +58,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 
 // GetAccount gets an account by ID
 func (h *AccountHandler) GetAccount(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -90,7 +90,7 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 
 // GetAccountByEmail gets an account by email
 func (h *AccountHandler) GetAccountByEmail(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -119,7 +119,7 @@ func (h *AccountHandler) GetAccountByEmail(c *gin.Context) {
 
 // ListAccounts lists all accounts in an organization
 func (h *AccountHandler) ListAccounts(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -142,7 +142,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 
 // UpdateAccount updates an account
 func (h *AccountHandler) UpdateAccount(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -185,7 +185,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 }
 
 func (h *AccountHandler) DeleteAccount(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -217,7 +217,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 
 // UpdateAccountLastLogin updates account last login timestamp
 func (h *AccountHandler) UpdateAccountLastLogin(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -248,7 +248,7 @@ func (h *AccountHandler) UpdateAccountLastLogin(c *gin.Context) {
 }
 
 func (h *AccountHandler) CheckAccountPermission(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)

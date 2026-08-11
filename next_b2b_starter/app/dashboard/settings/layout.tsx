@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Settings | AP Cash",
+  title: `Settings | ${PRODUCT_NAME}`,
   description: "Manage your profile and organization settings",
 };
 

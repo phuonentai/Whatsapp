@@ -17,7 +17,7 @@ import (
 const (
 	// Redis cache keys for JWKS
 	jwksCacheKeyPattern = "auth:stytch:jwks:key:%s" // Individual public key by kid
-	jwksCacheTTL        = 24 * time.Hour            // 24-hour cache
+	jwksCacheTTL        = 5 * time.Minute           // bounded by constitution: TTL <= 300s
 )
 
 // JWKSCache manages caching of JSON Web Key Sets from Stytch.

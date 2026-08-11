@@ -14,7 +14,7 @@ import (
 
 	billingServices "github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 )
 
@@ -38,9 +38,9 @@ func newTestContext(orgID int32) (*gin.Context, *httptest.ResponseRecorder) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/example_cognitive/chat", nil)
 	c.Set("organization_id", orgID)
-	// Simulate the org_context middleware having run (auth.GetOrganizationID
+	// Simulate the org_context middleware having run (authcontext.GetOrganizationID
 	// reads the RequestContext, not the raw key).
-	auth.SetRequestContext(c, &auth.RequestContext{OrganizationID: orgID})
+	authcontext.SetRequestContext(c, &authcontext.RequestContext{OrganizationID: orgID})
 	// Simulate the entitlement middleware having run (needed by features.Require)
 	features.SetEntitlement(c, &features.Entitlement{
 		Features: map[string]bool{"ai_assistant": true},

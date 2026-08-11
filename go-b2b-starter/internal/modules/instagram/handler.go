@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/instagram/app/services"
 	igDomain "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
@@ -107,7 +107,7 @@ func (h *Handler) HandleVerification(c *gin.Context) {
 }
 
 func (h *Handler) HandleGetConfig(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	config, err := h.configService.GetConfig(c.Request.Context(), orgID)
@@ -132,7 +132,7 @@ func (h *Handler) HandleGetConfig(c *gin.Context) {
 }
 
 func (h *Handler) HandleGetConfigHealth(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	stats, err := h.webhookService.GetWebhookLogStats(c.Request.Context(), orgID)
@@ -151,7 +151,7 @@ func (h *Handler) HandleGetConfigHealth(c *gin.Context) {
 // HandleReplayLog re-enqueues the events of a stored webhook log from its
 // raw payload (operator recovery action for lost/dead-lettered events).
 func (h *Handler) HandleReplayLog(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	logID, err := strconv.ParseInt(c.Param("id"), 10, 32)
@@ -199,7 +199,7 @@ type UpsertConfigRequest struct {
 }
 
 func (h *Handler) HandleUpsertConfig(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	var req UpsertConfigRequest
@@ -272,7 +272,7 @@ func (h *Handler) HandleUpsertConfig(c *gin.Context) {
 }
 
 func (h *Handler) HandleToggleConfig(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	config, err := h.configService.ToggleConfig(c.Request.Context(), orgID)
@@ -297,7 +297,7 @@ func (h *Handler) HandleToggleConfig(c *gin.Context) {
 }
 
 func (h *Handler) HandleRefreshToken(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	config, err := h.configService.RefreshToken(c.Request.Context(), orgID, h.appID, h.appSecret)

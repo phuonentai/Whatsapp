@@ -6,16 +6,29 @@ import { useCompanyQuery, useDealsQuery } from "@/lib/hooks/queries/use-crm-quer
 import { useFeature } from "@/lib/hooks/use-entitlement";
 import { CompanyDialog } from "@/components/crm/company-dialog";
 import { TagPicker } from "@/components/crm/tag-picker";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 
 export function CompanyDetail({ id }: { id: number }) {
   const router = useRouter();
-  const { data: company, isLoading } = useCompanyQuery(id);
+  const { data: company, isLoading, isError, refetch, isRefetching } = useCompanyQuery(id);
   const { data: negocios } = useDealsQuery();
   const canManage = useFeature("crm_companies");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (isLoading) return <div className="text-gray-500">Cargando empresa...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar la empresa"
+        description="No se pudo cargar la empresa. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
+
   if (!company) return <div className="text-gray-500">Empresa no encontrada</div>;
 
   const companyDeals = negocios?.filter((d) => d.company_id === company.id) ?? [];

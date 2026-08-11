@@ -10,11 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	billingServices "github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/mercadopago"
-	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/polar"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
@@ -22,14 +20,16 @@ import (
 type Handler struct {
 	billingService      billingServices.BillingService
 	logger              logger.Logger
+	webhookVerifier     domain.WebhookVerifier
 	polarWebhookSecret  string
 	mpWebhookSecret     string
 }
 
-func NewHandler(billingService billingServices.BillingService, polarWebhookSecret, mpWebhookSecret string, log logger.Logger) *Handler {
+func NewHandler(billingService billingServices.BillingService, webhookVerifier domain.WebhookVerifier, polarWebhookSecret, mpWebhookSecret string, log logger.Logger) *Handler {
 	return &Handler{
 		billingService:     billingService,
 		logger:             log,
+		webhookVerifier:    webhookVerifier,
 		polarWebhookSecret: polarWebhookSecret,
 		mpWebhookSecret:    mpWebhookSecret,
 	}
@@ -46,7 +46,7 @@ func NewHandler(billingService billingServices.BillingService, polarWebhookSecre
 // @Failure 500 {object} httperr.HTTPError "Internal server error"
 // @Router /api/subscriptions/status [get]
 func (h *Handler) GetBillingStatus(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,
@@ -390,16 +390,16 @@ func (h *Handler) ProcessPolarWebhook(c *gin.Context) {
 		return
 	}
 
-	msgID := c.GetHeader(polar.WebhookIDHeader)
-	msgTimestamp := c.GetHeader(polar.WebhookTimestampHeader)
-	signature := c.GetHeader(polar.WebhookSignatureHeader)
+	msgID := c.GetHeader(domain.PolarWebhookIDHeader)
+	msgTimestamp := c.GetHeader(domain.PolarWebhookTimestampHeader)
+	signature := c.GetHeader(domain.PolarWebhookSignatureHeader)
 
 	if h.polarWebhookSecret == "" {
 		c.JSON(http.StatusInternalServerError, map[string]any{"error": "webhook secret not configured"})
 		return
 	}
 
-	if err := polar.VerifyWebhookSignature(rawBody, msgID, msgTimestamp, signature, h.polarWebhookSecret); err != nil {
+	if err := h.webhookVerifier.VerifyPolar(rawBody, msgID, msgTimestamp, signature, h.polarWebhookSecret); err != nil {
 		h.logger.Warn("[ProcessPolarWebhook] Signature verification failed", map[string]any{
 			"error": err.Error(),
 		})
@@ -458,7 +458,7 @@ func (h *Handler) ProcessMPWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := mercadopago.VerifyWebhookSignature(rawBody, c.GetHeader("x-signature"), secret); err != nil {
+	if err := h.webhookVerifier.VerifyMercadoPago(rawBody, c.GetHeader(domain.MercadoPagoWebhookSignatureHeader), secret); err != nil {
 		h.logger.Warn("[ProcessMPWebhook] Signature verification failed", map[string]any{
 			"error": err.Error(),
 		})
@@ -501,7 +501,7 @@ type aiUsageResponse struct {
 // @Failure 500 {object} httperr.HTTPError "Internal server error"
 // @Router /api/crm/usage/ai [get]
 func (h *Handler) GetAiUsage(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,

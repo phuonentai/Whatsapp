@@ -2,12 +2,17 @@
 
 import type { Message } from "@/lib/models/conversation.model";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/common/error-state";
 import { cn } from "@/lib/utils";
+import { ui } from "@/lib/copy/ui";
 import { useEffect, useRef } from "react";
 
 interface MessageThreadProps {
   messages: Message[];
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 }
 
 function formatTime(dateStr?: string): string {
@@ -18,24 +23,42 @@ function formatTime(dateStr?: string): string {
 
 function messageTypeLabel(type: string): string {
   switch (type) {
-    case "image": return "🖼 Image";
-    case "video": return "🎬 Video";
-    case "audio": return "🎵 Audio";
-    case "document": return "📄 Document";
-    case "location": return "📍 Location";
+    case "image": return `🖼 ${ui.inbox.typeImage}`;
+    case "video": return `🎬 ${ui.inbox.typeVideo}`;
+    case "audio": return `🎵 ${ui.inbox.typeAudio}`;
+    case "document": return `📄 ${ui.inbox.typeDocument}`;
+    case "location": return `📍 ${ui.inbox.typeLocation}`;
     default: return type;
   }
 }
 
-export function MessageThread({ messages, isLoading }: MessageThreadProps) {
+export function MessageThread({ messages, isLoading, isError = false, onRetry, isRetrying = false }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  if (isError) {
+    return (
+      <div className="flex flex-1 items-center justify-center overflow-y-auto bg-gray-50 px-4 py-6">
+        <ErrorState
+          title={ui.inbox.threadErrorTitle}
+          description={ui.inbox.threadErrorDesc}
+          onRetry={onRetry}
+          isRetrying={isRetrying}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div data-testid="message-thread" className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6">
+    <div
+      data-testid="message-thread"
+      role="log"
+      aria-live="polite"
+      className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6"
+    >
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -46,7 +69,7 @@ export function MessageThread({ messages, isLoading }: MessageThreadProps) {
         </div>
       ) : messages.length === 0 ? (
         <div className="flex h-full items-center justify-center">
-          <p className="text-sm text-gray-400">No messages yet. Send a reply to start the conversation.</p>
+          <p className="text-sm text-gray-400">{ui.inbox.threadEmpty}</p>
         </div>
       ) : (
         <div className="space-y-3">

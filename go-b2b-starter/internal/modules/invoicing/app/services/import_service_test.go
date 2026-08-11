@@ -50,8 +50,16 @@ func (f *fakeImportCompanyRepo) GetByNit(ctx context.Context, orgID int32, nit s
 	return nil, crmdomain.ErrCompanyNotFound
 }
 
+func (f *fakeImportCompanyRepo) CountList(ctx context.Context, orgID int32) (int32, error) {
+	return int32(len(f.byNit)), nil
+}
+
 func (f *fakeImportCompanyRepo) List(ctx context.Context, orgID int32, limit, offset int32) ([]*crmdomain.CompanyWithCounts, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (f *fakeImportCompanyRepo) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	return 0, nil
 }
 
 func (f *fakeImportCompanyRepo) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*crmdomain.CompanyWithCounts, error) {
@@ -88,8 +96,16 @@ func (f *fakeImportContactRepo) List(ctx context.Context, orgID int32, limit, of
 	return nil, errors.New("not implemented")
 }
 
+func (f *fakeImportContactRepo) CountFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo int32) (int32, error) {
+	return 0, nil
+}
+
 func (f *fakeImportContactRepo) ListFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*crmdomain.Contact, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (f *fakeImportContactRepo) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	return 0, nil
 }
 
 func (f *fakeImportContactRepo) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*crmdomain.Contact, error) {

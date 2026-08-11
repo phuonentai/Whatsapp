@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,10 +16,11 @@ import {
   MessageCircle,
   Instagram,
   ScrollText,
+  FileText,
+  ServerCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 import { ProfileSection } from "./profile-section";
 import { MemberList } from "./member-list";
@@ -53,6 +54,8 @@ import { PlaybookSetupCard } from "./playbooks-section";
 import { AgentSettingsSection } from "./agent-settings-section";
 import { ComplianceSection } from "./compliance-section";
 import { AuditLogView } from "./audit-log-view";
+import { SiigoIntegrationSection } from "./siigo-integration-section";
+import { SiigoAdminView } from "./siigo-admin-view";
 
 // Query hooks - Component depends ONLY on these hooks
 import { useProfileQuery } from "@/lib/hooks/queries/use-profile-query";
@@ -66,7 +69,7 @@ interface SettingsContentProps {
   // No props required - component fetches its own data
 }
 
-type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp" | "instagram";
+type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp" | "instagram" | "siigo" | "siigo-admin";
 
 interface OverviewSection {
   key: Exclude<SettingsView, "overview">;
@@ -115,6 +118,14 @@ const DETAIL_META: Record<Exclude<SettingsView, "overview">, { title: string; de
     title: "Instagram",
     description: "Connect and manage your Instagram DMs integration.",
   },
+  siigo: {
+    title: "Integración Siigo",
+    description: "Conecta Siigo para facturación electrónica automática.",
+  },
+  "siigo-admin": {
+    title: "Onboarding Siigo",
+    description: "Vista de operación: estado de conexión por organización.",
+  },
 };
 
 function parseViewParam(raw: string | null): SettingsView | null {
@@ -129,7 +140,9 @@ function parseViewParam(raw: string | null): SettingsView | null {
     normalized === "compliance" ||
     normalized === "audit" ||
     normalized === "whatsapp" ||
-    normalized === "instagram"
+    normalized === "instagram" ||
+    normalized === "siigo" ||
+    normalized === "siigo-admin"
   ) {
     return normalized as SettingsView;
   }
@@ -273,8 +286,6 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
-  const paymentVerified = searchParams.get("payment_verified");
-  const paymentError = searchParams.get("payment_error");
 
   const [viewStack, setViewStack] = useState<SettingsView[]>(["overview"]);
   const currentView = viewStack[viewStack.length - 1];
@@ -295,7 +306,9 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         (requestedView === "compliance" && canManageMembers) ||
         (requestedView === "audit" && canViewAudit) ||
         (requestedView === "whatsapp" && canManageMembers) ||
-        (requestedView === "instagram" && canManageMembers);
+        (requestedView === "instagram" && canManageMembers) ||
+        (requestedView === "siigo" && canManageMembers) ||
+        (requestedView === "siigo-admin" && canManageMembers);
       if (isAllowed) {
         setViewStack((stack) =>
           stack[stack.length - 1] === requestedView ? stack : ["overview", requestedView]
@@ -325,38 +338,6 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   if (currentView === "audit" && !canViewAudit && viewStack[viewStack.length - 1] !== "overview") {
     setViewStack(["overview"]);
   }
-
-  // Track if we've shown the payment toast to prevent duplicates
-  const paymentToastShownRef = useRef(false);
-
-  // Handle payment verification feedback
-  useEffect(() => {
-    if (paymentToastShownRef.current) return;
-
-    if (paymentVerified === "true") {
-      paymentToastShownRef.current = true;
-      toast.success("Subscription activated successfully!", {
-        description: "Your payment has been verified and your subscription is now active.",
-      });
-
-      // Clean up the URL params
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("payment_verified");
-      const queryString = params.toString();
-      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
-    } else if (paymentError === "true") {
-      paymentToastShownRef.current = true;
-      toast.error("Payment verification issue", {
-        description: "We couldn't verify your payment immediately. Your subscription should activate shortly.",
-      });
-
-      // Clean up the URL params
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("payment_error");
-      const queryString = params.toString();
-      router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
-    }
-  }, [paymentVerified, paymentError, router, pathname, searchParams]);
 
   useEffect(() => {
     if (!permissionsReady) return;
@@ -613,6 +594,24 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         helper: instagramHelper,
         icon: Instagram,
       });
+
+      sections.push({
+        key: "siigo",
+        title: "Integración Siigo",
+        description: "Facturación electrónica automática desde WhatsApp.",
+        value: "Configurar facturación",
+        helper: "Conecta Siigo para emitir facturas en la etapa facturado.",
+        icon: FileText,
+      });
+
+      sections.push({
+        key: "siigo-admin",
+        title: "Onboarding Siigo",
+        description: "Vista de operación: estado de conexión por organización.",
+        value: "Ver organizaciones",
+        helper: "Estado, numeración e importación de cada cliente.",
+        icon: ServerCog,
+      });
     }
 
     if (canViewAudit) {
@@ -650,11 +649,15 @@ export function SettingsContent({}: SettingsContentProps = {}) {
       return;
     }
 
-    await inviteMemberMutation.mutateAsync({
-      request,
-      organizationId: profile.organizationId,
-    });
-    setInviteModalOpen(false);
+    try {
+      await inviteMemberMutation.mutateAsync({
+        request,
+        organizationId: profile.organizationId,
+      });
+      setInviteModalOpen(false);
+    } catch {
+      // error toast handled by mutation
+    }
     // Members list automatically refetches due to invalidation in mutation
   };
 
@@ -842,6 +845,30 @@ export function SettingsContent({}: SettingsContentProps = {}) {
           );
         }
         return <InstagramConfigSection />;
+      case "siigo":
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Acceso restringido</AlertTitle>
+              <AlertDescription>
+                No tienes permisos para administrar la integración Siigo.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <SiigoIntegrationSection />;
+      case "siigo-admin":
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Acceso restringido</AlertTitle>
+              <AlertDescription>
+                Solo los administradores pueden ver el onboarding Siigo.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <SiigoAdminView />;
       default:
         return null;
     }

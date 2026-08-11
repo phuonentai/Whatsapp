@@ -21,12 +21,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Document } from "@/lib/models/document.model";
 import { DocumentHelpers } from "@/lib/models/document.model";
+import { ErrorState } from "@/components/common/error-state";
 import { cn } from "@/lib/utils";
 
 interface DocumentListProps {
   documents: Document[];
   isLoading?: boolean;
   isFetching?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   onDelete: (documentId: number) => Promise<void>;
   onRefresh: () => void;
   compact?: boolean;
@@ -181,6 +184,8 @@ export function DocumentList({
   documents,
   isLoading = false,
   isFetching = false,
+  isError = false,
+  onRetry,
   onDelete,
   onRefresh,
   compact = false,
@@ -201,6 +206,16 @@ export function DocumentList({
 
   if (isLoading) {
     return <DocumentListSkeleton compact={compact} />;
+  }
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar los documentos"
+        description="No se pudieron cargar los documentos. Inténtalo de nuevo."
+        onRetry={onRetry}
+      />
+    );
   }
 
   if (documents.length === 0) {

@@ -49,6 +49,11 @@ func (s *testInvoiceService) CreateTestInvoice(ctx context.Context, orgID int32)
 	if err != nil {
 		return nil, err
 	}
+	if created == nil {
+		// Defense in depth: a provider that returns nil, nil (e.g. a noop
+		// resolution) must never reach the repository.
+		return nil, fmt.Errorf("%w: provider returned no invoice", domain.ErrProvider)
+	}
 
 	stored, err := s.repo.Insert(ctx, created)
 	if err != nil {
@@ -64,17 +69,19 @@ func (s *testInvoiceService) CreateTestInvoice(ctx context.Context, orgID int32)
 		})
 		return stored, nil
 	}
-	if remote.Status == stored.Status {
-		return stored, nil
+	if remote.Status != stored.Status {
+		if _, err := s.repo.UpdateStatus(ctx, stored.ID, remote.Status, remote.Cufe, remote.PdfURL); err != nil {
+			s.logger.Warn("failed to update test invoice status", map[string]any{"error": err.Error()})
+			return stored, nil
+		}
+		stored.Status = remote.Status
+		stored.Cufe = remote.Cufe
+		stored.PdfURL = remote.PdfURL
 	}
-	if _, err := s.repo.UpdateStatus(ctx, stored.ID, remote.Status, remote.Cufe, remote.PdfURL); err != nil {
-		s.logger.Warn("failed to update test invoice status", map[string]any{"error": err.Error()})
-		return stored, nil
-	}
-	stored.Status = remote.Status
-	stored.Cufe = remote.Cufe
-	stored.PdfURL = remote.PdfURL
 
+	// Advance on any valid resolution — including when the POST already
+	// returned valid (immediate provider resolution must not early-return
+	// past the sandbox_ok transition).
 	if stored.Status == domain.InvoiceStatusValid {
 		if _, err := s.connSvc.ConfirmSandboxOK(ctx, orgID); err != nil {
 			s.logger.Warn("failed to advance connection after sandbox test", map[string]any{

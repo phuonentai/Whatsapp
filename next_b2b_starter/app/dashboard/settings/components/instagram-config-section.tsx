@@ -87,20 +87,24 @@ export function InstagramConfigSection() {
       return;
     }
 
-    await upsertMutation.mutateAsync({
-      ig_user_id: igUserId.trim(),
-      ig_username: igUsername.trim() || undefined,
-      fb_page_id: fbPageId.trim() || undefined,
-      access_token: accessToken.trim() || undefined,
-      webhook_secret: webhookSecret.trim() || undefined,
-      verify_token: verifyToken.trim() || undefined,
-      api_version: apiVersion.trim() || undefined,
-      graph_api_url: graphApiUrl.trim() || undefined,
-    });
-    setAccessToken("");
-    setWebhookSecret("");
-    setVerifyToken("");
-    refetch();
+    try {
+      await upsertMutation.mutateAsync({
+        ig_user_id: igUserId.trim(),
+        ig_username: igUsername.trim() || undefined,
+        fb_page_id: fbPageId.trim() || undefined,
+        access_token: accessToken.trim() || undefined,
+        webhook_secret: webhookSecret.trim() || undefined,
+        verify_token: verifyToken.trim() || undefined,
+        api_version: apiVersion.trim() || undefined,
+        graph_api_url: graphApiUrl.trim() || undefined,
+      });
+      setAccessToken("");
+      setWebhookSecret("");
+      setVerifyToken("");
+      refetch();
+    } catch {
+      // error toast handled by mutation
+    }
   };
 
   const webhookActive =

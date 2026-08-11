@@ -54,6 +54,9 @@ type Config struct {
 	SecurityLogPath  string `mapstructure:"SECURITY_LOG_PATH"`
 	LogRetentionDays int    `mapstructure:"LOG_RETENTION_DAYS"`
 
+	// Profiling
+	PprofEnabled bool `mapstructure:"PPROF_ENABLED"`
+
 	// Processing Settings
 	ExtractionTimeoutSeconds int `mapstructure:"EXTRACTION_TIMEOUT_SECONDS"`
 	
@@ -104,6 +107,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("DISABLE_PATH_TRAVERSAL", false)
 	viper.SetDefault("SECURITY_LOG_PATH", "logs/security.log")
 	viper.SetDefault("LOG_RETENTION_DAYS", 30)
+	viper.SetDefault("PPROF_ENABLED", false)
 	viper.SetDefault("EXTRACTION_TIMEOUT_SECONDS", 60)
 	viper.SetDefault("DUPLICATE_SIMILARITY_THRESHOLD", 0.85)
 	viper.SetDefault("DUPLICATE_SEARCH_LIMIT", 10)

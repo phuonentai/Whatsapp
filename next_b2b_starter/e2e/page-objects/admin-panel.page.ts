@@ -9,6 +9,8 @@ const SETTINGS_VIEW_HEADINGS: Record<string, string> = {
   compliance: "Compliance",
   audit: "Audit log",
   whatsapp: "Messaging",
+  siigo: "Integración Siigo",
+  "siigo-admin": "Onboarding Siigo",
 };
 
 export class AdminPanelPage {
@@ -75,4 +77,26 @@ export class AdminPanelPage {
     await this.page.selectOption('select[aria-label="Filter audit log by type"]', type);
     await expect(this.auditLogList).toBeVisible();
   }
+  // ---- Siigo onboarding admin view ----
+
+
+  async openSiigoOnboarding() {
+    await this.gotoSettings("siigo-admin");
+    await this.page.getByText("Onboarding de facturación Siigo").first().waitFor({ state: "visible" });
+  }
+
+  async assertSiigoRow(orgId: string, status: string) {
+    const row = this.page.locator("tr", { has: this.page.getByText(orgId, { exact: true }) });
+    await expect(row).toBeVisible();
+    await expect(row.getByText(new RegExp(status))).toBeVisible();
+    return row;
+  }
+
+  async provisionCredentials(opts: { clientId: string; clientSecret: string; nit: string }) {
+    await this.page.getByPlaceholder("client_id").fill(opts.clientId);
+    await this.page.getByPlaceholder("client_secret").fill(opts.clientSecret);
+    await this.page.getByPlaceholder("NIT").fill(opts.nit);
+    await this.page.getByRole("button", { name: "Provisionar" }).click();
+}
+
 }

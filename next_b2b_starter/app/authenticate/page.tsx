@@ -118,26 +118,26 @@ export default function AuthenticateRedirectPage() {
       <AlertCircle className="h-10 w-10 text-red-500" aria-hidden="true" />
     ) : (
       <Loader2
-        className="h-10 w-10 animate-spin text-primary-500"
+        className="h-10 w-10 animate-spin text-primary"
         aria-hidden="true"
       />
     );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white px-8 py-10 text-center shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card px-8 py-10 text-center shadow-lg">
         <div className="flex flex-col items-center gap-4">
           {icon}
-          <h1 className="text-lg font-semibold text-gray-900" role="status">
+          <h1 className="text-lg font-semibold text-foreground" role="status">
             {status.headline}
           </h1>
-          <p className="text-sm text-gray-600">{status.message}</p>
+          <p className="text-sm text-muted-foreground">{status.message}</p>
           {status.state === "error" ? (
             <div className="mt-6 flex flex-col items-center gap-2">
               <Button asChild className="w-full justify-center">
                 <Link href="/auth">Back to login</Link>
               </Button>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Need help? Contact your workspace admin or request a new magic
                 link from the login page.
               </p>

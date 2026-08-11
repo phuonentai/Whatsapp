@@ -15,6 +15,8 @@ type ContactRepository interface {
 	List(ctx context.Context, orgID int32, limit, offset int32) ([]*Contact, error)
 	ListFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*Contact, error)
 	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*Contact, error)
+	CountFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo int32) (int32, error)
+	CountSearch(ctx context.Context, orgID int32, query string) (int32, error)
 	Update(ctx context.Context, contact *Contact) (*Contact, error)
 	Delete(ctx context.Context, orgID, contactID int32) error
 }
@@ -44,6 +46,8 @@ type CompanyRepository interface {
 	GetByNit(ctx context.Context, orgID int32, nit string) (*Company, error)
 	List(ctx context.Context, orgID int32, limit, offset int32) ([]*CompanyWithCounts, error)
 	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*CompanyWithCounts, error)
+	CountList(ctx context.Context, orgID int32) (int32, error)
+	CountSearch(ctx context.Context, orgID int32, query string) (int32, error)
 	Update(ctx context.Context, company *Company) (*Company, error)
 	Delete(ctx context.Context, orgID, companyID int32) error
 }
@@ -81,6 +85,10 @@ type ActivityRepository interface {
 	ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)
 	ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)
 	ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*ActivityWithActor, error)
+	CountByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID int32) (int32, error)
+	CountByContact(ctx context.Context, contactID, orgID int32) (int32, error)
+	CountByDeal(ctx context.Context, dealID, orgID int32) (int32, error)
+	CountByCompany(ctx context.Context, companyID, orgID int32) (int32, error)
 }
 
 type TagRepository interface {

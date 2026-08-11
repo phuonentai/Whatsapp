@@ -9,10 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/infra/siigo"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 )
@@ -23,6 +22,9 @@ type Handler struct {
 	numerationSvc      services.NumerationService
 	importSvc          services.ImportService
 	testInvoiceSvc     services.TestInvoiceService
+	numerationRepo     domain.NumerationRepository
+	importRunRepo      domain.ImportRunRepository
+	webhookVerifier    domain.WebhookVerifier
 	sandbox            bool
 	webhookSecret      string
 	logger             loggerDomain.Logger
@@ -34,7 +36,11 @@ func NewHandler(
 	numerationSvc services.NumerationService,
 	importSvc services.ImportService,
 	testInvoiceSvc services.TestInvoiceService,
-	cfg *siigo.Config,
+	numerationRepo domain.NumerationRepository,
+	importRunRepo domain.ImportRunRepository,
+	webhookVerifier domain.WebhookVerifier,
+	sandbox bool,
+	webhookSecret string,
 	log loggerDomain.Logger,
 ) *Handler {
 	return &Handler{
@@ -43,10 +49,59 @@ func NewHandler(
 		numerationSvc:    numerationSvc,
 		importSvc:        importSvc,
 		testInvoiceSvc:   testInvoiceSvc,
-		sandbox:          cfg.Sandbox,
-		webhookSecret:    cfg.WebhookSecret,
+		numerationRepo:   numerationRepo,
+		importRunRepo:    importRunRepo,
+		webhookVerifier:  webhookVerifier,
+		sandbox:          sandbox,
+		webhookSecret:    webhookSecret,
 		logger:           log,
 	}
+}
+
+// AdminListConnections godoc
+// @Summary Admin: list all organization invoicing connections
+// @Description Onboarding overview for operators: connection state,
+// @Description numeration snapshot, and last import run per org.
+// @Tags siigo
+// @Produce json
+// @Success 200 {object} map[string]any
+// @Router /api/v1/admin/siigo/connections [get]
+func (h *Handler) AdminListConnections(c *gin.Context) {
+	connections, err := h.connectionSvc.StatusAll(c.Request.Context())
+	if err != nil {
+		h.logger.Error("[siigo] admin connection list failed", map[string]any{"error": err.Error()})
+		response.Error(c, http.StatusInternalServerError, "failed to list connections", nil)
+		return
+	}
+
+	rows := make([]map[string]any, 0, len(connections))
+	for _, conn := range connections {
+		row := map[string]any{
+			"organization_id":    conn.OrganizationID,
+			"provider":           conn.Provider,
+			"status":             conn.Status,
+			"nit":                conn.Nit,
+			"siigo_company_name": conn.SiigoCompanyName,
+			"last_error":         conn.LastError,
+		}
+		if h.numerationRepo != nil {
+			if numeration, err := h.numerationRepo.Get(c.Request.Context(), conn.OrganizationID); err == nil && numeration != nil {
+				row["numeration"] = map[string]any{
+					"mode": numeration.Mode, "prefijo": numeration.Prefix,
+					"next_number": numeration.NextNumber, "confirmed_at": numeration.ConfirmedAt,
+				}
+			}
+		}
+		if h.importRunRepo != nil {
+			if runs, err := h.importRunRepo.ListByOrg(c.Request.Context(), conn.OrganizationID, 1); err == nil && len(runs) > 0 {
+				row["last_import_run"] = map[string]any{
+					"kind": runs[0].Kind, "counts": runs[0].Counts, "pulled_at": runs[0].PulledAt,
+				}
+			}
+		}
+		rows = append(rows, row)
+	}
+	response.Success(c, http.StatusOK, rows)
 }
 
 // GetNumeration godoc
@@ -58,7 +113,7 @@ func NewHandler(
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/numeration [get]
 func (h *Handler) GetNumeration(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -84,7 +139,7 @@ func (h *Handler) GetNumeration(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/confirm-numeration [post]
 func (h *Handler) ConfirmNumeration(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -110,7 +165,7 @@ func (h *Handler) ConfirmNumeration(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/import/preview [get]
 func (h *Handler) PreviewImport(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -132,7 +187,7 @@ func (h *Handler) PreviewImport(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/import/confirm [post]
 func (h *Handler) ConfirmImport(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -152,7 +207,7 @@ func (h *Handler) ConfirmImport(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/sync [post]
 func (h *Handler) SyncCustomers(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -179,7 +234,7 @@ func (h *Handler) TestInvoice(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "El proveedor no está en modo sandbox", nil)
 		return
 	}
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -204,7 +259,7 @@ func (h *Handler) TestInvoice(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/status [get]
 func (h *Handler) GetConnectionStatus(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -236,7 +291,7 @@ func (h *Handler) GetConnectionStatus(c *gin.Context) {
 // @Failure 400 {object} map[string]any
 // @Router /api/v1/org/siigo/connect [post]
 func (h *Handler) ConnectSiigo(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -271,7 +326,7 @@ func (h *Handler) ConnectSiigo(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/request-assisted [post]
 func (h *Handler) RequestAssistedSetup(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -290,7 +345,7 @@ func (h *Handler) RequestAssistedSetup(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/pause [post]
 func (h *Handler) PauseInvoicing(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -309,7 +364,7 @@ func (h *Handler) PauseInvoicing(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/resume [post]
 func (h *Handler) ResumeInvoicing(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -328,7 +383,7 @@ func (h *Handler) ResumeInvoicing(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/org/siigo/activate [post]
 func (h *Handler) ActivateInvoicing(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if ctx == nil {
 		response.Error(c, http.StatusUnauthorized, "authentication required", nil)
 		return
@@ -416,7 +471,7 @@ func (h *Handler) ProcessSiigoWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := siigo.VerifyWebhookSignature(rawBody, c.GetHeader(siigo.WebhookSignatureHeader), h.webhookSecret); err != nil {
+	if err := h.webhookVerifier.Verify(rawBody, c.GetHeader(domain.WebhookSignatureHeader), h.webhookSecret); err != nil {
 		h.logger.Warn("[ProcessSiigoWebhook] Signature verification failed", map[string]any{
 			"error": err.Error(),
 		})

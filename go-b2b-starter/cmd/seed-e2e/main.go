@@ -75,6 +75,16 @@ var seedOrgs = []seedOrg{
 			{email: "member-rbac@test.com", fullName: "RBAC Member", role: "member"},
 		},
 	},
+	{
+		// Dedicated org for the Siigo onboarding e2e suite: connection and
+		// import state stays isolated from the general-purpose orgs.
+		slug: "test-org-siigo",
+		plan: planPro,
+		accounts: []seedAccountRow{
+			{email: "admin-siigo@test.com", fullName: "Siigo Admin", role: "admin"},
+			{email: "member-siigo@test.com", fullName: "Siigo Member", role: "member"},
+		},
+	},
 }
 
 func planMetadata(plan string) []byte {

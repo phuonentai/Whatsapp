@@ -11,6 +11,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 )
 
@@ -85,7 +86,7 @@ func (h *MemberHandler) BootstrapOrganization(c *gin.Context) {
 // @Failure 500 {object} map[string]any "Failed to add member"
 // @Router /auth/members [post]
 func (h *MemberHandler) AddMember(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("request context not found", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -138,7 +139,7 @@ func (h *MemberHandler) AddMember(c *gin.Context) {
 // @Failure 500 {object} map[string]any "Failed to list members"
 // @Router /auth/members [get]
 func (h *MemberHandler) ListMembers(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("request context not found", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -175,7 +176,7 @@ func (h *MemberHandler) ListMembers(c *gin.Context) {
 // @Failure 500 {object} map[string]any "Failed to retrieve profile"
 // @Router /auth/profile/me [get]
 func (h *MemberHandler) GetProfile(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("request context not found", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -234,7 +235,7 @@ func (h *MemberHandler) GetProfile(c *gin.Context) {
 // @Failure 500 {object} map[string]any "Failed to delete member"
 // @Router /auth/members/{member_id} [delete]
 func (h *MemberHandler) DeleteMember(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("request context not found", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -302,7 +303,7 @@ func (h *MemberHandler) DeleteMember(c *gin.Context) {
 // @Failure 500 {object} map[string]any "Failed to update role"
 // @Router /auth/members/{member_id}/role [put]
 func (h *MemberHandler) ChangeMemberRole(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("request context not found", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)

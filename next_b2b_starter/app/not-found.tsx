@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePermissions } from "@/lib/hooks/use-permissions";
+import { BRAND_PRIMARY } from "@/lib/brand";
 
 export default function NotFound() {
   const router = useRouter();
@@ -19,7 +20,9 @@ export default function NotFound() {
   // Show minimal loading state while redirecting
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#0FA8A0]" />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-transparent"
+        style={{ borderTopColor: BRAND_PRIMARY }}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useActivitiesQuery } from "@/lib/hooks/queries/use-crm-queries";
 import { useCreateActivity } from "@/lib/hooks/mutations/use-crm-mutations";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
+import { ErrorState } from "@/components/common/error-state";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +19,7 @@ const TIPO_OPTIONS = [
 
 export function ActivityTimeline() {
   const [tipoFilter, setTipoFilter] = useState("");
-  const { data: activities, isLoading } = useActivitiesQuery({ tipo: tipoFilter || undefined });
+  const { data: activities, isLoading, isError, refetch, isRefetching } = useActivitiesQuery({ tipo: tipoFilter || undefined });
   const createActivity = useCreateActivity();
   const [showForm, setShowForm] = useState(false);
   const [tipo, setTipo] = useState("nota");
@@ -65,6 +66,17 @@ export function ActivityTimeline() {
   };
 
   if (isLoading) return <div className="text-gray-500">Cargando actividades...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar las actividades"
+        description="No se pudieron cargar las actividades. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   return (
     <div>

@@ -127,9 +127,11 @@ func (s *importService) upsertCustomer(ctx context.Context, orgID int32, rec dom
 		created, err := s.companyRepo.Create(ctx, &crmdomain.Company{
 			OrganizationID: orgID,
 			Name:           rec.Name,
-			Nit:            rec.Identification,
-			Phone:          rec.Phone,
-			Metadata:       map[string]any{"siigo_customer_id": rec.ExternalID, "siigo_imported": true},
+			// Store the NIT normalized (digits only) so GetByNit dedupe and
+			// the stored value agree — otherwise re-runs duplicate companies.
+			Nit:     nit,
+			Phone:   rec.Phone,
+			Metadata: map[string]any{"siigo_customer_id": rec.ExternalID, "siigo_imported": true},
 		})
 		if err != nil {
 			return err

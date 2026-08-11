@@ -10,8 +10,8 @@ import (
 type CompanyService interface {
 	Create(ctx context.Context, orgID int32, req *CreateCompanyRequest) (*domain.Company, error)
 	GetByID(ctx context.Context, orgID, companyID int32) (*domain.CompanyWithCounts, error)
-	List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error)
-	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.CompanyWithCounts, error)
+	List(ctx context.Context, orgID int32, limit, offset int32) (ListResult[*domain.CompanyWithCounts], error)
+	Search(ctx context.Context, orgID int32, query string, limit, offset int32) (ListResult[*domain.CompanyWithCounts], error)
 	Update(ctx context.Context, orgID int32, req *UpdateCompanyRequest) (*domain.Company, error)
 	Delete(ctx context.Context, orgID, companyID int32) error
 }
@@ -74,11 +74,27 @@ func (s *companyService) Create(ctx context.Context, orgID int32, req *CreateCom
 func (s *companyService) GetByID(ctx context.Context, orgID, companyID int32) (*domain.CompanyWithCounts, error) {
 	return s.companyRepo.GetByID(ctx, orgID, companyID)
 }
-func (s *companyService) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
-	return s.companyRepo.List(ctx, orgID, limit, offset)
+func (s *companyService) List(ctx context.Context, orgID int32, limit, offset int32) (ListResult[*domain.CompanyWithCounts], error) {
+	items, err := s.companyRepo.List(ctx, orgID, limit, offset)
+	if err != nil {
+		return ListResult[*domain.CompanyWithCounts]{}, err
+	}
+	total, err := s.companyRepo.CountList(ctx, orgID)
+	if err != nil {
+		return ListResult[*domain.CompanyWithCounts]{}, err
+	}
+	return ListResult[*domain.CompanyWithCounts]{Items: items, Total: total}, nil
 }
-func (s *companyService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
-	return s.companyRepo.Search(ctx, orgID, query, limit, offset)
+func (s *companyService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) (ListResult[*domain.CompanyWithCounts], error) {
+	items, err := s.companyRepo.Search(ctx, orgID, query, limit, offset)
+	if err != nil {
+		return ListResult[*domain.CompanyWithCounts]{}, err
+	}
+	total, err := s.companyRepo.CountSearch(ctx, orgID, query)
+	if err != nil {
+		return ListResult[*domain.CompanyWithCounts]{}, err
+	}
+	return ListResult[*domain.CompanyWithCounts]{Items: items, Total: total}, nil
 }
 func (s *companyService) Update(ctx context.Context, orgID int32, req *UpdateCompanyRequest) (*domain.Company, error) {
 	company := &domain.Company{ID: req.ID, OrganizationID: orgID, Name: req.Nombre, Nit: req.Nit,

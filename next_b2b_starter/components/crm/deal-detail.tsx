@@ -6,17 +6,30 @@ import { useDealQuery, useDealActivitiesQuery, usePipelinesQuery } from "@/lib/h
 import { useFeature } from "@/lib/hooks/use-entitlement";
 import { DealDialog } from "@/components/crm/deal-dialog";
 import { TagPicker } from "@/components/crm/tag-picker";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 
 export function DealDetail({ id }: { id: number }) {
   const router = useRouter();
-  const { data: deal, isLoading } = useDealQuery(id);
+  const { data: deal, isLoading, isError, refetch, isRefetching } = useDealQuery(id);
   const { data: activities } = useDealActivitiesQuery(id);
   const { data: pipelines } = usePipelinesQuery();
   const canManage = useFeature("crm_deals");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (isLoading) return <div className="text-gray-500">Cargando negocio...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar el negocio"
+        description="No se pudo cargar el negocio. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
+
   if (!deal) return <div className="text-gray-500">Negocio no encontrado</div>;
 
   const stage = pipelines

@@ -3,9 +3,10 @@ import { useTagsQuery } from "@/lib/hooks/queries/use-crm-queries";
 import { useCreateTag, useDeleteTag } from "@/lib/hooks/mutations/use-crm-mutations";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
+import { ErrorState } from "@/components/common/error-state";
 
 export function TagManager() {
-  const { data: tags, isLoading } = useTagsQuery();
+  const { data: tags, isLoading, isError, refetch, isRefetching } = useTagsQuery();
   const createTag = useCreateTag();
   const deleteTag = useDeleteTag();
   const [showForm, setShowForm] = useState(false);
@@ -14,6 +15,17 @@ export function TagManager() {
   const [deleting, setDeleting] = useState<{ id: number; nombre: string } | null>(null);
 
   if (isLoading) return <div className="text-gray-500">Cargando etiquetas...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar las etiquetas"
+        description="No se pudieron cargar las etiquetas. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   const handleCreate = () => {
     if (!nombre.trim()) return;

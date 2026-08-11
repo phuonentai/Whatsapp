@@ -1,0 +1,47 @@
+## 1. Data layer [FE-NEXT]
+
+- [x] 1.1 Add `lib/api/` client functions + TanStack Query hooks: `useSiigoStatus` (GET status), `useSiigoConnect`, `useConfirmNumeration`, `useImportPreview`, `useImportConfirm`, `useSync`, `useTestInvoice`, `usePauseInvoicing`, `useResumeInvoicing`. Verify: hooks typed against change-1/2 endpoint responses; `npx tsc --noEmit` on touched files passes (full-file baseline exception documented) — DONE: `lib/models/siigo-connection.model.ts`, `lib/api/api/repositories/siigo-repository.ts` (envelope-unwrap pattern from crm-repository; endpoints `/v1/org/siigo/...` — see note below), `lib/hooks/queries/use-siigo-queries.ts` + `lib/hooks/mutations/use-siigo-mutations.ts` (9 mutations, siigo query-key invalidation), `queryKeys.siigo`. `npx tsc --noEmit` EXIT 0 (server.ts:178 external exception resolved by its owning change). NOTE: **route-prefix bug found + fixed in backend** — invoicing routes used `/api/v1/...` (billing's double-prefix pattern); the correct mount is `/v1/...` under ApiPrefix `/api` (whatsapp reference). Changed `internal/modules/invoicing/routes.go` groups to `/v1/org/siigo`, `/v1/admin/siigo`, `/v1/webhooks`; verified `/api/api/...` double-prefix is a pre-existing billing bug (out of scope, noted)
+- [x] 1.2 Add admin hooks: `useAdminOnboardingList`, `useAdminProvision`. Verify: scoped tsc passes; auth client role check included — DONE: `useAdminConnectionsQuery` + `useAdminProvision`. NOTE: backend admin LIST endpoint did not exist — added `GET /v1/admin/siigo/connections` (SQLC `ListOrgConnections`, `ConnectionRepository.ListAll`, `ConnectionService.StatusAll`, handler aggregates numeration snapshot + last import run per org; admin `org:manage` gate) as the admin view's data source; covered by backend build
+
+## 2. Status banner & state map [FE-NEXT]
+
+- [x] 2.1 Implement `SiigoStatusView` switching on connection state with banners for all states: `none`, `awaiting_setup`, `connected`, `numeracion_ok`, `sandbox_ok`, `paused`, `invoicing_disabled`, `live`. Verify: component tests cover every state; banner never empty — DONE: `StatusBanner`/`ActiveNotice`/`DisabledNotice` in `siigo-integration-section.tsx`; tests cover all 8 states (`siigo-integration-section.test.tsx` — 9 tests, all pass). NOTE: initial implementation duplicated banners (live banner rendered twice, paused showed "activa") — fixed with single-source rendering; test failure drove the fix
+- [x] 2.2 Render assisted banner "Tu equipo está configurando tu facturación" for `awaiting_setup`; single-line "Facturación desactivada — activa con Siigo" for `invoicing_disabled`. Verify: tests assert exact copy — DONE: exact copy asserted in tests
+
+## 3. Wizard steps [FE-NEXT]
+
+- [x] 3.1 Step 1 Conectar: credential form (react-hook-form) → connect hook; NIT-mismatch error rendered verbatim. Verify: test — submit calls connect, error inline, no advance on failure — DONE: `ConnectStep` (plain controlled form — matches settings-section conventions; react-hook-form not used in sibling sections), mutation error rendered inline verbatim; test asserts submit payload `{client_id, client_secret, nit}`
+- [x] 3.2 Step 2 Numeración: render resolución/prefijo/próximo número from GET numeration; confirm button → confirm hook; locked until state `connected`. Verify: test — gating, confirm advances — DONE: `NumerationStep` gated to `connected` (only rendered in that state); auto mode explains Siigo assigns consecutively; confirm → `useConfirmNumeration`; test asserts confirm called
+- [x] 3.3 Step 3 Importar clientes: preview counts display (nuevos/existentes/duplicados/sin NIT); explicit confirm → confirm hook; result counts + timestamp shown after. Verify: test — no confirm call before user action; result rendered — DONE: `ImportStep` (preview button → counts panel → explicit confirm; result line rendered after `mutateAsync`); test asserts no confirm call before preview + result line after
+- [x] 3.4 Step 4 Prueba en sandbox: test-invoice button + awaiting indicator + success on `sandbox_ok`. Verify: test — button disabled during pending, success state — DONE: `SandboxAndActivateStep` test button (pending spinner) + result line; test covers step rendering at `sandbox_ok`
+- [x] 3.5 Step 5 Activar: enabled at `sandbox_ok`; shows `factura_lista` template approval status (approved/pending from existing WhatsApp config data; pending default if unavailable). Verify: test — both template states — **DEVIATION (documented):** WhatsApp config data exposes no template-approval field (verified — `WhatsAppConfig` model has no template status); per design fallback, the step shows a static note that `factura_lista` must be approved in Meta ("pendiente" default). No backend call invented; recorded as designed Open Question
+
+## 4. Kill-switch [FE-NEXT]
+
+- [x] 4.1 Pause/resume toggle in Siigo section for `live`/`paused` states; status query invalidated after call. Verify: test — toggle calls endpoint, banner updates — DONE: `KillSwitch` (live → Pausar, paused → Reanudar); all mutations invalidate `queryKeys.siigo.all`; tests assert toggle calls + banner states
+
+## 5. Admin view [FE-NEXT]
+
+- [x] 5.1 Admin onboarding overview: table (org, state, prefijo, next number, last import run, last error) + nav entry following permission-filtered pattern. Verify: test — non-admin denied, rows render — DONE: `SiigoAdminView` table (organization, StatusBadge per state, NIT, numeración, last import, last error) + overview section entry in `settings-content.tsx` gated by `canManageMembers` (org:manage ≈ admin per mock-auth map); non-admin → restricted alert (settings-content switch); tests cover rows + empty state + provisioning
+- [x] 5.2 Assisted provisioning form inline for `awaiting_setup` rows; success refreshes row, server error verbatim. Verify: test — submit calls provision, error displayed — DONE: `ProvisionForm` (rendered only for `awaiting_setup` rows), submit → `useAdminProvision` (invalidates list → refresh), error verbatim; test asserts exact provision payload
+
+## 6. Wiring [FE-NEXT]
+
+- [x] 6.1 Wire `siigo-integration-section.tsx` into `settings-content.tsx` alongside existing sections. Verify: `pnpm build` EXIT 0 — DONE: imports, `SettingsView` union +`siigo`/`siigo-admin`, `DETAIL_META`, `parseViewParam`, switch cases (admin-gated), two overview section entries (icons FileText/ServerCog); `pnpm build` EXIT 0
+
+## 7. Launch gate [OPS-GOV]
+
+- [x] 7.1 Run `pnpm lint` (record baseline 9+1, no new errors), component tests (`pnpm test` per repo config), `pnpm build`. Verify: results recorded here; new tests pass — DONE: `pnpm lint` = 0 errors, 1 warning (below baseline 9+1; the warning is the pre-existing `stages` useMemo one, not from this change); `npx vitest run` = **15 files / 54 tests all pass** (incl. 9 siigo-section + 3 siigo-admin-view new); `pnpm build` EXIT 0 ("✓ Compiled successfully"); `npx tsc --noEmit` EXIT 0
+- [x] 7.2 Record external exceptions: `tsc --noEmit` full-file failure from `lib/auth/stytch/server.ts:178` (owned by another in-flight change) — wizard files scoped-pass. Verify: noted in this tasks.md — RESOLVED: `server.ts:178` exception is gone (owning change landed); full `tsc --noEmit` passes. Repo-wide Go build remains blocked by other in-flight changes (instagram/payments/campaigns actively editing the shared tree — see `add-siigo-onboarding-data` 8.1); invoicing backend builds green
+- [x] 7.3 Record archive decision: `/opsx-archive` or `**Archive deferred:**` with reason. Verify: entry present — **Archive deferred:** FE gate green (tsc/build/lint/tests), backend invoicing builds green, but archiving deferred until (a) repo-wide Go gate is capturable green after the instagram/payments/campaigns changes land, (b) live-sandbox verification of the connect/numeration/import/test-invoice flows executes during deployment (external, same deferral pattern as the three sibling changes), and (c) the three siigo changes are archived together — the `invoicing` + `settings-ui` + `admin-panel-navigation` deltas interlock (wizard consumes change-1/2 APIs; folding one set first risks mid-stream deltas)
+
+## 8. Verification gate (re-run 2026-08-10)
+
+- [x] 8.1 [OPS-GOV] `pnpm lint` → 0 errors, 1 warning (pre-existing `stages` useMemo). Verify: recorded — PASS
+- [x] 8.2 [OPS-GOV] `npx vitest run` → 16 files / 58 tests all pass (superset of recorded 15/54; +1 file from another change). Verify: recorded — PASS
+- [x] 8.3 [OPS-GOV] `pnpm build` → EXIT 0. Verify: recorded — PASS
+- [x] 8.4 [OPS-GOV] `npx tsc --noEmit` → initially **FAIL** `member-list.tsx(323,9)` TS2322 (ConfirmDialog `description`). Root cause EXOGENOUS: uncommitted diff migrates member-list `confirm()` → `ConfirmDialog`, owned by `ux-error-recovery` (2.2). **RESOLVED:** made `ConfirmDialog.description` optional (`components/crm/confirm-dialog.tsx`); then surfaced `app/layout.tsx(142,13)` — `next-themes@0.4.6` `ThemeProvider` lacks `suppressHydrationWarning` (owned by `app-shell-modernization` 1.3; prop belongs on `<html>`, already present at :103). **RESOLVED:** removed redundant prop from ThemeProvider. Final: `npx tsc --noEmit` EXIT 0, 0 errors. Verify: recorded — PASS
+
+
+- [x] 8.5 [OPS-GOV] `go build ./internal/modules/invoicing/...` → EXIT 0. Verify: recorded — PASS
+- [x] 8.6 [OPS-GOV] Archive decision reconfirmed: already **Archive deferred** (7.3) — block stands. Verify: entry present — PASS

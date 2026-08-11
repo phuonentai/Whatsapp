@@ -388,11 +388,12 @@ The Playwright suite (`next_b2b_starter/e2e/`, 61 tests across 13 specs) runs fu
 |-----------|-------|
 | Go backend | `:8080` (`SERVER_ADDRESS=:8080`) |
 | Next.js frontend | `:3001` (`pnpm dev -p 3001`) |
+| Mock Siigo provider | `:8090` (`cmd/mock-siigo`) — backend points at it via `SIIGO_BASE_URL`/`SIIGO_TOKEN_URL`/`SIIGO_WEBHOOK_SECRET`; no real Siigo traffic |
 | Test database | `saas_db_test` |
 | Auth | `AUTH_MOCK_ENABLED=true` (`X-Test-Org-ID: <slug>:<email>`) |
-| Mock orgs | `test-org-free`, `test-org-pro`, `test-org-enterprise`, `test-org-rbac` |
+| Mock orgs | `test-org-free`, `test-org-pro`, `test-org-enterprise`, `test-org-rbac`, `test-org-siigo` (Siigo onboarding suite: `admin-siigo@test.com` / `member-siigo@test.com`) |
 
-`next_b2b_starter/.env.local` already carries the e2e values (`API_REWRITE_TARGET=http://localhost:8080`, `APP_BASE_URL=http://localhost:3001`). E2E helper defaults in `e2e/helpers/` point at `:8080`.
+`next_b2b_starter/.env.local` already carries the e2e values (`API_REWRITE_TARGET=http://localhost:8080`, `APP_BASE_URL=http://localhost:3001`). E2E helper defaults in `e2e/helpers/` point at `:8080`. The mock Siigo provider (`go-b2b-starter/cmd/mock-siigo`) implements the spike-verified adapter surface — token grant, absent `/v1/company`, paginated customers, invoice creation with Idempotency-Key dedupe and consecutive numbering — so the Siigo onboarding suite runs fully offline.
 
 ### One-command run
 

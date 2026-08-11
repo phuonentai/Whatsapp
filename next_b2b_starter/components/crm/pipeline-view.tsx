@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ErrorState } from "@/components/common/error-state";
 
 interface StageRow {
   nombre: string;
@@ -139,17 +140,21 @@ function StageEditRow({ pipelineId, stage, onDone }: { pipelineId: number; stage
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    await updateStage.mutateAsync({
-      pipelineId,
-      stageId: stage.id,
-      data: {
-        nombre: values.stage_name,
-        color: values.stage_color,
-        probabilidad: values.probabilidad ? Number(values.probabilidad) : undefined,
-      },
-    });
-    toast.success("Etapa actualizada");
-    onDone();
+    try {
+      await updateStage.mutateAsync({
+        pipelineId,
+        stageId: stage.id,
+        data: {
+          nombre: values.stage_name,
+          color: values.stage_color,
+          probabilidad: values.probabilidad ? Number(values.probabilidad) : undefined,
+        },
+      });
+      toast.success("Etapa actualizada");
+      onDone();
+    } catch {
+      // error toast handled by mutation
+    }
   });
 
   return (
@@ -164,11 +169,22 @@ function StageEditRow({ pipelineId, stage, onDone }: { pipelineId: number; stage
 }
 
 export function PipelineView() {
-  const { data: pipelines, isLoading } = usePipelinesQuery();
+  const { data: pipelines, isLoading, isError, refetch, isRefetching } = usePipelinesQuery();
   const [newOpen, setNewOpen] = useState(false);
   const [editing, setEditing] = useState<{ pipelineId: number; stage: PipelineStageDto } | null>(null);
 
   if (isLoading) return <div className="text-gray-500">Cargando pipelines...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar los pipelines"
+        description="No se pudieron cargar los pipelines. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   return (
     <div>

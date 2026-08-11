@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
+import { ui } from "@/lib/copy/ui";
 
 interface SubscriptionPaywallProps {
   // No props required - component fetches its own data
@@ -52,10 +53,10 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
       <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6 py-12">
         <div className="w-full max-w-lg space-y-4 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
-            Subscription access restricted
+            {ui.billing.restrictedTitle}
           </h1>
           <p className="text-sm text-gray-600">
-            You don&apos;t have permission to manage subscription or billing settings. Contact your workspace administrator if you believe this is an error.
+            {ui.billing.restrictedBody}
           </p>
         </div>
       </main>
@@ -69,10 +70,10 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
       <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6 py-12">
         <div className="w-full max-w-lg space-y-4 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
-            We couldn&apos;t load your subscription
+            {ui.billing.loadSubscriptionTitle}
           </h1>
           <p className="text-sm text-gray-600">
-            {loadError.message || "Please refresh the page or reach out to support."}
+            {loadError.message || ui.billing.refreshOrSupport}
           </p>
         </div>
       </main>
@@ -95,7 +96,7 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
       <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6 py-12">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900" />
-          <p className="text-sm text-gray-600">Redirecting to dashboard...</p>
+          <p className="text-sm text-gray-600">{ui.billing.redirecting}</p>
         </div>
       </main>
     );
@@ -109,7 +110,7 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
   const plan = resolvePlanFromState(state, products ?? []);
   const planPrice = plan?.price ?? null;
   const formattedPrice = planPrice != null ? formatUsd(planPrice) : null;
-  const interval = plan?.interval === "month" ? "per month" : "per billing period";
+  const interval = plan?.interval === "month" ? ui.billing.perMonth : "per billing period";
 
   const contactHref =
     process.env.NEXT_PUBLIC_CONTACT_EMAIL ||
@@ -139,14 +140,13 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
           <section className="flex flex-col justify-between rounded-3xl bg-white p-10 shadow-lg ring-1 ring-gray-200">
             <div>
               <span className="inline-flex items-center rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                {plan?.name ?? "Pro Plan"}
+                {plan?.name ?? ui.billing.proPlan}
               </span>
               <h1 className="mt-6 text-3xl font-semibold text-gray-900 sm:text-4xl">
-                Unlock the full AP automation experience
+                {ui.billing.unlockTitle}
               </h1>
               <p className="mt-4 text-base text-gray-600">
-                Process invoices faster, eliminate duplicates, and stay ahead of the month-end crunch.
-                Subscribe now to regain access to the dashboard.
+                {ui.billing.unlockBody}
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -166,34 +166,34 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
                 onClick={() => setPlansOpen(true)}
                 className="inline-flex items-center justify-center rounded-md bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
               >
-                View pricing plans
+                {ui.billing.viewPlans}
               </button>
               <a
                 href={contactHref}
                 className="inline-flex items-center justify-center rounded-md border border-gray-200 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-200"
               >
-                Talk to sales
+                {ui.billing.talkToSales}
               </a>
             </div>
           </section>
 
           <aside className="rounded-3xl bg-gray-900 p-8 text-white shadow-lg ring-1 ring-gray-900/10">
             <p className="text-sm uppercase tracking-[0.16em] text-gray-400">
-              Plan snapshot
+              {ui.billing.planSnapshot}
             </p>
             <p className="mt-4 text-4xl font-semibold">
-              {formattedPrice ?? "Contact sales"}
+              {formattedPrice ?? ui.billing.contactSales}
             </p>
             <p className="text-sm text-gray-400">
-              {formattedPrice ? `${interval} · cancel anytime` : "We’ll help you activate the right plan."}
+              {formattedPrice ? `${interval} · ${ui.billing.cancelAnytime}` : ui.billing.activateHelp}
             </p>
 
             <dl className="mt-8 space-y-4">
-              <UsageItem label="Invoices remaining" value={remaining} total={included} />
-              <UsageItem label="Invoices used this period" value={used} total={included} />
+              <UsageItem label={ui.billing.invoicesRemaining} value={remaining} total={included} />
+              <UsageItem label={ui.billing.invoicesUsedPeriod} value={used} total={included} />
               {state.subscription?.trialEnd && (
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <dt className="text-sm text-gray-300">Trial ends</dt>
+                  <dt className="text-sm text-gray-300">{ui.billing.trialEnds}</dt>
                   <dd className="mt-1 text-lg font-semibold text-white">
                     {new Date(state.subscription.trialEnd).toLocaleDateString()}
                   </dd>
@@ -204,22 +204,22 @@ export function SubscriptionPaywall({}: SubscriptionPaywallProps = {}) {
             {state.reason === "NO_ACTIVE_SUBSCRIPTION" && (
               <p className="mt-8 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                 {mercadopagoEnabled
-                  ? "Your MercadoPago subscription may have been canceled or your payment method may have expired. Restart your plan to continue where you left off."
-                  : "Your payment method may have expired or the subscription was canceled. Restart your plan to continue where you left off."}
+                  ? ui.billing.noActiveSubMp
+                  : ui.billing.noActiveSubPolar}
               </p>
             )}
 
             {state.reason === "CUSTOMER_NOT_FOUND" && (
               <p className="mt-8 rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
                 {mercadopagoEnabled
-                  ? "We couldn&apos;t match your organization to an active subscription. Subscribe via PSE or Nequi to reactivate it, and we&apos;ll link everything automatically."
-                  : "We couldn&apos;t match your organization to an active Polar customer. Subscribe using the same email you used to sign in, and we&apos;ll link everything automatically."}
+                  ? ui.billing.customerNotFoundMp
+                  : ui.billing.customerNotFoundPolar}
               </p>
             )}
 
             {state.reason === "UNKNOWN_ERROR" && (
               <p className="mt-8 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                We couldn&apos;t verify your subscription at the moment. Please retry or contact support.
+                {ui.billing.unknownErrorBody}
               </p>
             )}
           </aside>
@@ -262,7 +262,7 @@ function UsageItem({ label, value, total }: UsageItemProps) {
       <dt className="text-sm text-gray-400">{label}</dt>
       <dd className="mt-1 flex items-center justify-between text-lg font-semibold text-white">
         <span>{value.toLocaleString()}</span>
-        <span className="text-sm font-medium text-gray-400">of {total.toLocaleString()}</span>
+        <span className="text-sm font-medium text-gray-400">{ui.billing.of} {total.toLocaleString()}</span>
       </dd>
       <div className="mt-2 h-2 rounded-full bg-gray-800">
         <div
@@ -308,15 +308,15 @@ function buildFeatureList({
 }) {
   const features: Array<{ title: string; description: string }> = [
     {
-      title: `${includedInvoices.toLocaleString()} invoices / month included`,
-      description: "Metered usage with overage protection. Track consumption in real time.",
+      title: `${includedInvoices.toLocaleString()} ${ui.billing.invoicesMonthIncluded}`,
+      description: ui.billing.invoicesMonthIncludedDesc,
     },
   ];
 
   if (plan?.price != null) {
     features.push({
-      title: `${formatUsd(plan.price)} flat subscription`,
-      description: "Predictable billing aligned with your finance team’s needs.",
+      title: `${formatUsd(plan.price)} ${ui.billing.flatSubscription}`,
+      description: ui.billing.flatSubscriptionDesc,
     });
   }
 
@@ -324,18 +324,18 @@ function buildFeatureList({
     for (const benefit of plan.benefits) {
       features.push({
         title: benefit,
-        description: "Included with your current plan.",
+        description: ui.billing.includedWithPlan,
       });
     }
   } else {
     features.push(
       {
-        title: "Approvals & anomaly detection",
-        description: "Keep approvers accountable and surface risk before it hits ERP.",
+        title: ui.billing.approvalsAnomaly,
+        description: ui.billing.approvalsAnomalyDesc,
       },
       {
-        title: "Export-ready payments",
-        description: "Generate payment files that drop straight into NetSuite and SAP.",
+        title: ui.billing.exportReadyPayments,
+        description: ui.billing.exportReadyPaymentsDesc,
       }
     );
   }

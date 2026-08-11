@@ -22,7 +22,7 @@ interface ConversationDto {
 }
 
 interface MessageDto {
-  whatsapp_message_id?: string;
+  provider_message_id?: string;
   direction?: string;
 }
 
@@ -37,11 +37,11 @@ async function findConversationByPhone(phone: string): Promise<ConversationDto |
   return undefined;
 }
 
-async function findMessageByWhatsappId(convId: number, messageId: string): Promise<MessageDto | undefined> {
+async function findMessageByProviderId(convId: number, messageId: string): Promise<MessageDto | undefined> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const res = await apiRequest<{ data?: MessageDto[] }>(`/crm/conversaciones/${convId}/mensajes`);
     const list = Array.isArray(res) ? res : res.data ?? [];
-    const found = list.find((m) => m.whatsapp_message_id === messageId);
+    const found = list.find((m) => m.provider_message_id === messageId);
     if (found) return found;
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -126,7 +126,7 @@ test.describe("WhatsApp webhook edge cases", () => {
 
     const conv = await findConversationByPhone(from);
     expect(conv).toBeDefined();
-    const msg = await findMessageByWhatsappId(conv!.id, messageId);
+    const msg = await findMessageByProviderId(conv!.id, messageId);
     expect(msg).toBeDefined();
     expect(msg!.direction).toBe("inbound");
   });
@@ -147,7 +147,7 @@ test.describe("WhatsApp webhook edge cases", () => {
 
     const conv = await findConversationByPhone(from);
     if (conv) {
-      const msg = await findMessageByWhatsappId(conv.id, messageId);
+      const msg = await findMessageByProviderId(conv.id, messageId);
       expect(msg).toBeDefined();
       expect(msg!.direction).not.toBe("inbound");
     }

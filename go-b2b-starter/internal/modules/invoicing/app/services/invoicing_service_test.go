@@ -230,18 +230,18 @@ func (m *trackingActivitySvc) Create(ctx context.Context, orgID int32, req *crmS
 	return &domain.Activity{}, nil
 }
 
-func (m *trackingActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *trackingActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
 
-func (m *trackingActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *trackingActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
 
-func (m *trackingActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *trackingActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
 
-func (m *trackingActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *trackingActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }

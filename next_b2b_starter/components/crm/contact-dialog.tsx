@@ -68,14 +68,18 @@ export function ContactDialog({ open, onOpenChange, contact }: ContactDialogProp
       email: values.email ?? "",
       lead_status: values.lead_status,
     };
-    if (isEdit && contact) {
-      await updateMutation.mutateAsync({ id: contact.id, data: payload });
-      toast.success("Contacto actualizado");
-    } else {
-      await createMutation.mutateAsync(payload);
-      toast.success("Contacto creado");
+    try {
+      if (isEdit && contact) {
+        await updateMutation.mutateAsync({ id: contact.id, data: payload });
+        toast.success("Contacto actualizado");
+      } else {
+        await createMutation.mutateAsync(payload);
+        toast.success("Contacto creado");
+      }
+      onOpenChange(false);
+    } catch {
+      // dialog stays open with entered values; error toast handled by mutation
     }
-    onOpenChange(false);
   });
 
   return (

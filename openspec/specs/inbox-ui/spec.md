@@ -7,7 +7,7 @@ Defines the inbox UI: replying in open conversations, filtering the conversation
 ## Requirements
 
 ### Requirement: User sends a reply in an open conversation
-The system SHALL send a reply typed into the reply input of the selected conversation via `useSendMessage`, append it to the message thread, and clear the input on success. An empty or whitespace-only draft SHALL NOT be sent.
+The system SHALL send a reply typed into the reply input of the selected conversation via `useSendMessage`, append it to the message thread, and clear the input on success. An empty or whitespace-only draft SHALL NOT be sent. On failure, the system SHALL show an error toast, SHALL keep the draft in the input, SHALL NOT append the message to the thread, and SHALL NOT produce an unhandled promise rejection.
 
 #### Scenario: Typed reply appears in thread
 - **WHEN** user opens a conversation and types a reply then submits it
@@ -16,6 +16,14 @@ The system SHALL send a reply typed into the reply input of the selected convers
 #### Scenario: Empty reply is not sent
 - **WHEN** user submits an empty or whitespace-only reply input
 - **THEN** no message is sent and no request reaches the messaging API
+
+#### Scenario: Failed reply preserves the draft
+- **WHEN** user sends a reply and the request fails
+- **THEN** an error toast SHALL be shown and the draft SHALL remain in the input
+
+#### Scenario: Failed reply does not append to the thread
+- **WHEN** user sends a reply and the request fails
+- **THEN** no message SHALL appear in the thread and the rejection SHALL be handled (no unhandled promise rejection)
 
 ### Requirement: User filters the conversation list by status
 The system SHALL filter the conversation list by conversation status (active/closed) via the status filter control, and SHALL reload conversations scoped to the selected status.
@@ -62,7 +70,7 @@ The system SHALL hide quick-replies and the agent-suggestion panel from members 
 - **THEN** the API responds 403 and the suggestion remains pending
 
 ### Requirement: Inbox handles empty and failure states
-The system SHALL render an empty state when the conversation list has no conversations, SHALL surface an error toast when sending a reply fails, and SHALL NOT mutate the thread on failure.
+The system SHALL render an empty state when the conversation list has no conversations, SHALL surface an error toast when sending a reply fails, and SHALL NOT mutate the thread on failure. Empty and failure states SHALL render using the typed copy layer in Spanish-first voice, replacing the current English empty-state strings.
 
 #### Scenario: Empty conversation list renders empty state
 - **WHEN** an org has no conversations and user opens the inbox
@@ -79,6 +87,16 @@ The system SHALL render an empty state when the conversation list has no convers
 #### Scenario: Unicode reply round-trips
 - **WHEN** user submits a reply containing non-ASCII text
 - **THEN** the text renders in the thread exactly as sent
+
+#### Scenario: Channel empty states render Spanish
+
+- **WHEN** the conversation list is empty for a channel (WhatsApp or Instagram) or for all channels
+- **THEN** the empty-state message SHALL be a Spanish string resolved from the copy layer that explains how to get started (connect the channel in Settings)
+
+#### Scenario: Thread empty state renders Spanish
+
+- **WHEN** an open conversation has no messages
+- **THEN** the thread empty-state hint SHALL be a Spanish string resolved from the copy layer
 
 ### Requirement: Scripted sequence quick replies auto-advance in the composer
 The quick-replies row SHALL render scripted-sequence guiones (those carrying a `pasos` array) as distinct pills showing the sequence title and its step count. Clicking a sequence pill SHALL start sequence mode: the composer SHALL be pre-filled with the first step's message; after the message is sent successfully, the composer SHALL be pre-filled with the next step's message; after the final step is sent, sequence mode SHALL end and the progress indicator SHALL disappear. A progress indicator SHALL show the current step ("Paso k de n") while sequence mode is active. The platform SHALL NOT auto-send any step; every step SHALL be sent by the human via the existing conversation send path. Sequence mode SHALL reset when the selected conversation changes. Single-shot guiones SHALL keep the current one-click fill behavior unchanged.
@@ -170,3 +188,22 @@ The message thread SHALL render the delivery status ticks (`✓` / `✓✓`) onl
 
 - **WHEN** an Instagram-channel outbound message is rendered
 - **THEN** the status SHALL be shown without tick glyphs
+
+### Requirement: Conversation list shows unread indicators
+
+The conversation list SHALL render an unread indicator for conversations with new inbound messages not yet opened by the current user, and SHALL clear it once the conversation is opened or a reply is sent.
+
+#### Scenario: New inbound message marks item unread
+
+- **WHEN** a conversation receives a new inbound message and the user has not opened it
+- **THEN** the conversation item SHALL display an unread indicator distinct from the pending-suggestion badge
+
+#### Scenario: Opening the conversation clears the indicator
+
+- **WHEN** the user opens a conversation that has an unread indicator
+- **THEN** the indicator SHALL clear for that conversation
+
+#### Scenario: Sending a reply clears the indicator
+
+- **WHEN** the user sends a reply in a conversation with an unread indicator
+- **THEN** the indicator SHALL clear after the reply succeeds

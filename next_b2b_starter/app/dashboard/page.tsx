@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { verifyPayment } from "@/lib/actions/billing/verify-payment";
 import { verifyMercadoPagoPayment } from "@/lib/actions/billing/verify-mp-payment";
+import { DashboardHome } from "./components/dashboard-home";
 
 interface DashboardPageProps {
   searchParams: Promise<{ checkout_id?: string; payment_id?: string; preference_id?: string }>;
@@ -47,5 +48,5 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  redirect("/dashboard/settings");
+  return <DashboardHome />;
 }

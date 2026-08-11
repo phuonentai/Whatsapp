@@ -12,12 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/common/error-state";
 import { usePlaybooksQuery } from "@/lib/hooks/queries/use-playbooks-query";
 import { useApplyPlaybook, useResetPlaybook } from "@/lib/hooks/mutations/use-playbook-mutations";
 import type { PlaybookDto } from "@/lib/api/api/dto/playbook.dto";
 
 export function PlaybookSetupCard() {
-  const { data: playbooks, isLoading } = usePlaybooksQuery();
+  const { data: playbooks, isLoading, isError, refetch, isRefetching } = usePlaybooksQuery();
   const applyPlaybook = useApplyPlaybook();
   const resetPlaybook = useResetPlaybook();
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
@@ -29,6 +30,24 @@ export function PlaybookSetupCard() {
           <CardTitle className="text-base">Plantillas de negocio</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-gray-500">Cargando plantillas...</CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Plantillas de negocio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ErrorState
+            title="Error al cargar las plantillas"
+            description="No se pudieron cargar las plantillas. Inténtalo de nuevo."
+            onRetry={() => refetch()}
+            isRetrying={isRefetching}
+          />
+        </CardContent>
       </Card>
     );
   }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CalendarDays,
@@ -43,6 +44,7 @@ import { useAiUsageQuery } from "@/lib/hooks/queries/use-ai-usage-query";
 import { cancelSubscription } from "@/lib/actions/billing/cancel-subscription";
 import { cancelMPSubscription } from "@/lib/actions/billing/cancel-mp-subscription";
 import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
+import { ui, tpl } from "@/lib/copy/ui";
 
 interface SubscriptionTabProps {
   state: SubscriptionGateState | null;
@@ -131,11 +133,10 @@ export function SubscriptionTab({
           <AlertTriangle className="mt-1 h-5 w-5 text-amber-500" />
           <div className="space-y-1">
             <CardTitle className="text-lg text-amber-900">
-              Polar configuration required
+              {ui.billing.polarConfigRequired}
             </CardTitle>
             <CardDescription className="text-sm text-amber-800">
-              Add <code>POLAR_ACCESS_TOKEN</code> and <code>POLAR_WEBHOOK_SECRET</code>{" "}
-              to your environment to enable subscription management.
+              {ui.billing.polarConfigDesc}
             </CardDescription>
           </div>
         </CardHeader>
@@ -147,10 +148,10 @@ export function SubscriptionTab({
             }}
           >
             <RefreshCcw className="mr-2 h-4 w-4" />
-            Check again
+            {ui.billing.checkAgain}
           </Button>
           <Button variant="ghost" asChild className="text-amber-800 hover:text-amber-900">
-            <a href={contactHref}>Talk to support</a>
+            <a href={contactHref}>{ui.billing.talkToSupport}</a>
           </Button>
         </CardContent>
       </Card>
@@ -164,10 +165,9 @@ export function SubscriptionTab({
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
         <AlertTriangle className="h-6 w-6 text-gray-500" />
       </div>
-      <h3 className="mt-6 text-2xl font-semibold text-gray-900">No active plan</h3>
+      <h3 className="mt-6 text-2xl font-semibold text-gray-900">{ui.billing.noActivePlan}</h3>
       <p className="mt-2 text-sm text-gray-600">
-        Choose a plan to unlock automations. You&apos;ll be redirected to a secure
-        checkout page to confirm your subscription.
+        {ui.billing.noActivePlanBody}
       </p>
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button
@@ -175,11 +175,11 @@ export function SubscriptionTab({
           disabled={!canInteract}
           className="bg-gray-900 text-white hover:bg-gray-800"
         >
-          Browse plans
+          {ui.billing.browsePlans}
         </Button>
         <Button variant="outline" asChild>
           <a href={contactHref} className="text-sm">
-            Talk to sales
+            {ui.billing.talkToSales}
           </a>
         </Button>
       </div>
@@ -190,13 +190,13 @@ export function SubscriptionTab({
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-600">
             <CalendarDays className="h-3.5 w-3.5" />
-            Current plan
+            {ui.billing.currentPlanEyebrow}
           </div>
           <h3 className="text-3xl font-semibold text-gray-900">
-            {plan?.name ?? "Custom plan"}
+            {plan?.name ?? ui.billing.customPlan}
           </h3>
           <p className="text-sm text-gray-600">
-            {planPrice ? `${planPrice} • billed monthly` : `Billed via ${mercadopagoEnabled ? "MercadoPago" : "Polar"}`}
+            {planPrice ? `${planPrice} • ${ui.billing.billedMonthly}` : `${ui.billing.billedVia} ${mercadopagoEnabled ? "MercadoPago" : "Polar"}`}
           </p>
         </div>
         <Badge className={statusDisplay.className}>{statusDisplay.label}</Badge>
@@ -204,20 +204,20 @@ export function SubscriptionTab({
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {nextBillingDate && (
-          <SummaryMetric label="Renews on" value={format(nextBillingDate, "MMM d, yyyy")} />
+          <SummaryMetric label={ui.billing.renewsOn} value={format(nextBillingDate, "MMM d, yyyy")} />
         )}
         {trialEndDate && (
-          <SummaryMetric label="Trial ends" value={format(trialEndDate, "MMM d, yyyy")} />
+          <SummaryMetric label={ui.billing.trialEnds} value={format(trialEndDate, "MMM d, yyyy")} />
         )}
         {plan?.includedInvoices != null && (
           <SummaryMetric
-            label="Invoices per month"
+            label={ui.billing.invoicesPerMonth}
             value={plan.includedInvoices.toLocaleString()}
           />
         )}
         {plan?.includedSeats != null && (
           <SummaryMetric
-            label="Seats included"
+            label={ui.billing.seatsIncluded}
             value={plan.includedSeats.toLocaleString()}
           />
         )}
@@ -227,27 +227,24 @@ export function SubscriptionTab({
         {cancelAtPeriodEnd && nextBillingDate ? (
           <Alert className="border border-amber-200 bg-amber-50">
             <AlertTitle className="text-sm font-semibold text-amber-900">
-              Scheduled to end
+              {ui.billing.scheduledToEnd}
             </AlertTitle>
             <AlertDescription className="text-sm text-amber-800">
-              Your subscription will end on{" "}
-              <span className="font-semibold">
-                {format(nextBillingDate, "MMM d, yyyy")}
-              </span>
-              . Resume before then to keep automations running.
+              {tpl(ui.billing.scheduledToEndBody, {
+                date: format(nextBillingDate, "MMM d, yyyy"),
+              })}
             </AlertDescription>
           </Alert>
         ) : (
           <p className="text-sm text-gray-600">
-            To switch plans, cancel your current subscription. Once it ends, choose a new plan
-            and subscribe again from this page.
+            {ui.billing.switchPlansHint}
           </p>
         )}
 
         {plan?.benefits?.length ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-              Plan benefits
+              {ui.billing.planBenefits}
             </p>
             <ul className="mt-3 space-y-2">
               {plan.benefits.map((benefit) => (
@@ -267,8 +264,8 @@ export function SubscriptionTab({
               onClick={() => handleUpdateCancellation(false)}
               disabled={actionState !== "idle"}
             >
-              Resume subscription
-            </Button>
+              {ui.billing.resumeSubscription}
+              </Button>
           ) : (
             <Button
               variant="outline"
@@ -276,7 +273,7 @@ export function SubscriptionTab({
               onClick={() => setCancelDialogOpen(true)}
               disabled={actionState !== "idle"}
             >
-              Schedule cancellation
+              {ui.billing.scheduleCancellation}
             </Button>
           )}
           <Button
@@ -288,12 +285,12 @@ export function SubscriptionTab({
             disabled={!canInteract}
           >
             <RefreshCcw className="mr-2 h-4 w-4" />
-            Refresh status
+            {ui.billing.refreshStatus}
           </Button>
           <Button variant="ghost" asChild>
             <a href={contactHref} className="text-sm text-gray-600 hover:text-gray-900">
               <LifeBuoy className="mr-2 h-4 w-4" />
-              Contact support
+              {ui.common.contactSupport}
             </a>
           </Button>
         </div>
@@ -306,11 +303,11 @@ export function SubscriptionTab({
       <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <h4 className="text-lg font-semibold text-gray-900">Invoice usage</h4>
+            <h4 className="text-lg font-semibold text-gray-900">{ui.billing.invoiceUsage}</h4>
             <p className="text-sm text-gray-600">
               {nextBillingDate
-                ? `Usage resets on ${format(nextBillingDate, "MMM d, yyyy")}.`
-                : "Track how many invoices you’ve processed this period."}
+                ? tpl(ui.billing.usageResetsOn, { date: format(nextBillingDate, "MMM d, yyyy") })
+                : ui.billing.trackUsage}
             </p>
           </div>
           <Badge className="bg-gray-100 text-gray-700">
@@ -324,7 +321,7 @@ export function SubscriptionTab({
               <span className="font-semibold text-gray-900">
                 {usedInvoices.toLocaleString()}
               </span>{" "}
-              invoices processed
+              {ui.billing.invoicesProcessed}
             </span>
             <span className="flex items-center gap-2 text-xs text-gray-500">
               <Clock className="h-4 w-4" />
@@ -340,12 +337,15 @@ export function SubscriptionTab({
       <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <h4 className="text-lg font-semibold text-gray-900">AI credits</h4>
+            <h4 className="text-lg font-semibold text-gray-900">{ui.billing.aiCredits}</h4>
             <p className="text-sm text-gray-600">
-              Credits available for AI features this period.{" "}
-              {aiUsage.period_end
-                ? `Resets on ${format(new Date(aiUsage.period_end), "MMM d, yyyy")}.`
-                : null}
+              {tpl(ui.billing.aiCreditsBody, {
+                resets: aiUsage.period_end
+                  ? tpl(ui.billing.aiResetsOn, {
+                      date: format(new Date(aiUsage.period_end), "MMM d, yyyy"),
+                    })
+                  : "",
+              })}
             </p>
           </div>
           <Badge className="bg-gray-100 text-gray-700">
@@ -359,12 +359,12 @@ export function SubscriptionTab({
               <span className="font-semibold text-gray-900">
                 {aiUsage.credits_remaining.toLocaleString()}
               </span>{" "}
-              credits remaining
+              {ui.billing.creditsRemaining}
             </span>
             <span className="flex items-center gap-2 text-xs text-gray-500">
               <Sparkles className="h-4 w-4" />
-              {aiUsage.tokens_input.toLocaleString()} in / {aiUsage.tokens_output.toLocaleString()}{" "}
-              out tokens
+              {aiUsage.tokens_input.toLocaleString()} / {aiUsage.tokens_output.toLocaleString()}{" "}
+              {ui.billing.inOutTokens}
             </span>
           </div>
         </div>
@@ -378,7 +378,7 @@ export function SubscriptionTab({
           <div className="absolute inset-0 z-20 rounded-3xl bg-white/70 backdrop-blur-sm">
             <div className="flex h-full flex-col items-center justify-center gap-3 text-sm font-medium text-gray-700">
               <Loader2 className="h-6 w-6 animate-spin" />
-              Processing request…
+              {ui.billing.processingRequest}
             </div>
           </div>
         )}
@@ -386,14 +386,14 @@ export function SubscriptionTab({
         <div className="space-y-8">
           {error ? (
             <Alert variant="destructive">
-              <AlertTitle>Unable to load subscription</AlertTitle>
+              <AlertTitle>{ui.billing.unableLoadSubscription}</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
 
           {actionError ? (
             <Alert variant="destructive">
-              <AlertTitle>Action failed</AlertTitle>
+              <AlertTitle>{ui.billing.actionFailed}</AlertTitle>
               <AlertDescription>{actionError}</AlertDescription>
             </Alert>
           ) : null}
@@ -430,30 +430,30 @@ export function SubscriptionTab({
         <DialogContent className="max-w-lg">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-semibold text-gray-900">
-              Confirm cancellation
+              {ui.billing.confirmCancellation}
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-600">
-              Type <span className="font-semibold text-gray-900">CANCEL</span> to end your
-              subscription at the close of your current billing period. You&apos;ll keep
-              access until{" "}
-              {nextBillingDate ? format(nextBillingDate, "MMM d, yyyy") : "the end of the term"}.
+              {tpl(ui.billing.cancelDialogBody, {
+                date: nextBillingDate
+                  ? format(nextBillingDate, "MMM d, yyyy")
+                  : ui.billing.endOfTerm,
+              })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Input
               value={cancelInput}
               onChange={(event) => setCancelInput(event.target.value)}
-              placeholder="Type CANCEL to confirm"
+              placeholder={ui.billing.typeCancelPlaceholder}
               className="uppercase tracking-[0.3em]"
               autoFocus
             />
             <Alert className="border border-amber-200 bg-amber-50">
               <AlertTitle className="text-sm font-semibold text-amber-900">
-                Heads up
+                {ui.billing.headsUp}
               </AlertTitle>
               <AlertDescription className="text-sm text-amber-800">
-                Cancellation takes effect after the current term. You can resume the
-                subscription before that date to keep your automation running.
+                {ui.billing.headsUpBody}
               </AlertDescription>
             </Alert>
           </div>
@@ -466,7 +466,7 @@ export function SubscriptionTab({
               }}
               disabled={actionState === "cancelling"}
             >
-              Keep subscription
+              {ui.billing.keepSubscription}
             </Button>
             <Button
               variant="destructive"
@@ -476,7 +476,7 @@ export function SubscriptionTab({
               {actionState === "cancelling" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              Confirm cancellation
+              {ui.billing.confirmCancellation}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -542,17 +542,16 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
 
 function remainingInvoicesText(limit: number, used: number) {
   const remaining = Math.max(limit - used, 0);
-  const suffix = remaining === 1 ? "invoice remaining" : "invoices remaining";
-  return `${remaining.toLocaleString()} ${suffix}`;
+  return `${remaining.toLocaleString()} ${ui.billing.invoicesRemainingSuffix}`;
 }
 
 function SubscriptionSkeleton() {
   return (
     <Card className="border-gray-200">
       <CardHeader>
-        <CardTitle className="text-xl">Subscription overview</CardTitle>
+        <CardTitle className="text-xl">{ui.billing.subscriptionOverview}</CardTitle>
         <CardDescription className="text-sm text-gray-600">
-          Loading your plan details…
+          {ui.billing.loadingPlanDetails}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -571,14 +570,14 @@ function getStatusDisplay(
   const status = state?.status ?? null;
   if (!state?.isActive) {
     return {
-      label: status ? titleCase(status) : "Inactive",
+      label: status ? titleCase(status) : ui.billing.statusInactive,
       className: "bg-gray-200 text-gray-700",
     };
   }
 
   if (cancelAtPeriodEnd) {
     return {
-      label: "Cancels soon",
+      label: ui.billing.statusCancelsSoon,
       className: "bg-amber-100 text-amber-700",
     };
   }
@@ -586,23 +585,23 @@ function getStatusDisplay(
   switch (status) {
     case "trialing":
       return {
-        label: "Trialing",
+        label: ui.billing.statusTrialing,
         className: "bg-blue-100 text-blue-700",
       };
     case "past_due":
       return {
-        label: "Past due",
+        label: ui.billing.statusPastDue,
         className: "bg-amber-100 text-amber-700",
       };
     case "grace":
       return {
-        label: "Grace period",
+        label: ui.billing.statusGrace,
         className: "bg-amber-100 text-amber-700",
       };
     case "active":
     default:
       return {
-        label: status ? titleCase(status) : "Active",
+        label: status ? titleCase(status) : ui.billing.statusActive,
         className: "bg-emerald-100 text-emerald-700",
       };
   }

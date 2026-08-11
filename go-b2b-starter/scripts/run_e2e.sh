@@ -18,13 +18,17 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-saas_db_test}"
 MIGRATIONS_DIR="internal/db/postgres/sqlc/migrations"
 FRONTEND_DIR="../next_b2b_starter"
+MOCK_SIIGO_ADDR=":8090"
+MOCK_SIIGO_URL="http://localhost:8090"
 BACKEND_PID=""
 FRONTEND_PID=""
+MOCK_SIIGO_PID=""
 
 cleanup() {
   echo "Cleaning up spawned processes..."
   [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
   [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null || true
+  [ -n "$MOCK_SIIGO_PID" ] && kill "$MOCK_SIIGO_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -54,8 +58,17 @@ POSTGRES_HOST=localhost POSTGRES_PORT=5432 \
   POSTGRES_USER="$POSTGRES_USER" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
   POSTGRES_DB="$POSTGRES_DB" SKIP_MIGRATIONS=true go run ./cmd/seed-e2e
 
+echo "==> Starting mock Siigo provider on :8090..."
+go run ./cmd/mock-siigo -addr "$MOCK_SIIGO_ADDR" > /tmp/e2e-mock-siigo.log 2>&1 &
+MOCK_SIIGO_PID=$!
+
 echo "==> Starting Go backend on :8080 (mock auth)..."
-AUTH_MOCK_ENABLED=true SERVER_ADDRESS=:8080 go run ./cmd/api/main.go > /tmp/e2e-backend.log 2>&1 &
+AUTH_MOCK_ENABLED=true SERVER_ADDRESS=:8080 \
+  SIIGO_BASE_URL="$MOCK_SIIGO_URL" \
+  SIIGO_TOKEN_URL="$MOCK_SIIGO_URL/token" \
+  SIIGO_WEBHOOK_SECRET="test_webhook_secret_for_e2e" \
+  SIIGO_SANDBOX=true \
+  go run ./cmd/api/main.go > /tmp/e2e-backend.log 2>&1 &
 BACKEND_PID=$!
 
 echo "==> Starting Next.js frontend on :3001..."

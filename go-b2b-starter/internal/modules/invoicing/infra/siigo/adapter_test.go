@@ -339,3 +339,74 @@ func TestIncrementNumber(t *testing.T) {
 		}
 	}
 }
+
+func TestAdapter_ValidateCredentials_CompanyEndpointPresent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"access_token":"t"}`)
+			return
+		}
+		if r.URL.Path == "/v1/company" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"nit":"900111222","name":"Mi Empresa"}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	adapter := NewAdapter(&Config{ClientID: "c", ClientSecret: "s", BaseURL: srv.URL, TokenURL: srv.URL + "/token"}, nil, nil)
+	company, err := adapter.ValidateCredentials(context.Background(), "c", "s")
+	if err != nil {
+		t.Fatalf("ValidateCredentials failed: %v", err)
+	}
+	if company.Nit != "900111222" || company.Name != "Mi Empresa" {
+		t.Fatalf("unexpected company: %+v", company)
+	}
+}
+
+func TestAdapter_ValidateCredentials_CompanyPresentWithMismatchData(t *testing.T) {
+	// The adapter returns provider data as-is; the mismatch decision belongs
+	// to the connection service (covered there). This asserts data passthrough.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"access_token":"t"}`)
+			return
+		}
+		if r.URL.Path == "/v1/company" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"nit":"999888777","name":"Otra Empresa"}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	adapter := NewAdapter(&Config{ClientID: "c", ClientSecret: "s", BaseURL: srv.URL, TokenURL: srv.URL + "/token"}, nil, nil)
+	company, err := adapter.ValidateCredentials(context.Background(), "c", "s")
+	if err != nil {
+		t.Fatalf("ValidateCredentials failed: %v", err)
+	}
+	if company.Nit != "999888777" {
+		t.Fatalf("expected provider NIT passthrough, got %q", company.Nit)
+	}
+}
+
+func TestAdapter_ValidateCredentials_TokenGrantRejected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"error":"invalid_client"}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	adapter := NewAdapter(&Config{ClientID: "bad", ClientSecret: "bad", BaseURL: srv.URL, TokenURL: srv.URL + "/token"}, nil, nil)
+	if _, err := adapter.ValidateCredentials(context.Background(), "bad", "bad"); err == nil {
+		t.Fatal("expected error for rejected token grant")
+	}
+}

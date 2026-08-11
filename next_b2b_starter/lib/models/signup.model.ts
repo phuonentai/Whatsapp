@@ -8,6 +8,13 @@ export interface SignupOrganization {
   industry: string;
 }
 
+export type WhatsAppReadiness = "already" | "planning" | "no";
+
+export interface SignupBusinessContext {
+  whatsappReadiness: WhatsAppReadiness;
+  businessGoal: string;
+}
+
 export interface SignupDraft {
   owner: SignupOwner;
   organization: SignupOrganization;

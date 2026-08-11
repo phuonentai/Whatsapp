@@ -12,7 +12,7 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
 
@@ -29,7 +29,7 @@ func NewHandler(agent services.AgentService, compliance services.ComplianceServi
 
 // HandleListSuggestions returns the org's pending suggestions.
 func (h *Handler) HandleListSuggestions(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	suggestions, err := h.agent.ListPendingSuggestions(c.Request.Context(), orgID, 100, 0)
@@ -44,9 +44,9 @@ func (h *Handler) HandleListSuggestions(c *gin.Context) {
 
 // HandleApproveSuggestion sends an approved draft.
 func (h *Handler) HandleApproveSuggestion(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
-	memberID := auth.MustGetIdentity(c).UserID
+	memberID := authcontext.MustGetIdentity(c).UserID
 
 	suggestionID, err := pathID(c, "id")
 	if err != nil {
@@ -88,7 +88,7 @@ func (h *Handler) HandleApproveSuggestion(c *gin.Context) {
 // HandleSeedSuggestion inserts a pending reply suggestion for e2e testing.
 // Only reachable when mock auth is enabled (AUTH_MOCK_ENABLED=true).
 func (h *Handler) HandleSeedSuggestion(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	if os.Getenv("AUTH_MOCK_ENABLED") != "true" {
@@ -129,7 +129,7 @@ func (h *Handler) HandleSeedSuggestion(c *gin.Context) {
 
 // HandleRejectSuggestion marks a suggestion as rejected.
 func (h *Handler) HandleRejectSuggestion(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	suggestionID, err := pathID(c, "id")
@@ -156,7 +156,7 @@ func (h *Handler) HandleRejectSuggestion(c *gin.Context) {
 
 // HandleGetSettings returns the org's agent settings.
 func (h *Handler) HandleGetSettings(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	settings, err := h.agent.GetSettings(c.Request.Context(), orgID)
@@ -171,7 +171,7 @@ func (h *Handler) HandleGetSettings(c *gin.Context) {
 
 // HandleUpdateSettings persists the org's agent settings.
 func (h *Handler) HandleUpdateSettings(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	var settings domain.AgentSettings
@@ -192,7 +192,7 @@ func (h *Handler) HandleUpdateSettings(c *gin.Context) {
 
 // HandleGetFlowDebug returns the active flow for a conversation.
 func (h *Handler) HandleGetFlowDebug(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	convID, err := pathID(c, "conversationId")
@@ -213,7 +213,7 @@ func (h *Handler) HandleGetFlowDebug(c *gin.Context) {
 
 // HandleExportContact exports a contact's data (Ley 1581).
 func (h *Handler) HandleExportContact(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	contactID, err := pathID(c, "contactId")
@@ -238,7 +238,7 @@ func (h *Handler) HandleExportContact(c *gin.Context) {
 
 // HandleForgetContact anonymizes a contact (Ley 1581).
 func (h *Handler) HandleForgetContact(c *gin.Context) {
-	reqCtx := auth.MustGetRequestContext(c)
+	reqCtx := authcontext.MustGetRequestContext(c)
 	orgID := reqCtx.OrganizationID
 
 	contactID, err := pathID(c, "contactId")

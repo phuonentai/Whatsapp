@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/common/error-state";
 import { Loader2, Sparkles } from "lucide-react";
 import { usePendingSuggestionsQuery } from "@/lib/hooks/queries/use-pending-suggestions-query";
 import { useApproveSuggestion, useRejectSuggestion } from "@/lib/hooks/mutations/use-agent-suggestion-mutations";
 import type { AgentSuggestion } from "@/lib/models/agent.model";
+import { ui } from "@/lib/copy/ui";
 
 interface AgentSuggestionsPanelProps {
   conversationId?: number;
 }
 
 export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelProps) {
-  const { data: suggestions, isLoading } = usePendingSuggestionsQuery({
+  const { data: suggestions, isLoading, isError, refetch, isRefetching } = usePendingSuggestionsQuery({
     enabled: Boolean(conversationId),
   });
   const approveMutation = useApproveSuggestion();
@@ -22,6 +24,19 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
   const [editedBody, setEditedBody] = useState("");
 
   if (isLoading) return null;
+
+  if (isError) {
+    return (
+      <div className="border-t border-gray-200 bg-red-50/40 px-4 py-3">
+        <ErrorState
+          title={ui.agent.panelErrorTitle}
+          description={ui.agent.panelErrorDesc}
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+        />
+      </div>
+    );
+  }
 
   const conversationSuggestions = (suggestions ?? []).filter(
     (s) => s.conversation_id === conversationId && s.status === "pending"
@@ -56,10 +71,14 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
   };
 
   return (
-    <div className="border-t border-gray-200 bg-violet-50/60 px-4 py-3">
+    <div
+      role="status"
+      aria-live="polite"
+      className="border-t border-gray-200 bg-violet-50/60 px-4 py-3"
+    >
       <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-700">
         <Sparkles className="h-3.5 w-3.5" />
-        Sugerencia del asistente IA
+        {ui.agent.panelTitle}
       </div>
       <div className="space-y-2">
         {conversationSuggestions.map((suggestion) => (
@@ -83,10 +102,10 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
                     disabled={approveMutation.isPending}
                   >
                     {approveMutation.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                    Enviar editado
+                    {ui.agent.sendEdited}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditedBody(""); }}>
-                    Cancelar
+                    {ui.common.cancel}
                   </Button>
                 </div>
               </div>
@@ -101,7 +120,7 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
                     disabled={approveMutation.isPending}
                   >
                     {approveMutation.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                    Aprobar y enviar
+                    {ui.agent.approveSend}
                   </Button>
                   <Button
                     size="sm"
@@ -109,7 +128,7 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
                     onClick={() => { setEditingId(suggestion.id); setEditedBody(suggestion.body); }}
                     disabled={approveMutation.isPending}
                   >
-                    Editar
+                    {ui.agent.edit}
                   </Button>
                   <Button
                     size="sm"
@@ -118,7 +137,7 @@ export function AgentSuggestionsPanel({ conversationId }: AgentSuggestionsPanelP
                     onClick={() => handleReject(suggestion)}
                     disabled={rejectMutation.isPending}
                   >
-                    Rechazar
+                    {ui.agent.reject}
                   </Button>
                 </div>
               </>

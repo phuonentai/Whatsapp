@@ -79,14 +79,18 @@ export function DealDialog({ open, onOpenChange, deal, pipelineId, stages }: Dea
       company_id: values.company_id ? Number(values.company_id) : undefined,
       contact_id: values.contact_id ? Number(values.contact_id) : undefined,
     };
-    if (isEdit && deal) {
-      await updateMutation.mutateAsync({ id: deal.id, data: payload });
-      toast.success("Negocio actualizado");
-    } else {
-      await createMutation.mutateAsync({ ...payload, pipeline_id: pipelineId, stage_id: values.stage_id ? Number(values.stage_id) : undefined });
-      toast.success("Negocio creado");
+    try {
+      if (isEdit && deal) {
+        await updateMutation.mutateAsync({ id: deal.id, data: payload });
+        toast.success("Negocio actualizado");
+      } else {
+        await createMutation.mutateAsync({ ...payload, pipeline_id: pipelineId, stage_id: values.stage_id ? Number(values.stage_id) : undefined });
+        toast.success("Negocio creado");
+      }
+      onOpenChange(false);
+    } catch {
+      // dialog stays open with entered values; error toast handled by mutation
     }
-    onOpenChange(false);
   });
 
   return (

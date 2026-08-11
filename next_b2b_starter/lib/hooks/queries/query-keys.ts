@@ -245,6 +245,17 @@ export const queryKeys = {
   },
 
   /**
+   * Siigo invoicing onboarding query keys
+   */
+  siigo: {
+    all: ["siigo"] as const,
+    status: () => [...queryKeys.siigo.all, "status"] as const,
+    numeration: () => [...queryKeys.siigo.all, "numeration"] as const,
+    importPreview: () => [...queryKeys.siigo.all, "importPreview"] as const,
+    adminConnections: () => [...queryKeys.siigo.all, "adminConnections"] as const,
+  },
+
+  /**
    * Agent (agentic WhatsApp assistant) query keys
    */
   agent: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
@@ -30,9 +31,14 @@ export function ReplyInput({ onSend, isSending, conversationId, value, onChange,
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
-    await onSend(text.trim());
-    setText("");
-    onSent?.();
+    const content = text.trim();
+    try {
+      await onSend(content);
+      setText("");
+      onSent?.();
+    } catch {
+      toast.error("No se pudo enviar el mensaje. Tu borrador se conservó.");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

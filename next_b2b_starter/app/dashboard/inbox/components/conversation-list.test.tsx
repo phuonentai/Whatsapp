@@ -66,7 +66,7 @@ describe("ConversationList channel rendering", () => {
       />
     );
     expect(
-      screen.getByText("No Instagram messages yet — connect Instagram in Settings to get started")
+      screen.getByText("Aún no hay mensajes de Instagram — conecta Instagram en Configuración para comenzar")
     ).toBeDefined();
   });
 });

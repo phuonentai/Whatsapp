@@ -22,7 +22,7 @@ interface ConversationDto {
 
 interface MessageDto {
   id: number;
-  whatsapp_message_id?: string;
+  provider_message_id?: string;
   content?: string;
   direction?: string;
 }
@@ -102,7 +102,7 @@ test.describe("WhatsApp Inbox", () => {
 
     const msgs = await apiRequest<{ data?: MessageDto[] }>(`/crm/conversaciones/${conv!.id}/mensajes`);
     const list = Array.isArray(msgs) ? msgs : msgs.data ?? [];
-    const dup = list.filter((m) => m.whatsapp_message_id === messageId);
+    const dup = list.filter((m) => m.provider_message_id === messageId);
     expect(dup.length).toBe(1);
   });
 

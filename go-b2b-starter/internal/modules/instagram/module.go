@@ -47,9 +47,16 @@ func (m *Module) RegisterDependencies() error {
 
 	if err := m.container.Provide(func(
 		cfg graphapi.ClientConfig,
-	) (string, string) {
-		return cfg.AppID, cfg.AppSecret
-	}); err != nil {
+	) string {
+		return cfg.AppID
+	}, dig.Name("instagram_app_id")); err != nil {
+		return err
+	}
+	if err := m.container.Provide(func(
+		cfg graphapi.ClientConfig,
+	) string {
+		return cfg.AppSecret
+	}, dig.Name("instagram_app_secret")); err != nil {
 		return err
 	}
 

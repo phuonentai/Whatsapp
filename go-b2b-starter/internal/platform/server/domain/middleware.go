@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/moasq/go-b2b-starter/internal/platform/server/middleware"
+	"github.com/moasq/go-b2b-starter/internal/platform/server/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +16,7 @@ func (s *HTTPServer) setupMiddleware() {
 	
 	s.router.Use(
 		middleware.RequestID(),
+		middleware.Compression(),
 		ipProtection.Protect(),
 		middleware.RequestSanitization(s.config.GetSanitizationConfig()),
 		middleware.Recovery(s.logger),
@@ -22,6 +24,7 @@ func (s *HTTPServer) setupMiddleware() {
 		middleware.Timeout(requestTimeout),
 		middleware.RateLimiter(s.config.RateLimitPerSecond),
 		middleware.CORS(s.config.AllowedOrigins),
+		metrics.RequestMetrics(),
 		s.requestLoggingMiddleware(),
 	)
 

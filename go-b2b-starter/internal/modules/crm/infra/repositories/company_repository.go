@@ -66,6 +66,25 @@ func (r *companyRepository) Search(ctx context.Context, orgID int32, query strin
 	return companies, nil
 }
 
+func (r *companyRepository) CountList(ctx context.Context, orgID int32) (int32, error) {
+	count, err := r.store.CountCompaniesByOrganization(ctx, orgID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count companies: %w", err)
+	}
+	return int32(count), nil
+}
+
+func (r *companyRepository) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	count, err := r.store.CountSearchCompanies(ctx, sqlc.CountSearchCompaniesParams{
+		OrganizationID: orgID,
+		Column2:        helpers.ToPgText(query),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count search companies: %w", err)
+	}
+	return int32(count), nil
+}
+
 func (r *companyRepository) GetByNit(ctx context.Context, orgID int32, nit string) (*domain.Company, error) {
 	result, err := r.store.GetCompanyByNit(ctx, sqlc.GetCompanyByNitParams{
 		OrganizationID: orgID,

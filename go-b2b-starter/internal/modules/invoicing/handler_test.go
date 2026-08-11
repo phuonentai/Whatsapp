@@ -44,6 +44,7 @@ func newTestRouter(svc *stubInvoicingService, secret string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	h := &Handler{
 		invoicingService: svc,
+		webhookVerifier:  siigo.NewVerifier(),
 		webhookSecret:    secret,
 		logger:           nopLog{},
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	ticketsServices "github.com/moasq/go-b2b-starter/internal/modules/tickets/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/tickets/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
@@ -23,7 +23,7 @@ func NewHandler(ticketService ticketsServices.TicketService) *Handler {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	status := c.Query("status")
 	assignee := c.Query("assignee")
@@ -36,7 +36,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	ticket, err := h.ticketService.Get(c.Request.Context(), ctx.OrganizationID, parseID(c))
 	if err != nil {
 		if errors.Is(err, domain.ErrTicketNotFound) {
@@ -55,13 +55,13 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req ticketsServices.CreateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID
@@ -79,7 +79,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Transition(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Status string `json:"status"`
 	}
@@ -87,7 +87,7 @@ func (h *Handler) Transition(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID
@@ -108,7 +108,7 @@ func (h *Handler) Transition(c *gin.Context) {
 }
 
 func (h *Handler) Assign(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Assignee string `json:"assignee"`
 	}
@@ -116,7 +116,7 @@ func (h *Handler) Assign(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID
@@ -134,7 +134,7 @@ func (h *Handler) Assign(c *gin.Context) {
 }
 
 func (h *Handler) SetPriority(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Priority string `json:"priority"`
 	}
@@ -142,7 +142,7 @@ func (h *Handler) SetPriority(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID
@@ -163,7 +163,7 @@ func (h *Handler) SetPriority(c *gin.Context) {
 }
 
 func (h *Handler) SetTags(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Tags []string `json:"tags"`
 	}
@@ -171,7 +171,7 @@ func (h *Handler) SetTags(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID
@@ -189,7 +189,7 @@ func (h *Handler) SetTags(c *gin.Context) {
 }
 
 func (h *Handler) AddInternalNote(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Body string `json:"body"`
 	}
@@ -197,7 +197,7 @@ func (h *Handler) AddInternalNote(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	actor := auth.GetIdentity(c)
+	actor := authcontext.GetIdentity(c)
 	actorID := ""
 	if actor != nil {
 		actorID = actor.UserID

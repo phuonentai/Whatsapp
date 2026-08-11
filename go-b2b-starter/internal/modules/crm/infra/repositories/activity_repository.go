@@ -101,6 +101,43 @@ func (r *activityRepository) ListByCompany(ctx context.Context, companyID, orgID
 	return mapActivityRowsFromCompany(results), nil
 }
 
+func (r *activityRepository) CountByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID int32) (int32, error) {
+	count, err := r.store.CountActivitiesByOrganization(ctx, sqlc.CountActivitiesByOrganizationParams{
+		OrganizationID: orgID,
+		Column2:        helpers.ToPgText(tipo),
+		Column3:        helpers.ToPgText(entityType),
+		Column4:        entityID,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count activities: %w", err)
+	}
+	return int32(count), nil
+}
+
+func (r *activityRepository) CountByContact(ctx context.Context, contactID, orgID int32) (int32, error) {
+	count, err := r.store.CountActivitiesByContact(ctx, sqlc.CountActivitiesByContactParams{ContactID: helpers.ToPgInt4(contactID), OrganizationID: orgID})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count activities by contact: %w", err)
+	}
+	return int32(count), nil
+}
+
+func (r *activityRepository) CountByDeal(ctx context.Context, dealID, orgID int32) (int32, error) {
+	count, err := r.store.CountActivitiesByDeal(ctx, sqlc.CountActivitiesByDealParams{DealID: helpers.ToPgInt4(dealID), OrganizationID: orgID})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count activities by deal: %w", err)
+	}
+	return int32(count), nil
+}
+
+func (r *activityRepository) CountByCompany(ctx context.Context, companyID, orgID int32) (int32, error) {
+	count, err := r.store.CountActivitiesByCompany(ctx, sqlc.CountActivitiesByCompanyParams{CompanyID: helpers.ToPgInt4(companyID), OrganizationID: orgID})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count activities by company: %w", err)
+	}
+	return int32(count), nil
+}
+
 func mapActivityFromDomain(c *sqlc.CrmActivity) *domain.Activity {
 	return &domain.Activity{
 		ID:               c.ID,

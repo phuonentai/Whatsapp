@@ -10,6 +10,7 @@ import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { PipelineView } from "@/components/crm/pipeline-view";
 import { TagManager } from "@/components/crm/tag-manager";
 import { UpgradeBanner } from "@/components/crm/upgrade-banner";
+import { ErrorState } from "@/components/common/error-state";
 import { ContactDetail } from "@/components/crm/contact-detail";
 import { CompanyDetail } from "@/components/crm/company-detail";
 import { DealDetail } from "@/components/crm/deal-detail";
@@ -35,7 +36,7 @@ export function CRMPage() {
   const view = (searchParams.get("view") as Tab) || "contactos";
   const detailId = Number(searchParams.get("id")) || 0;
   const features = useFeatures();
-  const { data: entitlement, isLoading } = useEntitlementQuery();
+  const { data: entitlement, isLoading, isError, refetch, isRefetching } = useEntitlementQuery();
 
   const setView = (tab: Tab) => {
     const params = new URLSearchParams(searchParams);
@@ -56,6 +57,19 @@ export function CRMPage() {
     });
 
   if (isLoading) return <div className="p-8 text-gray-500">Cargando CRM...</div>;
+
+  if (isError) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          title="Error al cargar el CRM"
+          description="No se pudo cargar la información del CRM. Inténtalo de nuevo."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

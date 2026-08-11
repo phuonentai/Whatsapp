@@ -12,8 +12,8 @@ type ContactService interface {
 	Create(ctx context.Context, orgID int32, req *CreateContactRequest) (*domain.Contact, error)
 	GetByID(ctx context.Context, orgID, contactID int32) (*domain.Contact, error)
 	GetByPhone(ctx context.Context, orgID int32, phoneNumber string) (*domain.Contact, error)
-	List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*domain.Contact, error)
-	Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.Contact, error)
+	List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) (ListResult[*domain.Contact], error)
+	Search(ctx context.Context, orgID int32, query string, limit, offset int32) (ListResult[*domain.Contact], error)
 	Update(ctx context.Context, orgID int32, req *UpdateContactRequest) (*domain.Contact, error)
 	Delete(ctx context.Context, orgID, contactID int32) error
 }
@@ -85,11 +85,27 @@ func (s *contactService) GetByID(ctx context.Context, orgID, contactID int32) (*
 func (s *contactService) GetByPhone(ctx context.Context, orgID int32, phoneNumber string) (*domain.Contact, error) {
 	return s.contactRepo.GetByPhone(ctx, orgID, phoneNumber)
 }
-func (s *contactService) List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*domain.Contact, error) {
-	return s.contactRepo.ListFiltered(ctx, orgID, source, leadStatus, companyID, assignedTo, limit, offset)
+func (s *contactService) List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) (ListResult[*domain.Contact], error) {
+	items, err := s.contactRepo.ListFiltered(ctx, orgID, source, leadStatus, companyID, assignedTo, limit, offset)
+	if err != nil {
+		return ListResult[*domain.Contact]{}, err
+	}
+	total, err := s.contactRepo.CountFiltered(ctx, orgID, source, leadStatus, companyID, assignedTo)
+	if err != nil {
+		return ListResult[*domain.Contact]{}, err
+	}
+	return ListResult[*domain.Contact]{Items: items, Total: total}, nil
 }
-func (s *contactService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.Contact, error) {
-	return s.contactRepo.Search(ctx, orgID, query, limit, offset)
+func (s *contactService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) (ListResult[*domain.Contact], error) {
+	items, err := s.contactRepo.Search(ctx, orgID, query, limit, offset)
+	if err != nil {
+		return ListResult[*domain.Contact]{}, err
+	}
+	total, err := s.contactRepo.CountSearch(ctx, orgID, query)
+	if err != nil {
+		return ListResult[*domain.Contact]{}, err
+	}
+	return ListResult[*domain.Contact]{Items: items, Total: total}, nil
 }
 func (s *contactService) Update(ctx context.Context, orgID int32, req *UpdateContactRequest) (*domain.Contact, error) {
 	contact, err := s.contactRepo.GetByID(ctx, orgID, req.ID)

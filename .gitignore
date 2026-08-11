@@ -117,3 +117,6 @@ go-b2b-starter/seed-e2e
 
 # --- Playwright MCP artifacts ---
 .playwright-mcp/
+
+# --- Local runtime artifacts ---
+dump.rdb

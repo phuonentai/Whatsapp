@@ -153,6 +153,14 @@ func InitMods(container *dig.Container) {
 		panic(fmt.Sprintf("playbook catalog validation failed: %v", err))
 	}
 
+	// Billing module (subscription lifecycle, quotas, webhooks). Provides the
+	// FeatureProvider consumed by CRM/agent and registers the BillingService
+	// constructor (constructed lazily at paywall registration, after the
+	// payments module provides the payment event handler).
+	if err := billing.Init(container); err != nil {
+		panic(err)
+	}
+
 	// OCR service (Mistral API for document text extraction)	// Must be initialized before documents module (documents depends on OCR)
 	if err := ocr.Init(container); err != nil {
 		panic(err)
@@ -191,19 +199,14 @@ func InitMods(container *dig.Container) {
 	// Payments module (client-facing one-shot payment links). Depends on CRM
 	// repos/outbound; provides the PaymentEventHandler consumed by the billing
 	// webhook dispatch and the real PaymentLinker for invoicing. Must precede
-	// billing (BillingService construction consumes the handler) and invoicing.
+	// the paywall middleware registration (which constructs BillingService
+	// with the handler) and invoicing.
 	if err := payments.Init(container); err != nil {
 		panic(err)
 	}
 
-	// Billing module (subscription lifecycle, quotas, webhooks).
-	// Registry module services must be registered before billing because
-	// BillingService depends on ModuleService.
-	if err := billing.Init(container); err != nil {
-		panic(err)
-	}
-
-	// Paywall middleware (access gating based on subscription status)
+	// Paywall middleware (access gating based on subscription status).
+	// Registration constructs BillingService, so it must follow payments.Init.
 	if err := paywall.SetupMiddleware(container); err != nil {
 		panic(err)
 	}

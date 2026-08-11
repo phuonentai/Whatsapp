@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
@@ -50,7 +50,7 @@ var (
 // ---- Export handlers ----
 
 func (h *CRMHandler) ExportContactos(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		response.Error(c, http.StatusUnauthorized, "autenticación requerida", nil)
 		return
@@ -65,7 +65,7 @@ func (h *CRMHandler) ExportContactos(c *gin.Context) {
 			if err != nil {
 				return nil, err
 			}
-			return services.MapContactoCSV(contacts), nil
+			return services.MapContactoCSV(contacts.Items), nil
 		})
 	if err != nil {
 		h.logger.Error("error al exportar contactos", loggerFields("contactos", reqCtx, err))
@@ -75,7 +75,7 @@ func (h *CRMHandler) ExportContactos(c *gin.Context) {
 }
 
 func (h *CRMHandler) ExportEmpresas(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		response.Error(c, http.StatusUnauthorized, "autenticación requerida", nil)
 		return
@@ -90,7 +90,7 @@ func (h *CRMHandler) ExportEmpresas(c *gin.Context) {
 			if err != nil {
 				return nil, err
 			}
-			return services.MapEmpresaCSV(companies), nil
+			return services.MapEmpresaCSV(companies.Items), nil
 		})
 	if err != nil {
 		h.logger.Error("error al exportar empresas", loggerFields("empresas", reqCtx, err))
@@ -100,7 +100,7 @@ func (h *CRMHandler) ExportEmpresas(c *gin.Context) {
 }
 
 func (h *CRMHandler) ExportNegocios(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		response.Error(c, http.StatusUnauthorized, "autenticación requerida", nil)
 		return
@@ -125,7 +125,7 @@ func (h *CRMHandler) ExportNegocios(c *gin.Context) {
 }
 
 func (h *CRMHandler) ExportActividades(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		response.Error(c, http.StatusUnauthorized, "autenticación requerida", nil)
 		return
@@ -140,7 +140,7 @@ func (h *CRMHandler) ExportActividades(c *gin.Context) {
 			if err != nil {
 				return nil, err
 			}
-			return services.MapActividadCSV(activities), nil
+			return services.MapActividadCSV(activities.Items), nil
 		})
 	if err != nil {
 		h.logger.Error("error al exportar actividades", loggerFields("actividades", reqCtx, err))
@@ -169,7 +169,7 @@ func (h *CRMHandler) ImportContactosTemplate(c *gin.Context) {
 
 // ImportContactos handles a CSV upload, gated contact:manage.
 func (h *CRMHandler) ImportContactos(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		response.Error(c, http.StatusUnauthorized, "autenticación requerida", nil)
 		return
@@ -296,16 +296,16 @@ func (h *CRMHandler) resolveCompanyID(c *gin.Context, orgID int32, name string) 
 	if err != nil {
 		return nil, err
 	}
-	if len(companies) == 0 {
+	if len(companies.Items) == 0 {
 		return nil, nil
 	}
-	id := companies[0].ID
+	id := companies.Items[0].ID
 	return &id, nil
 }
 
 // ---- Audit ----
 
-func (h *CRMHandler) recordExportAudit(c *gin.Context, reqCtx *auth.RequestContext, entity string, rows int) {
+func (h *CRMHandler) recordExportAudit(c *gin.Context, reqCtx *authcontext.RequestContext, entity string, rows int) {
 	realizadaPor := reqCtx.AccountID
 	_, err := h.activityService.Create(c.Request.Context(), reqCtx.OrganizationID, &services.CreateActivityRequest{
 		Tipo:         domain.ActivityTypeSistema,
@@ -372,7 +372,7 @@ func importCell(row []string, cols ...int) string {
 	return ""
 }
 
-func loggerFields(entity string, reqCtx *auth.RequestContext, err error) map[string]interface{} {
+func loggerFields(entity string, reqCtx *authcontext.RequestContext, err error) map[string]interface{} {
 	return map[string]interface{}{
 		"entity":          entity,
 		"organization_id": strconv.Itoa(int(reqCtx.OrganizationID)),

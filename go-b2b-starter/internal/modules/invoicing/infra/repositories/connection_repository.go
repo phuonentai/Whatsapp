@@ -95,6 +95,18 @@ func (r *connectionRepository) ListByStatus(ctx context.Context, provider string
 	return connections, nil
 }
 
+func (r *connectionRepository) ListAll(ctx context.Context) ([]*domain.OrgConnection, error) {
+	rows, err := r.store.ListOrgConnections(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list org connections: %w", err)
+	}
+	connections := make([]*domain.OrgConnection, len(rows))
+	for i := range rows {
+		connections[i] = mapConnection(&rows[i])
+	}
+	return connections, nil
+}
+
 func mapConnection(row *sqlc.InvoicingOrgConnection) *domain.OrgConnection {
 	conn := &domain.OrgConnection{
 		OrganizationID:   row.OrganizationID,

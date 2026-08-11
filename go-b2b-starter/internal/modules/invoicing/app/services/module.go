@@ -64,7 +64,10 @@ type importParams struct {
 type testInvoiceParams struct {
 	dig.In
 
-	Provider domain.InvoicingProvider
+	// The siigo adapter directly, NOT the router: the router resolves non-live
+	// orgs to the noop provider, but the sandbox test must always reach the
+	// real provider surface.
+	Provider domain.InvoicingProvider `name:"siigo"`
 	Repo     domain.InvoiceRepository
 	ConnSvc  ConnectionService
 	Logger   loggerDomain.Logger

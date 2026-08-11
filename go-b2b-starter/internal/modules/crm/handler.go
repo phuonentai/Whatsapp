@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
@@ -61,27 +61,27 @@ func (h *CRMHandler) GetEntitlement(c *gin.Context) {
 // ---- Contactos ----
 
 func (h *CRMHandler) ListContactos(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.contactService.List(c.Request.Context(), ctx.OrganizationID, c.Query("source"), c.Query("lead_status"), 0, 0, limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar contactos", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) SearchContactos(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.contactService.Search(c.Request.Context(), ctx.OrganizationID, c.Query("q"), limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al buscar contactos", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) GetContacto(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	r, err := h.contactService.GetByID(c.Request.Context(), ctx.OrganizationID, parseID(c))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "Contacto no encontrado", err)
@@ -90,7 +90,7 @@ func (h *CRMHandler) GetContacto(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) CreateContacto(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.CreateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -109,7 +109,7 @@ func (h *CRMHandler) CreateContacto(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateContacto(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.UpdateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -129,7 +129,7 @@ func (h *CRMHandler) UpdateContacto(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteContacto(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if err := h.contactService.Delete(c.Request.Context(), ctx.OrganizationID, parseID(c)); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al eliminar contacto", err)
 		return
@@ -140,27 +140,27 @@ func (h *CRMHandler) DeleteContacto(c *gin.Context) {
 // ---- Empresas ----
 
 func (h *CRMHandler) ListEmpresas(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.companyService.List(c.Request.Context(), ctx.OrganizationID, limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar empresas", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) SearchEmpresas(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.companyService.Search(c.Request.Context(), ctx.OrganizationID, c.Query("q"), limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al buscar empresas", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) GetEmpresa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	r, err := h.companyService.GetByID(c.Request.Context(), ctx.OrganizationID, parseID(c))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "Empresa no encontrada", err)
@@ -169,7 +169,7 @@ func (h *CRMHandler) GetEmpresa(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) CreateEmpresa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.CreateCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -187,7 +187,7 @@ func (h *CRMHandler) CreateEmpresa(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateEmpresa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.UpdateCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -206,7 +206,7 @@ func (h *CRMHandler) UpdateEmpresa(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteEmpresa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if err := h.companyService.Delete(c.Request.Context(), ctx.OrganizationID, parseID(c)); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al eliminar empresa", err)
 		return
@@ -217,7 +217,7 @@ func (h *CRMHandler) DeleteEmpresa(c *gin.Context) {
 // ---- Negocios ----
 
 func (h *CRMHandler) ListNegocios(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.dealService.List(c.Request.Context(), ctx.OrganizationID,
 		parseInt(c.Query("pipeline_id")), parseInt(c.Query("stage_id")), c.Query("estado"),
@@ -229,7 +229,7 @@ func (h *CRMHandler) ListNegocios(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) GetNegocio(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	r, err := h.dealService.GetByID(c.Request.Context(), ctx.OrganizationID, parseID(c))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "Negocio no encontrado", err)
@@ -238,7 +238,7 @@ func (h *CRMHandler) GetNegocio(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) CreateNegocio(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.CreateDealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -252,7 +252,7 @@ func (h *CRMHandler) CreateNegocio(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateNegocio(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.UpdateDealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -268,7 +268,7 @@ func (h *CRMHandler) UpdateNegocio(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) MoverEtapa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		StageID      int32  `json:"stage_id"`
 		OldStageName string `json:"old_stage_name"`
@@ -286,7 +286,7 @@ func (h *CRMHandler) MoverEtapa(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteNegocio(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if err := h.dealService.Delete(c.Request.Context(), ctx.OrganizationID, parseID(c)); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al eliminar negocio", err)
 		return
@@ -297,7 +297,7 @@ func (h *CRMHandler) DeleteNegocio(c *gin.Context) {
 // ---- Pipelines ----
 
 func (h *CRMHandler) ListPipelines(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	r, err := h.pipelineService.GetOrCreateDefault(c.Request.Context(), ctx.OrganizationID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar pipelines", err)
@@ -311,7 +311,7 @@ func (h *CRMHandler) ListPipelines(c *gin.Context) {
 	response.Success(c, http.StatusOK, []*domain.PipelineWithStages{r})
 }
 func (h *CRMHandler) CreatePipeline(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.CreatePipelineRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -325,7 +325,7 @@ func (h *CRMHandler) CreatePipeline(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdatePipeline(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.UpdatePipelineRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -369,7 +369,7 @@ func (h *CRMHandler) UpdateEtapa(c *gin.Context) {
 // ---- Actividades ----
 
 func (h *CRMHandler) ListActividades(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.activityService.ListByOrganization(c.Request.Context(), ctx.OrganizationID,
 		c.Query("tipo"), c.Query("entity_type"), parseInt(c.Query("entity_id")), limit, offset)
@@ -377,10 +377,10 @@ func (h *CRMHandler) ListActividades(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "Error al listar actividades", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) CreateActividad(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req services.CreateActivityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
@@ -395,40 +395,40 @@ func (h *CRMHandler) CreateActividad(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) ListActividadesByContacto(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.activityService.ListByContact(c.Request.Context(), parseID(c), ctx.OrganizationID, limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar actividades", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) ListActividadesByNegocio(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.activityService.ListByDeal(c.Request.Context(), parseID(c), ctx.OrganizationID, limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar actividades", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 func (h *CRMHandler) ListActividadesByEmpresa(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	r, err := h.activityService.ListByCompany(c.Request.Context(), parseID(c), ctx.OrganizationID, limit, offset)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar actividades", err)
 		return
 	}
-	response.Success(c, http.StatusOK, r)
+	response.Paginated(c, http.StatusOK, r.Items, r.Total)
 }
 
 // ---- Etiquetas ----
 
 func (h *CRMHandler) ListEtiquetas(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	r, err := h.tagService.List(c.Request.Context(), ctx.OrganizationID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar etiquetas", err)
@@ -437,7 +437,7 @@ func (h *CRMHandler) ListEtiquetas(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) CreateEtiqueta(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Nombre string `json:"nombre"`
 		Color  string `json:"color"`
@@ -458,7 +458,7 @@ func (h *CRMHandler) CreateEtiqueta(c *gin.Context) {
 	response.Success(c, http.StatusCreated, r)
 }
 func (h *CRMHandler) UpdateEtiqueta(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	var req struct {
 		Nombre string `json:"nombre"`
 		Color  string `json:"color"`
@@ -495,7 +495,7 @@ func (h *CRMHandler) ListEntityEtiquetas(c *gin.Context) {
 	response.Success(c, http.StatusOK, r)
 }
 func (h *CRMHandler) DeleteEtiqueta(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	if err := h.tagService.Delete(c.Request.Context(), ctx.OrganizationID, parseID(c)); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al eliminar etiqueta", err)
 		return
@@ -533,7 +533,7 @@ func (h *CRMHandler) UntagEntity(c *gin.Context) {
 // ---- Conversaciones ----
 
 func (h *CRMHandler) ListConversaciones(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, offset := parsePagination(c)
 	statusFilter := c.Query("status")
 	channelFilter := c.Query("channel")
@@ -547,7 +547,7 @@ func (h *CRMHandler) ListConversaciones(c *gin.Context) {
 }
 
 func (h *CRMHandler) ListMensajes(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	convID := parseID(c)
 	limit, offset := parsePagination(c)
 
@@ -560,7 +560,7 @@ func (h *CRMHandler) ListMensajes(c *gin.Context) {
 }
 
 func (h *CRMHandler) UpdateEstadoConversacion(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	convID := parseID(c)
 
 	var req struct {
@@ -582,7 +582,7 @@ func (h *CRMHandler) UpdateEstadoConversacion(c *gin.Context) {
 // ---- Outbound Messages ----
 
 func (h *CRMHandler) HandleSendMessage(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	convID := parseID(c)
 
 	var req struct {

@@ -4,165 +4,86 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 )
 
-// Context keys for storing auth data.
-// Using unexported type to prevent collisions with other packages.
-type contextKey string
-
-const (
-	// identityKey is the context key for storing the authenticated Identity.
-	identityKey contextKey = "auth_identity"
-
-	// requestContextKey is the context key for storing the RequestContext.
-	requestContextKey contextKey = "auth_request_context"
+// Type aliases keep the request-context seam types available under the auth
+// package for backward compatibility. New code should use authcontext types.
+type (
+	Role           = authcontext.Role
+	Permission     = authcontext.Permission
+	Identity       = authcontext.Identity
+	RequestContext = authcontext.RequestContext
 )
+
+// NewPermission creates a permission from resource and action.
+func NewPermission(resource, action string) Permission {
+	return authcontext.NewPermission(resource, action)
+}
+
+// This file re-exports the request-context seam owned by the platform
+// authcontext package. The auth middleware populates the context through the
+// authcontext accessors, and modules read it back via authcontext directly.
+// These aliases keep existing auth-module code (middleware, adapters) compiling
+// without an import rewrite inside the module.
 
 // SetIdentity stores the Identity in the Gin context.
-//
-// This is called by the RequireAuth middleware after successful authentication.
-// Application code should not call this directly.
 func SetIdentity(c *gin.Context, identity *Identity) {
-	c.Set(string(identityKey), identity)
+	authcontext.SetIdentity(c, identity)
 }
 
 // GetIdentity retrieves the Identity from the Gin context.
-//
-// Returns nil if no identity is set (user not authenticated).
-// Use MustGetIdentity if you expect authentication middleware to have run.
-//
-// Example:
-//
-//	identity := auth.GetIdentity(c)
-//	if identity == nil {
-//	    // Handle unauthenticated request
-//	}
 func GetIdentity(c *gin.Context) *Identity {
-	if val, exists := c.Get(string(identityKey)); exists {
-		if identity, ok := val.(*Identity); ok {
-			return identity
-		}
-	}
-	return nil
+	return authcontext.GetIdentity(c)
 }
 
-// MustGetIdentity retrieves the Identity from the Gin context.
-//
-// Panics if no identity is set. Only use this after RequireAuth middleware.
-// For handlers where authentication is optional, use GetIdentity instead.
+// MustGetIdentity retrieves the Identity from the Gin context, panicking if unset.
 func MustGetIdentity(c *gin.Context) *Identity {
-	identity := GetIdentity(c)
-	if identity == nil {
-		panic("auth: MustGetIdentity called without Identity in context - ensure RequireAuth middleware is applied")
-	}
-	return identity
+	return authcontext.MustGetIdentity(c)
 }
 
 // SetRequestContext stores the RequestContext in the Gin context.
-//
-// This is called by the RequireOrganization middleware after resolving
-// the database IDs. Application code should not call this directly.
 func SetRequestContext(c *gin.Context, reqCtx *RequestContext) {
-	c.Set(string(requestContextKey), reqCtx)
+	authcontext.SetRequestContext(c, reqCtx)
 }
 
 // GetRequestContext retrieves the RequestContext from the Gin context.
-//
-// Returns nil if no request context is set.
-// Use MustGetRequestContext if you expect the organization middleware to have run.
-//
-// Example:
-//
-//	reqCtx := auth.GetRequestContext(c)
-//	if reqCtx == nil {
-//	    // Handle request without organization context
-//	}
-//	orgID := reqCtx.OrganizationID  // int32, type-safe
 func GetRequestContext(c *gin.Context) *RequestContext {
-	if val, exists := c.Get(string(requestContextKey)); exists {
-		if reqCtx, ok := val.(*RequestContext); ok {
-			return reqCtx
-		}
-	}
-	return nil
+	return authcontext.GetRequestContext(c)
 }
 
-// MustGetRequestContext retrieves the RequestContext from the Gin context.
-//
-// Panics if no request context is set. Only use this after RequireOrganization middleware.
-// For handlers where organization context is optional, use GetRequestContext instead.
-//
-// Example:
-//
-//	reqCtx := auth.MustGetRequestContext(c)
-//	orgID := reqCtx.OrganizationID
-//	accountID := reqCtx.AccountID
+// MustGetRequestContext retrieves the RequestContext from the Gin context, panicking if unset.
 func MustGetRequestContext(c *gin.Context) *RequestContext {
-	reqCtx := GetRequestContext(c)
-	if reqCtx == nil {
-		panic("auth: MustGetRequestContext called without RequestContext in context - ensure RequireOrganization middleware is applied")
-	}
-	return reqCtx
+	return authcontext.MustGetRequestContext(c)
 }
 
 // GetOrganizationID is a convenience function to get the database organization ID.
-//
-// Returns 0 if no request context is set.
-// Use MustGetRequestContext().OrganizationID if you expect the middleware to have run.
 func GetOrganizationID(c *gin.Context) int32 {
-	if reqCtx := GetRequestContext(c); reqCtx != nil {
-		return reqCtx.OrganizationID
-	}
-	return 0
+	return authcontext.GetOrganizationID(c)
 }
 
 // GetAccountID is a convenience function to get the database account ID.
-//
-// Returns 0 if no request context is set.
-// Use MustGetRequestContext().AccountID if you expect the middleware to have run.
 func GetAccountID(c *gin.Context) int32 {
-	if reqCtx := GetRequestContext(c); reqCtx != nil {
-		return reqCtx.AccountID
-	}
-	return 0
+	return authcontext.GetAccountID(c)
 }
 
 // WithIdentity adds the Identity to a context.Context.
-//
-// This is useful for passing auth context through service layers
-// that don't use Gin context directly.
 func WithIdentity(ctx context.Context, identity *Identity) context.Context {
-	return context.WithValue(ctx, identityKey, identity)
+	return authcontext.WithIdentity(ctx, identity)
 }
 
 // IdentityFromContext retrieves the Identity from a context.Context.
-//
-// Returns nil if no identity is set.
 func IdentityFromContext(ctx context.Context) *Identity {
-	if val := ctx.Value(identityKey); val != nil {
-		if identity, ok := val.(*Identity); ok {
-			return identity
-		}
-	}
-	return nil
+	return authcontext.IdentityFromContext(ctx)
 }
 
 // WithRequestContext adds the RequestContext to a context.Context.
-//
-// This is useful for passing auth context through service layers
-// that don't use Gin context directly.
 func WithRequestContext(ctx context.Context, reqCtx *RequestContext) context.Context {
-	return context.WithValue(ctx, requestContextKey, reqCtx)
+	return authcontext.WithRequestContext(ctx, reqCtx)
 }
 
 // RequestContextFromContext retrieves the RequestContext from a context.Context.
-//
-// Returns nil if no request context is set.
 func RequestContextFromContext(ctx context.Context) *RequestContext {
-	if val := ctx.Value(requestContextKey); val != nil {
-		if reqCtx, ok := val.(*RequestContext); ok {
-			return reqCtx
-		}
-	}
-	return nil
+	return authcontext.RequestContextFromContext(ctx)
 }

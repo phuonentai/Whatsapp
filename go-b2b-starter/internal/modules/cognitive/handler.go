@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	llmdomain "github.com/moasq/go-b2b-starter/internal/platform/llm/domain"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
@@ -50,7 +50,7 @@ type ChatRequest struct {
 // @Failure 500 {object} httperr.HTTPError
 // @Router /example_cognitive/chat [post]
 func (h *Handler) Chat(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,
@@ -107,7 +107,7 @@ func (h *Handler) Chat(c *gin.Context) {
 }
 
 // streamChat writes an SSE stream for a streaming chat request.
-func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *auth.RequestContext, chatReq *domain.ChatRequest) {
+func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *authcontext.RequestContext, chatReq *domain.ChatRequest) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -167,7 +167,7 @@ func isSSE(accept string) bool {
 // @Failure 500 {object} httperr.HTTPError
 // @Router /example_cognitive/sessions [get]
 func (h *Handler) ListSessions(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,
@@ -220,7 +220,7 @@ func (h *Handler) GetSessionHistory(c *gin.Context) {
 		return
 	}
 
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
 			http.StatusBadRequest,

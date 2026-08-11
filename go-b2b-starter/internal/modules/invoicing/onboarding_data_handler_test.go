@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
 )
@@ -83,13 +84,13 @@ func newOnboardingDataTestHandler(numeration services.NumerationService, importS
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		auth.SetIdentity(c, &auth.Identity{
+		auth.SetIdentity(c, &authcontext.Identity{
 			UserID: "m", Email: "a@b.co", EmailVerified: true, OrganizationID: "o5",
 			Roles: []auth.Role{auth.RoleAdmin},
 			Permissions: []auth.Permission{auth.PermOrgManage, auth.PermResourceView},
 			ExpiresAt:    time.Now().Add(time.Hour),
 		})
-		auth.SetRequestContext(c, &auth.RequestContext{OrganizationID: 5, AccountID: 1})
+		authcontext.SetRequestContext(c, &authcontext.RequestContext{OrganizationID: 5, AccountID: 1})
 		c.Next()
 	})
 	r.GET("/api/v1/org/siigo/numeration", h.GetNumeration)

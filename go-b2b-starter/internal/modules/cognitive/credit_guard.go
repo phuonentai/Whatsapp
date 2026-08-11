@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	billingServices "github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
 )
 
@@ -29,7 +29,7 @@ func (g *AiCreditGuard) RequireCredits() gin.HandlerFunc {
 			return
 		}
 
-		orgID := auth.GetOrganizationID(c)
+		orgID := authcontext.GetOrganizationID(c)
 		if orgID == 0 {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "configuration_error",

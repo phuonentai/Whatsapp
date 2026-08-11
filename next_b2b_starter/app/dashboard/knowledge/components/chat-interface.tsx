@@ -139,7 +139,10 @@ export function ChatInterface({
       ) : messages.length === 0 ? (
         <EmptyState onSuggestionClick={(text) => setInput(text)} />
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-white">
+        <div
+          aria-live="polite"
+          className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-white"
+        >
           {messages.map((message) => (
             <ChatMessage
               key={message.id}

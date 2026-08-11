@@ -69,11 +69,11 @@ func (r *fakePaymentRepo) AttachPaymentID(ctx context.Context, id int64, mpPayme
 }
 
 func (r *fakePaymentRepo) Transition(ctx context.Context, id int64, status domain.PaymentStatus, mpPaymentID string, paidAt *time.Time) (*domain.ClientPayment, error) {
-	r.transitionCalls = append(r.transitionCalls, status)
 	p := r.byID[id]
 	if p == nil || p.Status.IsTerminal() {
 		return nil, domain.ErrPaymentTerminal
 	}
+	r.transitionCalls = append(r.transitionCalls, status)
 	p.Status = status
 	p.MPPaymentID = mpPaymentID
 	p.PaidAt = paidAt
@@ -163,17 +163,17 @@ func (m *fakeActivitySvc) Create(ctx context.Context, orgID int32, req *crmServi
 	m.created = append(m.created, req)
 	return &crmdomain.Activity{}, nil
 }
-func (m *fakeActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*crmdomain.ActivityWithActor, error) {
-	return nil, nil
+func (m *fakeActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (crmServices.ListResult[*crmdomain.ActivityWithActor], error) {
+	return crmServices.ListResult[*crmdomain.ActivityWithActor]{}, nil
 }
-func (m *fakeActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*crmdomain.ActivityWithActor, error) {
-	return nil, nil
+func (m *fakeActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (crmServices.ListResult[*crmdomain.ActivityWithActor], error) {
+	return crmServices.ListResult[*crmdomain.ActivityWithActor]{}, nil
 }
-func (m *fakeActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*crmdomain.ActivityWithActor, error) {
-	return nil, nil
+func (m *fakeActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (crmServices.ListResult[*crmdomain.ActivityWithActor], error) {
+	return crmServices.ListResult[*crmdomain.ActivityWithActor]{}, nil
 }
-func (m *fakeActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*crmdomain.ActivityWithActor, error) {
-	return nil, nil
+func (m *fakeActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (crmServices.ListResult[*crmdomain.ActivityWithActor], error) {
+	return crmServices.ListResult[*crmdomain.ActivityWithActor]{}, nil
 }
 
 type fakeOutbound struct {

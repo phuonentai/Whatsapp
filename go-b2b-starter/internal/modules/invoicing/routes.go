@@ -9,7 +9,8 @@ import (
 
 func (h *Handler) Routes(router *gin.RouterGroup, resolver serverDomain.MiddlewareResolver) {
 	// Organization-facing Siigo connection endpoints (org-scoped).
-	org := router.Group("/api/v1/org/siigo")
+	// Mounted under ApiPrefix "/api" → /api/v1/org/siigo/...
+	org := router.Group("/v1/org/siigo")
 	org.Use(
 		resolver.Get("auth"),
 		resolver.Get("org_context"),
@@ -66,18 +67,19 @@ func (h *Handler) Routes(router *gin.RouterGroup, resolver serverDomain.Middlewa
 
 	// Admin-scoped assisted provisioning (no org context: target org is in
 	// the request body; the admin role gate is org:manage).
-	admin := router.Group("/api/v1/admin/siigo")
+	admin := router.Group("/v1/admin/siigo")
 	admin.Use(
 		resolver.Get("auth"),
 		auth.RequirePermissionFunc("org", "manage"),
 	)
 	{
+		admin.GET("/connections", h.AdminListConnections)
 		admin.POST("/provision", h.ProvisionSiigo)
 	}
 
 	// Webhook ingress (signature-only, no session required).
 	// Follows the per-provider pattern established by whatsapp and billing.
-	webhooks := router.Group("/api/v1/webhooks")
+	webhooks := router.Group("/v1/webhooks")
 	{
 		webhooks.POST("/siigo", h.ProcessSiigoWebhook)
 	}

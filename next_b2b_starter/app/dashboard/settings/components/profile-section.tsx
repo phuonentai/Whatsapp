@@ -9,6 +9,7 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { queryKeys } from "@/lib/hooks/queries/query-keys";
 import { organizationRepository } from "@/lib/api/api/repositories/organization-repository";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
   const roleConfig = MemberHelpers.getRoleConfig(profile.role);
   const displayName =
     profile.name?.trim() ||
-    (profile.email ? profile.email.split("@")[0] : "AP Cash member");
+    (profile.email ? profile.email.split("@")[0] : `${PRODUCT_NAME} member`);
 
   const handleSaveWorkspace = async () => {
     const name = workspaceName.trim();
@@ -183,7 +184,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
               {profile.organizationId || "Not assigned"}
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              You&apos;ll need this ID when connecting AP Cash to external approval tools.
+              You&apos;ll need this ID when connecting {PRODUCT_NAME} to external approval tools.
             </p>
           </div>
           <p className="text-xs text-gray-500">

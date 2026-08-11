@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
@@ -47,13 +48,14 @@ func (r *invoiceRepository) GetByExternalID(ctx context.Context, externalID stri
 func (r *invoiceRepository) Insert(ctx context.Context, inv *domain.Invoice) (*domain.Invoice, error) {
 	row, err := r.store.InsertInvoice(ctx, sqlc.InsertInvoiceParams{
 		OrganizationID: inv.OrganizationID,
-		DealID:         helpers.ToPgInt4(inv.DealID),
-		ExternalID:     helpers.ToPgText(inv.ExternalID),
-		Cufe:           helpers.ToPgText(inv.Cufe),
-		Status:         string(inv.Status),
-		PdfUrl:         helpers.ToPgText(inv.PdfURL),
-		Amount:         helpers.ToPgNumeric(inv.Amount),
-		Currency:       inv.Currency,
+		// deal_id 0 means "no deal" (sandbox test invoices) → NULL.
+		DealID:     pgtype.Int4{Int32: inv.DealID, Valid: inv.DealID != 0},
+		ExternalID: helpers.ToPgText(inv.ExternalID),
+		Cufe:       helpers.ToPgText(inv.Cufe),
+		Status:     string(inv.Status),
+		PdfUrl:     helpers.ToPgText(inv.PdfURL),
+		Amount:     helpers.ToPgNumeric(inv.Amount),
+		Currency:   inv.Currency,
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError

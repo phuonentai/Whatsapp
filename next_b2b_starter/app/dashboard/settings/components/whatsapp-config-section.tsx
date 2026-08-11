@@ -16,6 +16,7 @@ import { useWhatsAppSignupMetaConfig, useWhatsAppSignupStatus } from "@/lib/hook
 import { useWhatsAppSignupExchange } from "@/lib/hooks/mutations/use-whatsapp-signup-mutation";
 import type { WhatsAppConfigInput } from "@/lib/models/whatsapp-config.model";
 import { toast } from "sonner";
+import { ui } from "@/lib/copy/ui";
 
 declare global {
   interface Window {
@@ -33,12 +34,7 @@ declare global {
   }
 }
 
-const MICRO_STATUS_STEPS = [
-  "Connecting your WhatsApp...",
-  "Verifying Coexistence session...",
-  "Establishing secure token & webhooks...",
-  "All set! Your WhatsApp is live.",
-];
+const MICRO_STATUS_STEPS = ui.whatsapp.microSteps;
 
 const IN_PROGRESS_STATUSES = new Set(["exchanging", "registering", "verifying"]);
 
@@ -138,7 +134,7 @@ export function WhatsAppConfigSection() {
 
   const copyCallbackUrl = useCallback(() => {
     navigator.clipboard.writeText(callbackUrl);
-    toast.success("Callback URL copied to clipboard");
+    toast.success(ui.whatsapp.callbackCopied);
   }, [callbackUrl]);
 
   // Sanctioned render-phase state adjustment (React "adjusting state during
@@ -171,12 +167,12 @@ export function WhatsAppConfigSection() {
     setValidationError(null);
 
     if (!phoneNumberId.trim() || !businessPhone.trim()) {
-      setValidationError("Phone Number ID and Business Phone are required");
+      setValidationError(ui.whatsapp.validationPhoneRequired);
       return;
     }
 
     if (!hasExistingConfig && (!webhookSecret.trim() || !verifyToken.trim())) {
-      setValidationError("Webhook Secret and Verify Token are required for new connections");
+      setValidationError(ui.whatsapp.validationWebhookRequired);
       return;
     }
 
@@ -214,14 +210,14 @@ export function WhatsAppConfigSection() {
       const meta = await metaConfigQuery.refetch();
       const metaData = meta.data;
       if (!metaData) {
-        setConnectError("Could not load the WhatsApp signup configuration.");
+        setConnectError(ui.whatsapp.signupConfigError);
         return;
       }
       await loadFBSDK(metaData.app_id);
 
       const code = await new Promise<string | null>((resolve) => {
         if (!window.FB) {
-          setConnectError("The Meta SDK is not available.");
+          setConnectError(ui.whatsapp.metaSdkUnavailable);
           resolve(null);
           return;
         }
@@ -234,7 +230,7 @@ export function WhatsAppConfigSection() {
             }
             const authCode = response.authResponse?.code;
             if (!authCode) {
-              setConnectError("Meta did not return an authorization code. Please try again.");
+              setConnectError(ui.whatsapp.noAuthCode);
               resolve(null);
               return;
             }
@@ -254,19 +250,19 @@ export function WhatsAppConfigSection() {
       const result = await exchangeMutation.mutateAsync(code);
       if (result.status === "connected") {
         setMicroStepIndex(MICRO_STATUS_STEPS.length - 1);
-        toast.success("WhatsApp connected successfully!");
+        toast.success(ui.whatsapp.connected);
         refetch();
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Connection failed";
+      const message = err instanceof Error ? err.message : ui.whatsapp.connectionFailed;
       if (message.includes("signup_failed")) {
         setSignupErrorCode(message);
-        setConnectError("WhatsApp connection failed during provisioning.");
+        setConnectError(ui.whatsapp.connectFailed);
       } else if (message.includes("signup_already_connected")) {
-        setConnectError("This organization is already connected.");
+        setConnectError(ui.whatsapp.alreadyConnected);
         refetch();
       } else if (message.includes("signup_in_progress")) {
-        setConnectError("A connection is already in progress.");
+        setConnectError(ui.whatsapp.connectionInProgress);
       } else {
         setConnectError(message);
       }
@@ -285,12 +281,12 @@ export function WhatsAppConfigSection() {
   if (error && !notConnected) {
     return (
       <Alert variant="destructive" className="border border-red-200 bg-red-50">
-        <AlertTitle>Failed to load configuration</AlertTitle>
+        <AlertTitle>{ui.whatsapp.loadFailedTitle}</AlertTitle>
         <AlertDescription>
-          {error.message || "Could not fetch WhatsApp configuration. Please try again."}
+          {error.message || ui.whatsapp.loadFailedBody}
         </AlertDescription>
         <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
-          Retry
+          {ui.common.retry}
         </Button>
       </Alert>
     );
@@ -304,16 +300,16 @@ export function WhatsAppConfigSection() {
             <div className="flex items-center gap-3">
               <MessageCircle className="h-6 w-6 text-gray-600" />
               <div>
-                <CardTitle>WhatsApp Business Integration</CardTitle>
+                <CardTitle>{ui.whatsapp.title}</CardTitle>
                 <CardDescription>
-                  Connect your WhatsApp Business Account to receive and manage messages.
+                  {ui.whatsapp.description}
                 </CardDescription>
               </div>
             </div>
             {hasExistingConfig && (
               <div className="flex items-center gap-2">
                 <Label htmlFor="active-toggle" className="text-sm font-medium">
-                  {isActive ? "Active" : "Inactive"}
+                  {isActive ? ui.whatsapp.active : ui.whatsapp.inactive}
                 </Label>
                 <Switch
                   id="active-toggle"
@@ -331,15 +327,13 @@ export function WhatsAppConfigSection() {
             <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
               <MessageCircle className="h-10 w-10 text-gray-400" />
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Connect WhatsApp</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{ui.whatsapp.connectTitle}</h3>
                 <p className="mt-1 max-w-md text-sm text-gray-500">
-                  Keep your mobile WhatsApp Business app and chat history while enabling
-                  automated messaging through the Cloud API. Meta will guide you through
-                  picking your business, number, and verification.
+                  {ui.whatsapp.connectBody}
                 </p>
               </div>
               <Button onClick={handleConnect} className="bg-emerald-600 text-white hover:bg-emerald-700">
-                Connect WhatsApp
+                {ui.whatsapp.connectButton}
               </Button>
             </div>
           )}
@@ -367,19 +361,19 @@ export function WhatsAppConfigSection() {
             <Alert variant="destructive" className="border border-red-200 bg-red-50">
               <AlertTitle className="flex items-center gap-2">
                 <LifeBuoy className="h-4 w-4" />
-                Connection failed
+                {ui.whatsapp.connectionFailedTitle}
               </AlertTitle>
               <AlertDescription>
-                {connectError ?? "WhatsApp connection failed during provisioning."}
+                {connectError ?? ui.whatsapp.connectFailed}
                 {(signupStatusQuery.data?.error_code || signupErrorCode) && (
                   <span className="mt-1 block text-xs text-gray-500">
-                    Error code: {signupStatusQuery.data?.error_code ?? signupErrorCode} — contact
-                    support if this persists.
+                    {ui.whatsapp.errorCodePrefix} {signupStatusQuery.data?.error_code ?? signupErrorCode} —{" "}
+                    {ui.whatsapp.errorCodeHint}
                   </span>
                 )}
               </AlertDescription>
               <Button variant="outline" size="sm" className="mt-3" onClick={handleConnect}>
-                Try again
+                {ui.whatsapp.tryAgain}
               </Button>
             </Alert>
           )}
@@ -388,19 +382,19 @@ export function WhatsAppConfigSection() {
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4">
               <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
                 <CheckCircle className="h-4 w-4" />
-                WhatsApp connected
+                {ui.whatsapp.connected}
               </div>
               <div className="grid gap-2 text-sm text-gray-600 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs text-gray-500">Business phone</p>
+                  <p className="text-xs text-gray-500">{ui.whatsapp.businessPhone}</p>
                   <p className="font-medium text-gray-800">{config.businessPhone}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Phone number ID</p>
+                  <p className="text-xs text-gray-500">{ui.whatsapp.phoneNumberId}</p>
                   <p className="font-medium text-gray-800">{config.phoneNumberId}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">WABA ID</p>
+                  <p className="text-xs text-gray-500">{ui.whatsapp.wabaId}</p>
                   <p className="font-medium text-gray-800">{config.wabaId ?? "—"}</p>
                 </div>
               </div>
@@ -415,16 +409,16 @@ export function WhatsAppConfigSection() {
               onClick={() => setShowAdvanced((v) => !v)}
             >
               {showAdvanced ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
-              Advanced settings
+              {ui.whatsapp.advancedSettings}
             </Button>
           </div>
 
           {showAdvanced && (
             <div className="space-y-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div>
-                <Label className="text-sm font-medium">Webhook Callback URL</Label>
+                <Label className="text-sm font-medium">{ui.whatsapp.webhookCallbackUrl}</Label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Configure this URL in your Meta WhatsApp Business Dashboard under Webhook settings.
+                  {ui.whatsapp.webhookCallbackHint}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 truncate">
@@ -432,7 +426,7 @@ export function WhatsAppConfigSection() {
                   </code>
                   <Button variant="outline" size="sm" onClick={copyCallbackUrl} className="shrink-0">
                     <Copy className="h-4 w-4 mr-1" />
-                    Copy
+                    {ui.whatsapp.copy}
                   </Button>
                 </div>
               </div>
@@ -599,7 +593,7 @@ export function WhatsAppConfigSection() {
                   className="bg-gray-900 text-white hover:bg-gray-800"
                 >
                   {upsertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {hasExistingConfig ? "Save changes" : "Connect WhatsApp"}
+                  {hasExistingConfig ? ui.whatsapp.saveChanges : ui.whatsapp.connectButton}
                 </Button>
 
                 {hasExistingConfig && config && (
@@ -607,12 +601,12 @@ export function WhatsAppConfigSection() {
                     {config.isActive ? (
                       <>
                         <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        <span className="text-emerald-700">Messages are being received</span>
+                        <span className="text-emerald-700">{ui.whatsapp.messagesBeingReceived}</span>
                       </>
                     ) : (
                       <>
                         <XCircle className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-500">Message receiving is paused</span>
+                        <span className="text-gray-500">{ui.whatsapp.messageReceivingPaused}</span>
                       </>
                     )}
                   </div>
@@ -623,7 +617,7 @@ export function WhatsAppConfigSection() {
 
           <p className="flex items-center gap-1 text-xs text-gray-400">
             <ExternalLink className="h-3 w-3" />
-            Requiere configuracion previa de la app de Meta (Embedded Signup).
+            {ui.whatsapp.footerNote}
           </p>
         </CardContent>
       </Card>

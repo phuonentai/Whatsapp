@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/campaigns/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/campaigns/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
@@ -29,7 +29,7 @@ func NewHandler(
 // ---- Segments ----
 
 func (h *Handler) ListSegments(c *gin.Context) {
-	orgID := auth.GetRequestContext(c).OrganizationID
+	orgID := authcontext.GetRequestContext(c).OrganizationID
 	segments, err := h.segmentService.List(c.Request.Context(), orgID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar segmentos", err)
@@ -39,7 +39,7 @@ func (h *Handler) ListSegments(c *gin.Context) {
 }
 
 func (h *Handler) CreateSegment(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	var body struct {
 		Nombre     string          `json:"nombre" binding:"required"`
 		FilterSpec []domain.Filter `json:"filter_spec" binding:"required"`
@@ -57,7 +57,7 @@ func (h *Handler) CreateSegment(c *gin.Context) {
 }
 
 func (h *Handler) UpdateSegment(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	id, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de segmento inválido", nil)
@@ -80,7 +80,7 @@ func (h *Handler) UpdateSegment(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSegment(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	id, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de segmento inválido", nil)
@@ -94,7 +94,7 @@ func (h *Handler) DeleteSegment(c *gin.Context) {
 }
 
 func (h *Handler) PreviewSegment(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	id, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de segmento inválido", nil)
@@ -114,7 +114,7 @@ func (h *Handler) PreviewSegment(c *gin.Context) {
 }
 
 func (h *Handler) GetSegment(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	id, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de segmento inválido", nil)
@@ -129,7 +129,7 @@ func (h *Handler) GetSegment(c *gin.Context) {
 }
 
 func (h *Handler) PreviewSpec(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	var body struct {
 		FilterSpec []domain.Filter `json:"filter_spec" binding:"required"`
 	}
@@ -148,7 +148,7 @@ func (h *Handler) PreviewSpec(c *gin.Context) {
 // AiBuild converts natural language into a validated candidate filter spec
 // with preview. Persists nothing.
 func (h *Handler) AiBuild(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	var body struct {
 		Descripcion string `json:"descripcion" binding:"required"`
 	}
@@ -171,7 +171,7 @@ func (h *Handler) AiBuild(c *gin.Context) {
 // ---- Campaigns ----
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
-	orgID := auth.GetRequestContext(c).OrganizationID
+	orgID := authcontext.GetRequestContext(c).OrganizationID
 	campaigns, err := h.campaignService.List(c.Request.Context(), orgID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar campañas", err)
@@ -181,7 +181,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 }
 
 func (h *Handler) CreateCampaign(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	var body struct {
 		Nombre    string `json:"nombre" binding:"required"`
 		SegmentID int32  `json:"segment_id" binding:"required"`
@@ -203,7 +203,7 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 }
 
 func (h *Handler) LaunchCampaign(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	id, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de campaña inválido", nil)
@@ -226,7 +226,7 @@ func (h *Handler) LaunchCampaign(c *gin.Context) {
 }
 
 func (h *Handler) ListRecipients(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	campaignID, ok := parseID(c)
 	if !ok {
 		response.Error(c, http.StatusBadRequest, "ID de campaña inválido", nil)
@@ -258,7 +258,7 @@ func writeSegmentError(c *gin.Context, err error) {
 	}
 }
 
-func memberID(reqCtx *auth.RequestContext) string {
+func memberID(reqCtx *authcontext.RequestContext) string {
 	if reqCtx.Identity == nil {
 		return ""
 	}

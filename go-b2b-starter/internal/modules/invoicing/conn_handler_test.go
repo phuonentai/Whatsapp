@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
@@ -91,6 +92,10 @@ func (s *stubConnService) ConfirmSandboxOK(ctx context.Context, orgID int32) (*d
 
 func (s *stubConnService) IsLive(ctx context.Context, orgID int32) (bool, error) { return true, nil }
 
+func (s *stubConnService) StatusAll(ctx context.Context) ([]*domain.OrgConnection, error) {
+	return []*domain.OrgConnection{{OrganizationID: 5, Provider: "siigo", Status: domain.ConnStatusConnected}}, nil
+}
+
 func newConnTestHandler(svc services.ConnectionService) *Handler {
 	return &Handler{
 		invoicingService: &stubInvoicingService{},
@@ -116,7 +121,7 @@ func doRequest(h *Handler, method, path string, body string) *httptest.ResponseR
 	r := gin.New()
 	// Identity middleware: admin perms, org 5.
 	r.Use(func(c *gin.Context) {
-		auth.SetIdentity(c, &auth.Identity{
+		auth.SetIdentity(c, &authcontext.Identity{
 			UserID:         "member-1",
 			Email:          "admin@test.local",
 			EmailVerified:  true,
@@ -129,7 +134,7 @@ func doRequest(h *Handler, method, path string, body string) *httptest.ResponseR
 			ExpiresAt: time.Now().Add(time.Hour),
 		})
 		// org_context middleware equivalent: resolves the DB org id.
-		auth.SetRequestContext(c, &auth.RequestContext{
+		authcontext.SetRequestContext(c, &authcontext.RequestContext{
 			OrganizationID: 5,
 			AccountID:      1,
 		})

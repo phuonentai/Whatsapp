@@ -15,6 +15,7 @@ export function KnowledgeContent() {
     data: documentsData,
     isLoading: isDocumentsLoading,
     isFetching: isDocumentsFetching,
+    isError: isDocumentsError,
     refetch: refetchDocuments,
   } = useDocumentsQuery();
 
@@ -25,11 +26,19 @@ export function KnowledgeContent() {
   const processedDocCount = documents.filter((d) => d.status === "processed").length;
 
   const handleUpload = async (file: File, title: string) => {
-    await uploadMutation.mutateAsync({ file, title });
+    try {
+      await uploadMutation.mutateAsync({ file, title });
+    } catch {
+      // error handled by mutation
+    }
   };
 
   const handleDeleteDocument = async (documentId: number) => {
-    await deleteMutation.mutateAsync({ documentId });
+    try {
+      await deleteMutation.mutateAsync({ documentId });
+    } catch {
+      // error handled by mutation
+    }
   };
 
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -159,6 +168,8 @@ export function KnowledgeContent() {
           isSessionsLoading={isSessionsLoading}
           isDocumentsLoading={isDocumentsLoading}
           isDocumentsFetching={isDocumentsFetching}
+          isDocumentsError={isDocumentsError}
+          onRetryDocuments={() => refetchDocuments()}
           onSelectSession={handleSelectSession}
           onNewChat={handleNewChat}
           onUploadDocument={handleUpload}

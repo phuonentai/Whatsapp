@@ -7,16 +7,28 @@ import { useModule } from "@/lib/hooks/use-entitlement";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/common/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 export function ModulesSection() {
-  const { data: catalog, isLoading } = useModulesCatalogQuery();
+  const { data: catalog, isLoading, isError, refetch, isRefetching } = useModulesCatalogQuery();
   const { data: orgModules } = useOrgModulesQuery();
 
   if (isLoading) {
     return <div className="text-sm text-gray-500">Cargando módulos...</div>;
+  }
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar los módulos"
+        description="No se pudieron cargar los módulos. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { ConversationList } from "./components/conversation-list";
 import { MessageThread } from "./components/message-thread";
 import { ConversationHeader } from "./components/conversation-header";
@@ -17,6 +18,8 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { usePendingSuggestionsQuery } from "@/lib/hooks/queries/use-pending-suggestions-query";
 import { useSequence } from "@/lib/hooks/use-sequence";
+import { useInboxStore } from "@/lib/stores/use-inbox-store";
+import { markInboxVisited } from "@/lib/onboarding/storage";
 import type { Conversation, ConversationStatus, Channel } from "@/lib/models/conversation.model";
 import type { PlaybookGuionDto } from "@/lib/api/api/dto/playbook.dto";
 
@@ -29,6 +32,8 @@ export default function InboxPage() {
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [draft, setDraft] = useState<string>("");
+  const lastSeenAt = useInboxStore((s) => s.lastSeenAt);
+  const markSeen = useInboxStore((s) => s.markSeen);
 
   const rawChannel = searchParams.get("channel");
   const channelFilter: Channel | "all" = CHANNEL_VALUES.includes(rawChannel as Channel)
@@ -55,11 +60,27 @@ export default function InboxPage() {
     }
   }, [isInitialized, hasPermission, router]);
 
-  const { data: conversations, isLoading: isConvsLoading } = useConversationsQuery({
+  useEffect(() => {
+    markInboxVisited();
+  }, []);
+
+  const {
+    data: conversations,
+    isLoading: isConvsLoading,
+    isError: isConvsError,
+    refetch: refetchConvs,
+    isRefetching: isConvsRefetching,
+  } = useConversationsQuery({
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(channelFilter !== "all" ? { channel: channelFilter } : {}),
   });
-  const { data: messages, isLoading: isMsgsLoading } = useMessagesQuery(selectedConv?.id);
+  const {
+    data: messages,
+    isLoading: isMsgsLoading,
+    isError: isMsgsError,
+    refetch: refetchMsgs,
+    isRefetching: isMsgsRefetching,
+  } = useMessagesQuery(selectedConv?.id);
   const { data: pendingSuggestions } = usePendingSuggestionsQuery();
   const sendMsgMutation = useSendMessage(selectedConv?.id ?? 0);
   const updateStatusMutation = useUpdateConversationStatus();
@@ -83,11 +104,13 @@ export default function InboxPage() {
     setSelectedConv(conv);
     sequence.reset();
     setDraft("");
+    markSeen(conv.id);
   };
 
   const handleSendMessage = async (content: string) => {
     if (!selectedConv) return;
     await sendMsgMutation.mutateAsync(content);
+    markSeen(selectedConv.id);
   };
 
   const handleSelectGuion = (guion: PlaybookGuionDto) => {
@@ -105,11 +128,15 @@ export default function InboxPage() {
   const handleToggleStatus = async () => {
     if (!selectedConv) return;
     const newStatus: ConversationStatus = selectedConv.status === "active" ? "closed" : "active";
-    await updateStatusMutation.mutateAsync({
-      conversationId: selectedConv.id,
-      status: newStatus,
-    });
-    setSelectedConv({ ...selectedConv, status: newStatus });
+    try {
+      await updateStatusMutation.mutateAsync({
+        conversationId: selectedConv.id,
+        status: newStatus,
+      });
+      setSelectedConv({ ...selectedConv, status: newStatus });
+    } catch {
+      toast.error("No se pudo actualizar el estado de la conversación. Inténtalo de nuevo.");
+    }
   };
 
   return (
@@ -120,11 +147,15 @@ export default function InboxPage() {
           selectedId={selectedConv?.id}
           onSelect={handleSelectConversation}
           isLoading={isConvsLoading}
+          isError={isConvsError}
+          onRetry={() => refetchConvs()}
+          isRetrying={isConvsRefetching}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           channelFilter={channelFilter}
           onChannelFilterChange={handleChannelChange}
           pendingCounts={pendingCounts}
+          lastSeenAt={lastSeenAt}
         />
       </div>
 
@@ -136,7 +167,13 @@ export default function InboxPage() {
               onToggleStatus={handleToggleStatus}
               isUpdating={updateStatusMutation.isPending}
             />
-            <MessageThread messages={messages ?? []} isLoading={isMsgsLoading} />
+            <MessageThread
+              messages={messages ?? []}
+              isLoading={isMsgsLoading}
+              isError={isMsgsError}
+              onRetry={() => refetchMsgs()}
+              isRetrying={isMsgsRefetching}
+            />
             <AgentSuggestionsPanel conversationId={selectedConv.id} />
             <QuickReplies
               conversationId={selectedConv.id}

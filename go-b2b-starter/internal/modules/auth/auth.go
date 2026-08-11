@@ -60,7 +60,6 @@ package auth
 
 import (
 	"context"
-	"time"
 )
 
 // AuthProvider abstracts the authentication provider (Stytch, Auth0, Firebase, etc.).
@@ -79,91 +78,6 @@ type AuthProvider interface {
 	// The token is typically a JWT from the Authorization header.
 	// Returns ErrInvalidToken, ErrTokenExpired, or other auth errors on failure.
 	VerifyToken(ctx context.Context, token string) (*Identity, error)
-}
-
-// Identity represents an authenticated user in a provider-agnostic way.
-//
-// This struct contains all the information needed by the application
-// after a user has been authenticated. Provider-specific data is stored
-// in the Raw field for debugging or advanced use cases.
-type Identity struct {
-	// UserID is the unique identifier for the user from the auth provider.
-	// For Stytch, this is the member_id. For Auth0, this is the sub claim.
-	UserID string `json:"user_id"`
-
-	// Email is the user's email address.
-	Email string `json:"email"`
-
-	// EmailVerified indicates whether the email has been verified.
-	EmailVerified bool `json:"email_verified"`
-
-	// OrganizationID is the auth provider's organization/tenant identifier.
-	// This is a string UUID from the provider, NOT the database int32 ID.
-	// Use RequestContext.OrganizationID for the database ID.
-	OrganizationID string `json:"organization_id"`
-
-	// Roles contains the user's role assignments (e.g., "admin", "member").
-	Roles []Role `json:"roles"`
-
-	// Permissions contains the derived permissions in "resource:action" format.
-	// These are derived from roles by the auth provider or adapter.
-	Permissions []Permission `json:"permissions"`
-
-	// ExpiresAt is when the token/session expires.
-	ExpiresAt time.Time `json:"expires_at"`
-
-	// Raw contains provider-specific data for debugging or advanced use cases.
-	// This should NOT be used in normal application logic.
-	Raw map[string]any `json:"raw,omitempty"`
-}
-
-// HasRole checks if the identity has a specific role.
-func (i *Identity) HasRole(role Role) bool {
-	for _, r := range i.Roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
-}
-
-// HasPermission checks if the identity has a specific permission.
-func (i *Identity) HasPermission(permission Permission) bool {
-	for _, p := range i.Permissions {
-		if p == permission {
-			return true
-		}
-	}
-	return false
-}
-
-// HasResourcePermission checks if the identity has permission for a resource and action.
-func (i *Identity) HasResourcePermission(resource, action string) bool {
-	return i.HasPermission(NewPermission(resource, action))
-}
-
-// RequestContext holds the resolved database IDs for the current request.
-//
-// This is set by the RequireOrganization middleware after looking up
-// the organization and account in the database using the Identity's
-// provider-specific IDs.
-//
-// Use auth.GetRequestContext(c) to retrieve this in handlers.
-type RequestContext struct {
-	// Identity contains the authenticated user information from the auth provider.
-	Identity *Identity `json:"identity"`
-
-	// OrganizationID is the database primary key (int32) for the organization.
-	// This is resolved from Identity.OrganizationID by the middleware.
-	OrganizationID int32 `json:"organization_id"`
-
-	// AccountID is the database primary key (int32) for the user's account.
-	// This is resolved from Identity.Email by the middleware.
-	AccountID int32 `json:"account_id"`
-
-	// ProviderOrgID preserves the original provider organization ID for reference.
-	// Use this when making calls back to the auth provider.
-	ProviderOrgID string `json:"provider_org_id,omitempty"`
 }
 
 // OrganizationRepository defines the interface for looking up organizations.

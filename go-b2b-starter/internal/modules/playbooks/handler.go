@@ -6,14 +6,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	playbooksServices "github.com/moasq/go-b2b-starter/internal/modules/playbooks/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/playbooks/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 )
 
 func orgIDFromContext(c *gin.Context) int32 {
-	rc := auth.GetRequestContext(c)
+	rc := authcontext.GetRequestContext(c)
 	if rc == nil {
 		return 0
 	}

@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useMemo, useCallback, useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
+import { Check, Monitor, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { buildLoginUrl } from "@/lib/auth/stytch-client";
@@ -30,6 +35,7 @@ export function UserMenu() {
   const authContext = useAuthContext();
   const queryClient = useQueryClient();
   const stytchConfig = useStytchConfig();
+  const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
 
   const loginHref = useMemo(() => {
@@ -50,7 +56,7 @@ export function UserMenu() {
 
   if (!isInitialized) {
     return (
-      <div className="h-9 w-24 animate-pulse rounded-md bg-gray-100" aria-label="Loading user" />
+      <div className="h-9 w-24 animate-pulse rounded-md bg-muted" aria-label="Loading user" />
     );
   }
 
@@ -69,7 +75,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="h-9 gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
             {initials}
           </span>
           <span className="hidden max-w-[160px] truncate text-sm md:inline">{display}</span>
@@ -79,6 +85,43 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/dashboard">Dashboard</Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Theme
+        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            onClick={() => setTheme("light")}
+            className="justify-between"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Sun className="h-4 w-4" aria-hidden />
+              Light
+            </span>
+            {theme === "light" && <Check className="h-4 w-4" aria-hidden />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setTheme("dark")}
+            className="justify-between"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Moon className="h-4 w-4" aria-hidden />
+              Dark
+            </span>
+            {theme === "dark" && <Check className="h-4 w-4" aria-hidden />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setTheme("system")}
+            className="justify-between"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Monitor className="h-4 w-4" aria-hidden />
+              System
+            </span>
+            {theme === "system" && <Check className="h-4 w-4" aria-hidden />}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} disabled={isPending}>
           {isPending ? "Logging out..." : "Log out"}
         </DropdownMenuItem>

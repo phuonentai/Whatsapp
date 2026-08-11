@@ -12,6 +12,7 @@ import type { CompanyDto } from "@/lib/api/api/dto/crm.dto";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { CompanyDialog } from "@/components/crm/company-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 
 export function CompanyTable() {
@@ -24,7 +25,7 @@ export function CompanyTable() {
   const hasCompanies = useFeature("crm_companies");
   const { hasPermission } = usePermissions();
   const canExport = hasPermission("contact:export");
-  const { data: companies, isLoading } = useCompaniesQuery();
+  const { data: companies, isLoading, isError, refetch, isRefetching } = useCompaniesQuery();
   const deleteMutation = useDeleteCompany();
 
   const handleExport = async () => {
@@ -49,12 +50,27 @@ export function CompanyTable() {
 
   const handleDelete = async () => {
     if (!deleting) return;
-    await deleteMutation.mutateAsync(deleting.id);
-    toast.success("Empresa eliminada");
-    setDeleting(null);
+    try {
+      await deleteMutation.mutateAsync(deleting.id);
+      toast.success("Empresa eliminada");
+      setDeleting(null);
+    } catch {
+      // error toast handled by mutation
+    }
   };
 
   if (isLoading) return <div className="text-gray-500">Cargando empresas...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar las empresas"
+        description="No se pudieron cargar las empresas. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   return (
     <div>

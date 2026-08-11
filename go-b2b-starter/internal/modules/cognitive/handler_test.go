@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/cognitive/domain"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
@@ -49,7 +49,7 @@ func newChatHandlerTestContext(body string, accept string) (*gin.Context, *httpt
 	if accept != "" {
 		c.Request.Header.Set("Accept", accept)
 	}
-	auth.SetRequestContext(c, &auth.RequestContext{OrganizationID: 1, AccountID: 1})
+	authcontext.SetRequestContext(c, &authcontext.RequestContext{OrganizationID: 1, AccountID: 1})
 	features.SetEntitlement(c, &features.Entitlement{
 		Features: map[string]bool{"ai_assistant": true},
 	})

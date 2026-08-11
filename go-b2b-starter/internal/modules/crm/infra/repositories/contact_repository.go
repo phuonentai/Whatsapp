@@ -141,6 +141,31 @@ func (r *contactRepository) Search(ctx context.Context, orgID int32, query strin
 	return contacts, nil
 }
 
+func (r *contactRepository) CountFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo int32) (int32, error) {
+	count, err := r.store.CountContactsByOrganizationFiltered(ctx, sqlc.CountContactsByOrganizationFilteredParams{
+		OrganizationID: orgID,
+		Column2:        interface{}(source),
+		Column3:        interface{}(leadStatus),
+		Column4:        companyID,
+		Column5:        assignedTo,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count filtered contacts: %w", err)
+	}
+	return int32(count), nil
+}
+
+func (r *contactRepository) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	count, err := r.store.CountSearchContacts(ctx, sqlc.CountSearchContactsParams{
+		OrganizationID: orgID,
+		Column2:        helpers.ToPgText(query),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count search contacts: %w", err)
+	}
+	return int32(count), nil
+}
+
 func (r *contactRepository) Update(ctx context.Context, contact *domain.Contact) (*domain.Contact, error) {
 	result, err := r.store.UpdateContact(ctx, sqlc.UpdateContactParams{
 		ID:             contact.ID,

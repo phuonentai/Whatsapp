@@ -10,7 +10,7 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/analytics/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/analytics/domain"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 )
 
@@ -23,7 +23,7 @@ func NewHandler(reportService *services.SalesReportService) *Handler {
 }
 
 func (h *Handler) Revenue(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	period := c.Query("period")
 	if period == "" {
 		period = "month"
@@ -47,7 +47,7 @@ func (h *Handler) Revenue(c *gin.Context) {
 }
 
 func (h *Handler) TopCustomers(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	limit, err := parseInt32Param(c.Query("limit"), 0, 50)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Parámetro limit inválido.", domain.ErrInvalidLimit)
@@ -62,7 +62,7 @@ func (h *Handler) TopCustomers(c *gin.Context) {
 }
 
 func (h *Handler) Funnel(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	report, err := h.reportService.Funnel(c.Request.Context(), ctx.OrganizationID)
 	if err != nil {
 		writeServiceError(c, err, "Error al generar el reporte de embudo")
@@ -72,7 +72,7 @@ func (h *Handler) Funnel(c *gin.Context) {
 }
 
 func (h *Handler) InactiveContacts(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	days, err := parseInt32Param(c.Query("days"), 1, 365)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Parámetro days inválido.", domain.ErrInvalidDays)

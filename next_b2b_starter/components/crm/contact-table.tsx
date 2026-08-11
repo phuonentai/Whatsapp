@@ -13,6 +13,7 @@ import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { ContactDialog } from "@/components/crm/contact-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
 import { ContactImportDialog } from "@/components/crm/contact-import-dialog";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 
 export function ContactTable() {
@@ -27,7 +28,7 @@ export function ContactTable() {
   const canManage = useFeature("crm_contacts_manage");
   const { hasPermission } = usePermissions();
   const canExport = hasPermission("contact:export");
-  const { data: contacts, isLoading } = useContactsQuery({ lead_status: filterStatus || undefined });
+  const { data: contacts, isLoading, isError, refetch, isRefetching } = useContactsQuery({ lead_status: filterStatus || undefined });
   const deleteMutation = useDeleteContact();
 
   const handleExport = async () => {
@@ -54,12 +55,27 @@ export function ContactTable() {
 
   const handleDelete = async () => {
     if (!deleting) return;
-    await deleteMutation.mutateAsync(deleting.id);
-    toast.success("Contacto eliminado");
-    setDeleting(null);
+    try {
+      await deleteMutation.mutateAsync(deleting.id);
+      toast.success("Contacto eliminado");
+      setDeleting(null);
+    } catch {
+      // error toast handled by mutation
+    }
   };
 
   if (isLoading) return <div className="text-gray-500">Cargando contactos...</div>;
+
+  if (isError) {
+    return (
+      <ErrorState
+        title="Error al cargar los contactos"
+        description="No se pudieron cargar los contactos. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   return (
     <div>

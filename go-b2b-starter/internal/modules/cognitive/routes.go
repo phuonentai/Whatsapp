@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	serverDomain "github.com/moasq/go-b2b-starter/internal/platform/server/domain"
 )
@@ -34,7 +35,7 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 	cognitiveGroup.Use(
 		resolver.Get("auth"),
 		resolver.Get("org_context"),
-		features.EntitlementMiddleware(r.featureProvider, auth.GetRequestContext),
+		features.EntitlementMiddleware(r.featureProvider, authcontext.GetRequestContext),
 		resolver.Get("subscription"),
 	)
 	{

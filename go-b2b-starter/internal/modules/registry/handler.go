@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/registry/domain"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
@@ -33,7 +33,7 @@ func (h *Handler) GetCatalog(c *gin.Context) {
 
 // GetOrgModules returns the requesting org's enabled modules with configs.
 func (h *Handler) GetOrgModules(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	modules, orgMods, err := h.moduleService.ListOrgModules(c.Request.Context(), ctx.OrganizationID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar módulos de la organización", err)
@@ -68,7 +68,7 @@ func (h *Handler) GetMyModules(c *gin.Context) {
 
 // SaveModuleConfig validates and persists the org's module config.
 func (h *Handler) SaveModuleConfig(c *gin.Context) {
-	ctx := auth.GetRequestContext(c)
+	ctx := authcontext.GetRequestContext(c)
 	moduleKey := c.Param("key")
 	var req map[string]any
 	if err := c.ShouldBindJSON(&req); err != nil {

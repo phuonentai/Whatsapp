@@ -52,14 +52,18 @@ export function CompanyDialog({ open, onOpenChange, company }: CompanyDialogProp
   }, [open, company, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
-    if (isEdit && company) {
-      await updateMutation.mutateAsync({ id: company.id, data: values });
-      toast.success("Empresa actualizada");
-    } else {
-      await createMutation.mutateAsync(values);
-      toast.success("Empresa creada");
+    try {
+      if (isEdit && company) {
+        await updateMutation.mutateAsync({ id: company.id, data: values });
+        toast.success("Empresa actualizada");
+      } else {
+        await createMutation.mutateAsync(values);
+        toast.success("Empresa creada");
+      }
+      onOpenChange(false);
+    } catch {
+      // dialog stays open with entered values; error toast handled by mutation
     }
-    onOpenChange(false);
   });
 
   return (

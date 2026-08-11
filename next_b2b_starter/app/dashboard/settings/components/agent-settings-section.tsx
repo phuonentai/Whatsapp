@@ -12,6 +12,7 @@ import { Loader2, Sparkles, Plus, X } from "lucide-react";
 import { useAgentSettingsQuery } from "@/lib/hooks/queries/use-agent-settings-query";
 import { useUpdateAgentSettings } from "@/lib/hooks/mutations/use-update-agent-settings";
 import type { AgentSettings } from "@/lib/models/agent.model";
+import { ui, tpl } from "@/lib/copy/ui";
 
 export function AgentSettingsSection() {
   const { data: settings, isLoading, error, refetch } = useAgentSettingsQuery();
@@ -52,12 +53,12 @@ export function AgentSettingsSection() {
   if (error && !settings) {
     return (
       <Alert variant="destructive" className="border border-red-200 bg-red-50">
-        <AlertTitle>Error al cargar</AlertTitle>
+        <AlertTitle>{ui.agent.loadErrorTitle}</AlertTitle>
         <AlertDescription>
-          {error.message || "No se pudo cargar la configuración del asistente IA."}
+          {error.message || ui.agent.loadErrorBody}
         </AlertDescription>
         <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
-          Reintentar
+          {ui.common.retry}
         </Button>
       </Alert>
     );
@@ -117,9 +118,9 @@ export function AgentSettingsSection() {
           <div className="flex items-center gap-3">
             <Sparkles className="h-6 w-6 text-gray-600" />
             <div>
-              <CardTitle>Asistente IA de WhatsApp</CardTitle>
+              <CardTitle>{ui.agent.settingsTitle}</CardTitle>
               <CardDescription>
-                Configura cómo el agente redacta y responde mensajes en tus conversaciones.
+                {ui.agent.settingsDescription}
               </CardDescription>
             </div>
           </div>
@@ -127,41 +128,41 @@ export function AgentSettingsSection() {
         <CardContent className="space-y-6">
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Modo</Label>
+              <Label className="text-sm font-medium">{ui.agent.mode}</Label>
               <select
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 value={form.mode}
                 onChange={(e) => set("mode", e.target.value as AgentSettings["mode"])}
                 disabled={updateMutation.isPending}
               >
-                <option value="copilot">Copiloto (sugiere respuestas, un humano aprueba)</option>
-                <option value="autopilot">Autopiloto (responde solo dentro de la ventana)</option>
+                <option value="copilot">{ui.agent.modeCopilot}</option>
+                <option value="autopilot">{ui.agent.modeAutopilot}</option>
               </select>
               <p className="text-xs text-gray-500">
-                Copiloto redacta borradores. Autopiloto envía respuestas autónomas solo si todas las reglas se cumplen.
+                {ui.agent.modeHint}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Tono de voz</Label>
+              <Label className="text-sm font-medium">{ui.agent.tone}</Label>
               <select
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 value={form.tone}
                 onChange={(e) => set("tone", e.target.value as AgentSettings["tone"])}
                 disabled={updateMutation.isPending}
               >
-                <option value="formal">Formal (usted)</option>
-                <option value="casual">Informal (tú/vos)</option>
+                <option value="formal">{ui.agent.toneFormal}</option>
+                <option value="casual">{ui.agent.toneCasual}</option>
               </select>
-              <p className="text-xs text-gray-500">Registro usado en las respuestas generadas.</p>
+              <p className="text-xs text-gray-500">{ui.agent.toneHint}</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Voz de la marca</Label>
+            <Label className="text-sm font-medium">{ui.agent.brandVoice}</Label>
             <Input
               type="text"
-              placeholder="Ej: Atendemos con calidez y rapidez, siempre en español colombiano."
+              placeholder={ui.agent.brandVoicePlaceholder}
               value={form.brand_voice ?? ""}
               onChange={(e) => set("brand_voice", e.target.value)}
               disabled={updateMutation.isPending}
@@ -170,7 +171,7 @@ export function AgentSettingsSection() {
 
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Ventana autopiloto (inicio)</Label>
+              <Label className="text-sm font-medium">{ui.agent.autopilotStart}</Label>
               <Input
                 type="time"
                 value={form.autopilot_start ?? ""}
@@ -179,7 +180,7 @@ export function AgentSettingsSection() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Ventana autopiloto (fin)</Label>
+              <Label className="text-sm font-medium">{ui.agent.autopilotEnd}</Label>
               <Input
                 type="time"
                 value={form.autopilot_end ?? ""}
@@ -188,7 +189,7 @@ export function AgentSettingsSection() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Zona horaria</Label>
+              <Label className="text-sm font-medium">{ui.agent.timezone}</Label>
               <Input
                 type="text"
                 value={form.timezone ?? "America/Bogota"}
@@ -200,7 +201,7 @@ export function AgentSettingsSection() {
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Límite de mensajes diarios (0 = ilimitado)</Label>
+              <Label className="text-sm font-medium">{ui.agent.maxDailyMessages}</Label>
               <Input
                 type="number"
                 min={0}
@@ -210,7 +211,7 @@ export function AgentSettingsSection() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Descuento máximo permitido (%)</Label>
+              <Label className="text-sm font-medium">{ui.agent.maxDiscount}</Label>
               <Input
                 type="number"
                 min={0}
@@ -228,8 +229,8 @@ export function AgentSettingsSection() {
 
           <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div>
-              <Label className="text-sm font-medium">Interruptor de emergencia</Label>
-              <p className="text-xs text-gray-500">Bloquea todos los envíos del agente inmediatamente.</p>
+              <Label className="text-sm font-medium">{ui.agent.killSwitch}</Label>
+              <p className="text-xs text-gray-500">{ui.agent.killSwitchHint}</p>
             </div>
             <Switch
               checked={form.kill_switch}
@@ -239,12 +240,12 @@ export function AgentSettingsSection() {
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
-            <Label className="text-sm font-medium">Términos prohibidos (nunca usarlos en respuestas)</Label>
+            <Label className="text-sm font-medium">{ui.agent.forbiddenTerms}</Label>
             <div className="mt-2 flex flex-wrap gap-2">
               {(form.guardrails.never?.forbidden_terms ?? []).map((term, i) => (
                 <span key={`forbidden-${i}`} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs text-red-700">
                   {term}
-                  <button type="button" onClick={() => removeTerm("never", i)} aria-label={`Quitar ${term}`}>
+                  <button type="button" onClick={() => removeTerm("never", i)} aria-label={tpl(ui.agent.removeAria, { term })}>
                     <X className="h-3 w-3" />
                   </button>
                 </span>
@@ -253,7 +254,7 @@ export function AgentSettingsSection() {
             <div className="mt-2 flex gap-2">
               <Input
                 type="text"
-                placeholder="Ej: garantía total, envío gratis"
+                placeholder={ui.agent.forbiddenPlaceholder}
                 value={newForbiddenTerm}
                 onChange={(e) => setNewForbiddenTerm(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addForbiddenTerm(); } }}
@@ -265,13 +266,13 @@ export function AgentSettingsSection() {
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
-            <Label className="text-sm font-medium">Temas de escalamiento (derivar a un humano)</Label>
-            <p className="text-xs text-gray-500">Si el cliente menciona estos temas, el agente nunca responde solo.</p>
+            <Label className="text-sm font-medium">{ui.agent.escalateTerms}</Label>
+            <p className="text-xs text-gray-500">{ui.agent.escalateHint}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(form.guardrails.escalate?.terms ?? []).map((term, i) => (
                 <span key={`escalate-${i}`} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700">
                   {term}
-                  <button type="button" onClick={() => removeTerm("escalate", i)} aria-label={`Quitar ${term}`}>
+                  <button type="button" onClick={() => removeTerm("escalate", i)} aria-label={tpl(ui.agent.removeAria, { term })}>
                     <X className="h-3 w-3" />
                   </button>
                 </span>
@@ -280,7 +281,7 @@ export function AgentSettingsSection() {
             <div className="mt-2 flex gap-2">
               <Input
                 type="text"
-                placeholder="Ej: abogado, legal, garantía, demanda"
+                placeholder={ui.agent.escalatePlaceholder}
                 value={newEscalateTerm}
                 onChange={(e) => setNewEscalateTerm(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEscalateTerm(); } }}
@@ -293,9 +294,9 @@ export function AgentSettingsSection() {
 
           <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div>
-              <Label className="text-sm font-medium">Consentimiento requerido (Ley 1581)</Label>
+              <Label className="text-sm font-medium">{ui.agent.consentRequired}</Label>
               <p className="text-xs text-gray-500">
-                Solicita autorización de tratamiento de datos antes de responder autónomamente.
+                {ui.agent.consentHint}
               </p>
             </div>
             <Switch
@@ -307,13 +308,13 @@ export function AgentSettingsSection() {
 
           {form.consent_required && (
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Mensaje de consentimiento</Label>
+              <Label className="text-sm font-medium">{ui.agent.consentMessage}</Label>
               <textarea
                 className="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                 value={form.consent_template ?? ""}
                 onChange={(e) => set("consent_template", e.target.value)}
                 disabled={updateMutation.isPending}
-                placeholder="Hola, para atenderte necesitamos tu autorización para el tratamiento de tus datos personales conforme a la Ley 1581. ¿Nos autorizas? (Responde sí o acepto)."
+                placeholder={ui.agent.consentPlaceholder}
               />
             </div>
           )}
@@ -325,7 +326,7 @@ export function AgentSettingsSection() {
               className="bg-gray-900 text-white hover:bg-gray-800"
             >
               {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar configuración
+              {ui.agent.saveConfig}
             </Button>
           </div>
         </CardContent>

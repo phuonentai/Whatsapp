@@ -9,11 +9,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Download, Trash2, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { agentRepository } from "@/lib/api/api/repositories/agent-repository";
+import { ConfirmDialog } from "@/components/crm/confirm-dialog";
 
 export function ComplianceSection() {
   const [contactId, setContactId] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [isForgetting, setIsForgetting] = useState(false);
+  const [forgetConfirmOpen, setForgetConfirmOpen] = useState(false);
   const [exportResult, setExportResult] = useState<{ contactName: string; conversations: number } | null>(null);
 
   const handleExport = async () => {
@@ -50,9 +52,6 @@ export function ComplianceSection() {
       toast.error("Ingresa un ID de contacto válido");
       return;
     }
-    if (!window.confirm("¿Anonimizar todos los datos personales de este contacto? Esta acción no se puede deshacer.")) {
-      return;
-    }
     setIsForgetting(true);
     try {
       await agentRepository.forgetContact(id);
@@ -61,6 +60,7 @@ export function ComplianceSection() {
       toast.error(err instanceof Error ? err.message : "Error al anonimizar el contacto");
     } finally {
       setIsForgetting(false);
+      setForgetConfirmOpen(false);
     }
   };
 
@@ -121,7 +121,14 @@ export function ComplianceSection() {
               Exportar datos del contacto
             </Button>
             <Button
-              onClick={handleForget}
+              onClick={() => {
+                const id = Number(contactId);
+                if (!Number.isInteger(id) || id <= 0) {
+                  toast.error("Ingresa un ID de contacto válido");
+                  return;
+                }
+                setForgetConfirmOpen(true);
+              }}
               disabled={isForgetting || !contactId}
               variant="outline"
               className="text-red-600 hover:bg-red-50"
@@ -132,6 +139,17 @@ export function ComplianceSection() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={forgetConfirmOpen}
+        onOpenChange={setForgetConfirmOpen}
+        title="Derecho al olvido"
+        description="¿Anonimizar todos los datos personales de este contacto? Esta acción no se puede deshacer."
+        confirmLabel="Anonimizar"
+        destructive
+        loading={isForgetting}
+        onConfirm={() => void handleForget()}
+      />
     </div>
   );
 }

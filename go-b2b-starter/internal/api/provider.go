@@ -1,7 +1,11 @@
 package api
 
 import (
+	"net/http/pprof"
+
 	"go.uber.org/dig"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent"
 	"github.com/moasq/go-b2b-starter/internal/modules/analytics"
@@ -17,7 +21,24 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/tickets"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp"
 	server "github.com/moasq/go-b2b-starter/internal/platform/server/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/server/config"
+	"github.com/moasq/go-b2b-starter/internal/platform/server/metrics"
 )
+
+// setupProfiling registers pprof handlers only when explicitly enabled
+// (PPROF_ENABLED=true); default is off, including in production.
+func setupProfiling(engine *gin.Engine, cfg *config.Config) {
+	if !cfg.PprofEnabled {
+		return
+	}
+	pprofGroup := engine.Group("/debug/pprof")
+	pprofGroup.GET("", gin.WrapF(pprof.Index))
+	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
+	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
+	pprofGroup.GET("/symbol", gin.WrapF(pprof.Symbol))
+	pprofGroup.POST("/symbol", gin.WrapF(pprof.Symbol))
+	pprofGroup.GET("/trace", gin.WrapF(pprof.Trace))
+}
 
 type moduleRoutes struct {
 	OrganizationRoutes  *organizations.Routes
@@ -82,8 +103,12 @@ func registerAPI(container *dig.Container) error {
 
 	return container.Invoke(func(
 		srv server.Server,
+		engine *gin.Engine,
+		cfg *config.Config,
 		modules *moduleRoutes,
 	) {
+		metrics.SetupPrometheus(engine)
+		setupProfiling(engine, cfg)
 		srv.RegisterRoutes(modules.OrganizationRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.RbacRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.SubscriptionHandler.Routes, server.ApiPrefix)

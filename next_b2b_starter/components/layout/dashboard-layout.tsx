@@ -7,6 +7,9 @@ import { toast } from "sonner";
 
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { CommandPalette } from "@/components/common/command-palette";
+import { ShortcutsHelpOverlay } from "@/components/common/shortcuts-help-overlay";
+import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts";
 import { PlansModal } from "@/components/billing/plans-modal";
 import {
   SubscriptionAlerts,
@@ -147,27 +150,39 @@ export function DashboardLayout({
 
   const isReady = Boolean(auth?.isInitialized && permissions);
 
+  useGlobalShortcuts();
+
   if (!isReady || !permissions) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="h-8 w-8 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <div className="h-8 w-8 border-4 border-border border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-background">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[300] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        >
+          Skip to content
+        </a>
         <Sidebar
           permissions={permissions}
         />
         <Header />
+        <CommandPalette />
+        <ShortcutsHelpOverlay />
 
         <main
+          id="main-content"
+          tabIndex={-1}
           className={cn(
-            "p-6 transition-[padding] duration-200",
+            "p-6 transition-[padding] duration-200 focus:outline-none",
             isSidebarCollapsed ? "lg:pl-24" : "lg:pl-64"
           )}
         >

@@ -7,6 +7,7 @@ import {
   useSetTicketPriority,
   useAddInternalNote,
 } from "@/lib/hooks/mutations/use-tickets-mutations";
+import { ErrorState } from "@/components/common/error-state";
 import type { TicketDto } from "@/lib/api/api/repositories/ticket-repository";
 
 const STATUS_OPTIONS: { value: TicketDto["status"]; label: string }[] = [
@@ -18,13 +19,24 @@ const STATUS_OPTIONS: { value: TicketDto["status"]; label: string }[] = [
 ];
 
 export function TicketDetail({ id }: { id: number }) {
-  const { data, isLoading } = useTicketQuery(id);
+  const { data, isLoading, isError, refetch, isRefetching } = useTicketQuery(id);
   const transition = useTransitionTicket();
   const setPriority = useSetTicketPriority();
   const addNote = useAddInternalNote();
   const [note, setNote] = useState("");
 
-  if (isLoading || !data) return <div className="text-gray-500 text-sm">Cargando...</div>;
+  if (isLoading) return <div className="text-gray-500 text-sm">Cargando...</div>;
+
+  if (isError || !data) {
+    return (
+      <ErrorState
+        title="Error al cargar el ticket"
+        description="No se pudo cargar el ticket. Inténtalo de nuevo."
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
+  }
 
   const { ticket, eventos } = data;
 

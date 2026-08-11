@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTicketsQuery } from "@/lib/hooks/queries/use-modules-queries";
 import { useCreateTicket } from "@/lib/hooks/mutations/use-tickets-mutations";
+import { ErrorState } from "@/components/common/error-state";
 import type { TicketDto } from "@/lib/api/api/repositories/ticket-repository";
 
 const STATUSES = [
@@ -30,7 +31,7 @@ export function TicketList({
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
 }) {
-  const { data: tickets, isLoading } = useTicketsQuery(statusFilter ? { status: statusFilter } : undefined);
+  const { data: tickets, isLoading, isError, refetch, isRefetching } = useTicketsQuery(statusFilter ? { status: statusFilter } : undefined);
   const createTicket = useCreateTicket();
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
@@ -79,6 +80,15 @@ export function TicketList({
       )}
 
       {isLoading && <div className="text-gray-500 text-sm">Cargando tickets...</div>}
+
+      {isError && (
+        <ErrorState
+          title="Error al cargar los tickets"
+          description="No se pudieron cargar los tickets. Inténtalo de nuevo."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+        />
+      )}
 
       <div className="space-y-2">
         {(tickets ?? []).map((t) => (

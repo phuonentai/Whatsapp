@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MessageCircle, Instagram } from "lucide-react";
+import { ui } from "@/lib/copy/ui";
 
 interface EmptyStateProps {
   channel?: "all" | "whatsapp" | "instagram";
@@ -18,16 +19,15 @@ export function EmptyState({ channel = "all" }: EmptyStateProps) {
           <MessageCircle className="h-8 w-8 text-gray-400" />
         )}
       </div>
-      <h3 className="mt-4 text-lg font-semibold text-gray-900">No conversation selected</h3>
+      <h3 className="mt-4 text-lg font-semibold text-gray-900">{ui.inbox.noConversationSelected}</h3>
       <p className="mt-2 max-w-sm text-sm text-gray-500">
-        Select a conversation from the list to view messages, or connect a channel in
-        Settings to start receiving messages.
+        {ui.inbox.selectConversationHint}
       </p>
       <Link
         href={`/dashboard/settings?view=${settingsView}`}
         className="mt-6 text-sm font-medium text-blue-600 hover:text-blue-700"
       >
-        Go to {channel === "instagram" ? "Instagram" : "WhatsApp"} settings →
+        {channel === "instagram" ? ui.inbox.goToInstagramSettings : ui.inbox.goToWhatsappSettings}
       </Link>
     </div>
   );

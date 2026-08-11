@@ -364,5 +364,52 @@ ORDER BY et.entity_type, et.entity_id;
 -- name: CountContactsByOrganization :one
 SELECT COUNT(*) FROM crm.contacts WHERE organization_id = $1;
 
+-- name: CountContactsByOrganizationFiltered :one
+SELECT COUNT(*) FROM crm.contacts
+WHERE organization_id = $1
+  AND (NULLIF($2, '') IS NULL OR source = $2)
+  AND (NULLIF($3, '') IS NULL OR lead_status = $3)
+  AND ($4::int = 0 OR company_id = $4)
+  AND ($5::int = 0 OR assigned_to = $5);
+
+-- name: CountSearchContacts :one
+SELECT COUNT(*) FROM crm.contacts
+WHERE organization_id = $1
+  AND (display_name ILIKE '%' || $2 || '%'
+    OR email ILIKE '%' || $2 || '%'
+    OR phone_number ILIKE '%' || $2 || '%'
+    OR numero_documento ILIKE '%' || $2 || '%');
+
+-- name: CountCompaniesByOrganization :one
+SELECT COUNT(*) FROM crm.companies WHERE organization_id = $1;
+
+-- name: CountSearchCompanies :one
+SELECT COUNT(*) FROM crm.companies
+WHERE organization_id = $1
+  AND (name ILIKE '%' || $2 || '%'
+    OR nit ILIKE '%' || $2 || '%'
+    OR sector ILIKE '%' || $2 || '%'
+    OR ciudad ILIKE '%' || $2 || '%');
+
+-- name: CountActivitiesByOrganization :one
+SELECT COUNT(*) FROM crm.activities
+WHERE organization_id = $1
+  AND (NULLIF($2, '') IS NULL OR tipo = $2)
+  AND (NULLIF($3, '') IS NULL OR ($3 = 'contact' AND contact_id = $4::int)
+    OR ($3 = 'company' AND company_id = $4::int)
+    OR ($3 = 'deal' AND deal_id = $4::int));
+
+-- name: CountActivitiesByContact :one
+SELECT COUNT(*) FROM crm.activities
+WHERE contact_id = $1 AND organization_id = $2;
+
+-- name: CountActivitiesByDeal :one
+SELECT COUNT(*) FROM crm.activities
+WHERE deal_id = $1 AND organization_id = $2;
+
+-- name: CountActivitiesByCompany :one
+SELECT COUNT(*) FROM crm.activities
+WHERE company_id = $1 AND organization_id = $2;
+
 -- name: CountDealsByOrganization :one
 SELECT COUNT(*) FROM crm.deals WHERE organization_id = $1;

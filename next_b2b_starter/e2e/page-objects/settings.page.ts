@@ -8,7 +8,9 @@ type SectionTitle =
   | "AI Copilot"
   | "Compliance (Ley 1581)"
   | "Messaging"
-  | "Audit log";
+  | "Audit log"
+  | "Integración Siigo"
+  | "Onboarding Siigo";
 
 export class SettingsPage {
   readonly page: Page;
@@ -79,4 +81,58 @@ export class SettingsPage {
     await input.fill(name);
     await this.page.getByRole("button", { name: "Guardar" }).click();
   }
+  // ---- Siigo onboarding section ----
+
+
+  async openSiigoSection() {
+    await this.goto();
+    await this.openSection("Integración Siigo");
+  }
+
+  async connectSiigo(opts: { clientId: string; clientSecret: string; nit: string }) {
+    await this.page.getByPlaceholder("client_id").fill(opts.clientId);
+    await this.page.getByPlaceholder("client_secret").fill(opts.clientSecret);
+    await this.page.getByPlaceholder("900.123.456-7").fill(opts.nit);
+    await this.page.getByRole("button", { name: "Conectar Siigo" }).click();
+  }
+
+  async requestAssistedSetup() {
+    // Navigate explicitly so the view re-opens after an auth-header swap
+    // (a bare reload can land on the overview while query params settle).
+    await this.page.goto("/dashboard/settings?view=siigo");
+    await this.page.getByRole("button", { name: /No tengo Siigo/ }).click();
+  }
+
+  async confirmNumeration() {
+    await this.page.getByRole("button", { name: "Confirmar numeración" }).click();
+  }
+
+  async previewImport() {
+    await this.page.getByRole("button", { name: "Ver vista previa" }).click();
+  }
+
+  async confirmImport() {
+    await this.page.getByRole("button", { name: "Confirmar importación" }).click();
+  }
+
+  async createTestInvoice() {
+    await this.page.getByRole("button", { name: "Crear factura de prueba" }).click();
+  }
+
+  async activateInvoicing() {
+    await this.page.getByRole("button", { name: "Activar facturación" }).click();
+  }
+
+  async pauseInvoicing() {
+    await this.page.getByRole("button", { name: "Pausar" }).click();
+  }
+
+  async resumeInvoicing() {
+    await this.page.getByRole("button", { name: "Reanudar" }).click();
+  }
+
+  async assertSiigoBanner(text: string | RegExp) {
+    await expect(this.page.getByText(new RegExp(text)).first()).toBeVisible();
+}
+
 }

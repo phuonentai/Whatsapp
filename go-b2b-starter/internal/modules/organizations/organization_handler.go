@@ -8,7 +8,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	"github.com/moasq/go-b2b-starter/pkg/response"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 )
 
@@ -45,7 +45,7 @@ func (h *OrganizationHandler) CreateOrganization(c *gin.Context) {
 
 // GetOrganization gets the current organization (from context)
 func (h *OrganizationHandler) GetOrganization(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -90,7 +90,7 @@ func (h *OrganizationHandler) GetOrganizationBySlug(c *gin.Context) {
 
 // UpdateOrganization updates the current organization (from context)
 func (h *OrganizationHandler) UpdateOrganization(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)
@@ -144,7 +144,7 @@ func (h *OrganizationHandler) ListOrganizations(c *gin.Context) {
 
 // GetOrganizationStats gets statistics for the current organization (from context)
 func (h *OrganizationHandler) GetOrganizationStats(c *gin.Context) {
-	reqCtx := auth.GetRequestContext(c)
+	reqCtx := authcontext.GetRequestContext(c)
 	if reqCtx == nil {
 		h.logger.Error("missing request context", nil)
 		response.Error(c, http.StatusBadRequest, "organization context is required", nil)

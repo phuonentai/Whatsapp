@@ -105,3 +105,7 @@ LIMIT $2;
 SELECT * FROM invoicing.org_connections
 WHERE provider = $1 AND status = $2
 ORDER BY organization_id;
+
+-- name: ListOrgConnections :many
+SELECT * FROM invoicing.org_connections
+ORDER BY organization_id;

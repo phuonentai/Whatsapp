@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { renderWithProviders } from "@/test/render";
 import { ReplyInput } from "./reply-input";
 
@@ -54,5 +55,19 @@ describe("ReplyInput", () => {
     );
     await user.keyboard("{Enter}");
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("keeps the draft and shows an error toast when send fails", async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockRejectedValue(new Error("network"));
+    renderWithProviders(
+      <ReplyInput onSend={onSend} isSending={false} conversationId={1} />
+    );
+    const input = screen.getByPlaceholderText("Type a message...");
+    await user.type(input, "Hola cliente");
+    await user.keyboard("{Enter}");
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect((input as HTMLInputElement).value).toBe("Hola cliente");
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/No se pudo enviar el mensaje/i));
   });
 });

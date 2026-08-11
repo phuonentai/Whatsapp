@@ -12,6 +12,26 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 )
 
+// Verifier adapts MercadoPago signature verification to the billing domain
+// WebhookVerifier interface.
+type Verifier struct{}
+
+// NewVerifier creates a MercadoPago webhook verifier.
+func NewVerifier() *Verifier { return &Verifier{} }
+
+// VerifyPolar is not implemented by the MercadoPago adapter.
+func (v *Verifier) VerifyPolar(payload []byte, msgID, msgTimestamp, signature, secret string) error {
+	return fmt.Errorf("mercadopago verifier does not support polar webhooks")
+}
+
+// VerifyMercadoPago verifies a MercadoPago IPN webhook signature.
+func (v *Verifier) VerifyMercadoPago(payload []byte, signature, secret string) error {
+	return VerifyWebhookSignature(payload, signature, secret)
+}
+
+// ensure interface compliance
+var _ domain.WebhookVerifier = (*Verifier)(nil)
+
 // VerifyWebhookSignature verifies a MercadoPago IPN webhook signature.
 // It supports both the current MercadoPago format
 // ("ts=<timestamp>,v1=<hex hmac>" over "id:<id>;request-id:<request_id>;ts:<ts>;<body>")

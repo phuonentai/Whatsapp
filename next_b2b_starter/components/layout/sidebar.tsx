@@ -1,7 +1,7 @@
 // components/layout/sidebar.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -19,6 +19,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
+import { PRODUCT_NAME } from "@/lib/brand";
 import type { ServerPermissions } from "@/lib/auth/server-permissions";
 import { useEntitlementQuery } from "@/lib/hooks/use-entitlement";
 import type { LucideIcon } from "lucide-react";
@@ -87,8 +88,24 @@ export function Sidebar({
   const pathname = usePathname();
   const isCollapsed = useSidebarStore((state) => state.isCollapsed);
   const entitlement = useEntitlementQuery().data;
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  // Escape closes the mobile drawer and returns focus to the hamburger.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+        hamburgerRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobileMenuOpen]);
 
   // Filter navigation items based on permissions
   const visibleNavigation = useMemo(() => {
@@ -125,10 +142,11 @@ export function Sidebar({
       {/* Mobile menu button */}
       <div className="fixed left-4 top-4 z-50 lg:hidden">
         <Button
+          ref={hamburgerRef}
           variant="outline"
           size="icon"
           onClick={() => setIsMobileMenuOpen((open) => !open)}
-          className="bg-white"
+          className="bg-background"
           aria-label={isMobileMenuOpen ? "Close sidebar" : "Open sidebar"}
         >
           {isMobileMenuOpen ? (
@@ -150,7 +168,7 @@ export function Sidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-gray-200 bg-white transition-[transform,width] duration-200 ease-in-out lg:translate-x-0",
+          "fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-border bg-background transition-[transform,width] duration-200 ease-in-out lg:translate-x-0",
           isMobileMenuOpen
             ? "translate-x-0"
             : "-translate-x-full lg:translate-x-0",
@@ -159,7 +177,7 @@ export function Sidebar({
         )}
       >
         {/* Logo / brand */}
-        <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-5">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-5">
           <div className="flex h-11 w-11 flex-none items-center justify-center">
             <Image
               src="/icon.png"
@@ -175,8 +193,8 @@ export function Sidebar({
               isCollapsed ? "lg:max-w-0 lg:opacity-0" : "lg:opacity-100"
             )}
           >
-            <div className="text-lg font-semibold tracking-tight text-gray-900">
-              Your App
+            <div className="text-lg font-semibold tracking-tight text-foreground">
+              {PRODUCT_NAME}
             </div>
           </div>
         </div>
@@ -200,15 +218,16 @@ export function Sidebar({
                     "relative flex items-center overflow-hidden rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                     isCollapsed && "lg:justify-center lg:px-5",
                     isActive
-                      ? "bg-gray-900 text-white"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                   aria-label={item.name}
+                  aria-current={isActive ? "page" : undefined}
                 >
                   <item.icon
                     className={cn(
                       "h-4 w-4 flex-none",
-                      isActive ? "text-white" : "text-gray-400"
+                      isActive ? "text-primary-foreground" : "text-muted-foreground"
                     )}
                   />
                   <span
@@ -230,7 +249,7 @@ export function Sidebar({
         {/* Account section */}
         <div
           className={cn(
-            "border-t border-gray-100 px-5 py-4 transition-[padding] duration-200",
+            "border-t border-border px-5 py-4 transition-[padding] duration-200",
             isCollapsed && "lg:px-3"
           )}
         >
@@ -244,18 +263,19 @@ export function Sidebar({
                   href={item.href}
                   onClick={closeMobileMenu}
                   title={isCollapsed ? item.name : undefined}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex h-10 items-center gap-2 rounded-md border border-transparent px-3 text-sm font-medium transition-colors",
                     isCollapsed && "lg:h-9 lg:justify-center lg:px-0",
                     isActive
-                      ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-                      : "text-gray-600 hover:border-gray-200 hover:bg-gray-100 hover:text-gray-900"
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:border-border hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
                   <item.icon
                     className={cn(
-                      "h-4 w-4 flex-none text-gray-500",
-                      isActive && "text-white"
+                      "h-4 w-4 flex-none text-muted-foreground",
+                      isActive && "text-primary-foreground"
                     )}
                   />
                   <span

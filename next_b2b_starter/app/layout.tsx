@@ -1,10 +1,12 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { StytchProvider } from "@/components/auth/stytch-provider";
 import { authBootstrap } from "@/lib/auth/bootstrap";
 import { buildStytchClientConfig } from "@/lib/auth/stytch-server";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { JsonLd } from "@/components/seo/jsonld";
 import { Inter } from "next/font/google";
@@ -29,8 +31,8 @@ export const metadata: Metadata = {
     icon: "/icon.png",
   },
   title: {
-    default: "Your App | Next.js Starter with Auth & Billing",
-    template: "%s | Your App",
+    default: `${PRODUCT_NAME} | Next.js Starter with Auth & Billing`,
+    template: `%s | ${PRODUCT_NAME}`,
   },
   description:
     "A modern Next.js starter template with authentication, billing, and team management built in. Perfect for launching your SaaS application quickly.",
@@ -46,8 +48,8 @@ export const metadata: Metadata = {
     "tailwind starter",
   ],
   authors: [{ name: "Your Team" }],
-  creator: "Your App",
-  publisher: "Your App",
+  creator: PRODUCT_NAME,
+  publisher: PRODUCT_NAME,
   formatDetection: {
     email: false,
     address: false,
@@ -62,15 +64,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "https://yourdomain.com/",
-    siteName: "Your App",
-    title: "Your App | Next.js Starter with Auth & Billing",
+    siteName: PRODUCT_NAME,
+    title: `${PRODUCT_NAME} | Next.js Starter with Auth & Billing`,
     description:
       "A modern Next.js starter template with authentication, billing, and team management built in. Perfect for launching your SaaS application quickly.",
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Your App | Next.js Starter with Auth & Billing",
+    title: `${PRODUCT_NAME} | Next.js Starter with Auth & Billing`,
     description:
       "A modern Next.js starter template with authentication, billing, and team management built in. Perfect for launching your SaaS application quickly.",
   },
@@ -115,7 +117,7 @@ export default async function RootLayout({
           data={{
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "Your App",
+            name: PRODUCT_NAME,
             url: "https://yourdomain.com",
             logo: "https://yourdomain.com/icon.png",
             description: "A modern Next.js starter template with authentication, billing, and team management built in.",
@@ -126,23 +128,30 @@ export default async function RootLayout({
           data={{
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "Your App",
+            name: PRODUCT_NAME,
             url: "https://yourdomain.com",
             inLanguage: "en",
           }}
         />
         <StytchProvider config={stytchConfig}>
-          <AuthProvider
-            initialProfile={bootstrap.profile}
-            initialRoles={bootstrap.roles}
-            initialPermissions={bootstrap.permissions}
-            shouldClearCache={bootstrap.shouldClearCache}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
           >
-            <QueryProvider>
-              {children}
-              <Toaster position="top-right" richColors />
-            </QueryProvider>
-          </AuthProvider>
+            <AuthProvider
+              initialProfile={bootstrap.profile}
+              initialRoles={bootstrap.roles}
+              initialPermissions={bootstrap.permissions}
+              shouldClearCache={bootstrap.shouldClearCache}
+            >
+              <QueryProvider>
+                {children}
+                <Toaster position="top-right" richColors />
+              </QueryProvider>
+            </AuthProvider>
+          </ThemeProvider>
         </StytchProvider>
       </body>
     </html>

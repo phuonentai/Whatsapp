@@ -14,9 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 )
 
@@ -54,11 +54,11 @@ func (f *fakeContactService) GetByPhone(ctx context.Context, orgID int32, phoneN
 	}
 	return nil, domain.ErrContactNotFound
 }
-func (f *fakeContactService) List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*domain.Contact, error) {
-	return f.contacts, nil
+func (f *fakeContactService) List(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) (services.ListResult[*domain.Contact], error) {
+	return services.ListResult[*domain.Contact]{Items: f.contacts, Total: int32(len(f.contacts))}, nil
 }
-func (f *fakeContactService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.Contact, error) {
-	return nil, nil
+func (f *fakeContactService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) (services.ListResult[*domain.Contact], error) {
+	return services.ListResult[*domain.Contact]{}, nil
 }
 func (f *fakeContactService) Update(ctx context.Context, orgID int32, req *services.UpdateContactRequest) (*domain.Contact, error) {
 	return nil, nil
@@ -76,14 +76,14 @@ func (f *fakeCompanyService) Create(ctx context.Context, orgID int32, req *servi
 func (f *fakeCompanyService) GetByID(ctx context.Context, orgID, companyID int32) (*domain.CompanyWithCounts, error) {
 	return nil, domain.ErrCompanyNotFound
 }
-func (f *fakeCompanyService) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
-	return f.companies, nil
+func (f *fakeCompanyService) List(ctx context.Context, orgID int32, limit, offset int32) (services.ListResult[*domain.CompanyWithCounts], error) {
+	return services.ListResult[*domain.CompanyWithCounts]{Items: f.companies, Total: int32(len(f.companies))}, nil
 }
-func (f *fakeCompanyService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
+func (f *fakeCompanyService) Search(ctx context.Context, orgID int32, query string, limit, offset int32) (services.ListResult[*domain.CompanyWithCounts], error) {
 	if c, ok := f.byName[strings.ToLower(strings.TrimSpace(query))]; ok {
-		return []*domain.CompanyWithCounts{c}, nil
+		return services.ListResult[*domain.CompanyWithCounts]{Items: []*domain.CompanyWithCounts{c}, Total: 1}, nil
 	}
-	return nil, nil
+	return services.ListResult[*domain.CompanyWithCounts]{}, nil
 }
 func (f *fakeCompanyService) Update(ctx context.Context, orgID int32, req *services.UpdateCompanyRequest) (*domain.Company, error) {
 	return nil, nil
@@ -120,17 +120,17 @@ func (f *fakeActivityService) Create(ctx context.Context, orgID int32, req *serv
 	f.created = append(f.created, req)
 	return &domain.Activity{ID: int32(len(f.created)), OrganizationID: orgID, Tipo: req.Tipo}, nil
 }
-func (f *fakeActivityService) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return f.activities, nil
+func (f *fakeActivityService) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (services.ListResult[*domain.ActivityWithActor], error) {
+	return services.ListResult[*domain.ActivityWithActor]{Items: f.activities, Total: int32(len(f.activities))}, nil
 }
-func (f *fakeActivityService) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (f *fakeActivityService) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (services.ListResult[*domain.ActivityWithActor], error) {
+	return services.ListResult[*domain.ActivityWithActor]{}, nil
 }
-func (f *fakeActivityService) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (f *fakeActivityService) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (services.ListResult[*domain.ActivityWithActor], error) {
+	return services.ListResult[*domain.ActivityWithActor]{}, nil
 }
-func (f *fakeActivityService) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (f *fakeActivityService) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (services.ListResult[*domain.ActivityWithActor], error) {
+	return services.ListResult[*domain.ActivityWithActor]{}, nil
 }
 
 // ---- harness ----
@@ -146,11 +146,11 @@ func newCSVTestHandler(contacts *fakeContactService, companies *fakeCompanyServi
 }
 
 // withAuth is a test middleware injecting the request context the handlers
-// read via auth.GetRequestContext(c).
+// read via authcontext.GetRequestContext(c).
 func withAuth(orgID, accountID int32) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		auth.SetRequestContext(c, &auth.RequestContext{
-			Identity:       &auth.Identity{},
+		authcontext.SetRequestContext(c, &authcontext.RequestContext{
+			Identity:       &authcontext.Identity{},
 			OrganizationID: orgID,
 			AccountID:      accountID,
 		})

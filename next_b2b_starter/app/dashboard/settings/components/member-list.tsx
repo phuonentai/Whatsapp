@@ -31,6 +31,7 @@ import {
 } from "@/lib/models/member.model";
 import { memberRepository } from "@/lib/api/api/repositories/member-repository";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/crm/confirm-dialog";
 
 interface MemberListProps {
   members: OrganizationMember[];
@@ -55,13 +56,12 @@ export function MemberList({
   const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
   const [roleErrorMemberId, setRoleErrorMemberId] = useState<string | null>(null);
   const [roleErrorMessage, setRoleErrorMessage] = useState<string | null>(null);
+  const [removeConfirmMember, setRemoveConfirmMember] = useState<OrganizationMember | null>(null);
+  const [roleChangeConfirm, setRoleChangeConfirm] = useState<{ member: OrganizationMember; newRole: MemberRole } | null>(null);
   const { toast } = useToast();
 
   const handleRemoveMember = async (member: OrganizationMember) => {
     const memberName = member.name || member.email;
-    if (!confirm(`Are you sure you want to remove ${memberName} from the organization?\n\nThis action cannot be undone.`)) {
-      return;
-    }
 
     setPendingMemberId(member.id);
     try {
@@ -84,6 +84,7 @@ export function MemberList({
       });
     } finally {
       setPendingMemberId(null);
+      setRemoveConfirmMember(null);
     }
   };
 
@@ -116,9 +117,6 @@ export function MemberList({
     const memberName = member.name || member.email;
     const currentLabel = MemberHelpers.getRoleConfig(member.role).label;
     const targetLabel = MemberHelpers.getRoleConfig(newRole).label;
-    if (!confirm(`Change ${memberName}'s role from ${currentLabel} to ${targetLabel}?`)) {
-      return;
-    }
 
     setRoleErrorMemberId(null);
     setRoleErrorMessage(null);
@@ -145,6 +143,7 @@ export function MemberList({
       }
     } finally {
       setRoleChangingId(null);
+      setRoleChangeConfirm(null);
     }
   };
 
@@ -202,9 +201,12 @@ export function MemberList({
                     <div className="w-40">
                       <Select
                         value={member.role}
-                        onValueChange={(value) =>
-                          handleRoleChange(member, value as MemberRole)
-                        }
+                        onValueChange={(value) => {
+                          const newRole = value as MemberRole;
+                          if (newRole !== member.role) {
+                            setRoleChangeConfirm({ member, newRole });
+                          }
+                        }}
                         disabled={isRoleChanging || isFetching}
                       >
                         <SelectTrigger
@@ -277,7 +279,7 @@ export function MemberList({
                           )}
                           <DropdownMenuItem
                             disabled={pendingMemberId === member.id}
-                            onClick={() => handleRemoveMember(member)}
+                            onClick={() => setRemoveConfirmMember(member)}
                             className="cursor-pointer text-red-600 focus:text-red-600"
                           >
                             <UserMinus className="mr-2 h-4 w-4" />
@@ -300,6 +302,37 @@ export function MemberList({
           )}
         </TableBody>
       </Table>
+
+      <ConfirmDialog
+        open={Boolean(removeConfirmMember)}
+        onOpenChange={(next) => !next && setRemoveConfirmMember(null)}
+        title="Eliminar miembro"
+        description={`¿Estás seguro de eliminar a ${removeConfirmMember?.name || removeConfirmMember?.email || "este miembro"} de la organización? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        destructive
+        loading={pendingMemberId === removeConfirmMember?.id}
+        onConfirm={() => {
+          if (removeConfirmMember) void handleRemoveMember(removeConfirmMember);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(roleChangeConfirm)}
+        onOpenChange={(next) => !next && setRoleChangeConfirm(null)}
+        title="Cambiar rol"
+        description={
+          roleChangeConfirm
+            ? `¿Cambiar el rol de ${roleChangeConfirm.member.name || roleChangeConfirm.member.email} de ${MemberHelpers.getRoleConfig(roleChangeConfirm.member.role).label} a ${MemberHelpers.getRoleConfig(roleChangeConfirm.newRole).label}?`
+            : "¿Cambiar el rol del miembro?"
+        }
+        confirmLabel="Confirmar"
+        cancelLabel="Cancelar"
+        destructive={false}
+        loading={roleChangingId === roleChangeConfirm?.member.id}
+        onConfirm={() => {
+          if (roleChangeConfirm) void handleRoleChange(roleChangeConfirm.member, roleChangeConfirm.newRole);
+        }}
+      />
     </div>
   );
 }

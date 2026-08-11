@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default function HomePage() {
   return (
@@ -11,7 +12,7 @@ export default function HomePage() {
           <div className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-balance text-5xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
-                Welcome to Your App
+                Welcome to {PRODUCT_NAME}
               </h1>
               <p className="mx-auto max-w-2xl text-xl text-slate-600 sm:text-2xl">
                 A modern Next.js starter with authentication, billing, and team management built in.

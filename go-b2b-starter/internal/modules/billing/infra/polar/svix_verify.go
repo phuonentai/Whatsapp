@@ -8,14 +8,36 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 )
 
 // Webhook headers used by the Svix webhook signature scheme
 const (
-	WebhookIDHeader        = "webhook-id"
-	WebhookTimestampHeader = "webhook-timestamp"
-	WebhookSignatureHeader = "webhook-signature"
+	WebhookIDHeader        = domain.PolarWebhookIDHeader
+	WebhookTimestampHeader = domain.PolarWebhookTimestampHeader
+	WebhookSignatureHeader = domain.PolarWebhookSignatureHeader
 )
+
+// Verifier adapts the Svix signature verification to the billing domain
+// WebhookVerifier interface.
+type Verifier struct{}
+
+// NewVerifier creates a Polar webhook verifier.
+func NewVerifier() *Verifier { return &Verifier{} }
+
+// VerifyPolar verifies a Svix-scheme webhook signature.
+func (v *Verifier) VerifyPolar(payload []byte, msgID, msgTimestamp, signature, secret string) error {
+	return VerifyWebhookSignature(payload, msgID, msgTimestamp, signature, secret)
+}
+
+// VerifyMercadoPago is not implemented by the Polar adapter.
+func (v *Verifier) VerifyMercadoPago(payload []byte, signature, secret string) error {
+	return fmt.Errorf("polar verifier does not support mercadopago webhooks")
+}
+
+// ensure interface compliance
+var _ domain.WebhookVerifier = (*Verifier)(nil)
 
 // webhookTolerance is the maximum age (in seconds) accepted for a webhook
 // timestamp before it is considered expired. Matches Svix's default.

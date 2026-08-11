@@ -18,6 +18,7 @@ import { useModule } from "@/lib/hooks/use-entitlement";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorState } from "@/components/common/error-state";
 
 function formatCOP(value: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -192,6 +193,14 @@ export function ReportesPage() {
             <CardTitle>Ventas facturadas por {period === "week" ? "semana" : "mes"}</CardTitle>
           </CardHeader>
           <CardContent className="h-72">
+            {canViewInvoices && revenueQuery.isError && (
+              <ErrorState
+                title="Error al cargar las ventas"
+                description="No se pudieron cargar las ventas facturadas."
+                onRetry={() => revenueQuery.refetch()}
+                isRetrying={revenueQuery.isRefetching}
+              />
+            )}
             {canViewInvoices && revenueQuery.isLoading && (
               <p className="text-gray-500">Cargando...</p>
             )}
@@ -228,6 +237,14 @@ export function ReportesPage() {
             <CardTitle>Embudo de negocios</CardTitle>
           </CardHeader>
           <CardContent className="h-72 overflow-auto">
+            {canViewDeals && funnelQuery.isError && (
+              <ErrorState
+                title="Error al cargar el embudo"
+                description="No se pudo cargar el embudo de negocios."
+                onRetry={() => funnelQuery.refetch()}
+                isRetrying={funnelQuery.isRefetching}
+              />
+            )}
             {canViewDeals && funnelQuery.isLoading && (
               <p className="text-gray-500">Cargando...</p>
             )}
@@ -292,6 +309,14 @@ export function ReportesPage() {
           </select>
         </CardHeader>
         <CardContent>
+          {canViewContacts && inactiveQuery.isError && (
+            <ErrorState
+              title="Error al cargar los contactos inactivos"
+              description="No se pudieron cargar los contactos inactivos."
+              onRetry={() => inactiveQuery.refetch()}
+              isRetrying={inactiveQuery.isRefetching}
+            />
+          )}
           {canViewContacts && inactiveQuery.isLoading && (
             <p className="text-gray-500">Cargando...</p>
           )}

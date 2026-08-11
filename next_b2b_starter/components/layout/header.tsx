@@ -8,6 +8,7 @@ import {
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   Settings,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -15,12 +16,14 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
+import { useCommandPaletteStore } from "@/lib/stores/command-palette-store";
 import { UserMenu } from "./user-menu";
 
 export function Header() {
   const isSidebarCollapsed = useSidebarStore((state) => state.isCollapsed);
   const toggleSidebar = useSidebarStore((state) => state.toggle);
   const isAutoCollapsed = useSidebarStore((state) => state.isAutoCollapsed);
+  const openPalette = useCommandPaletteStore((state) => state.openPalette);
   const pathname = usePathname();
 
   const breadcrumbItems = useMemo(() => {
@@ -57,11 +60,11 @@ export function Header() {
   const pageTitle = breadcrumbItems[breadcrumbItems.length - 1]?.label ?? "Overview";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="flex">
         <div
           className={cn(
-            "hidden border-r border-gray-200 transition-[width] duration-200 lg:block",
+            "hidden border-r border-border transition-[width] duration-200 lg:block",
             isSidebarCollapsed ? "w-20" : "w-64"
           )}
         />
@@ -85,25 +88,25 @@ export function Header() {
                   )}
                 </Button>
 
-                <span className="hidden h-8 w-px bg-gray-200 lg:block" aria-hidden="true" />
+                <span className="hidden h-8 w-px bg-border lg:block" aria-hidden="true" />
 
                 <div>
-                  <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
-                  <nav className="mt-1 flex flex-wrap items-center gap-1 text-sm text-gray-500">
+                  <h1 className="text-lg font-semibold text-foreground">{pageTitle}</h1>
+                  <nav className="mt-1 flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
                     {breadcrumbItems.map((item, index) => (
                       <span key={item.href} className="flex items-center gap-1">
                         {item.isLast ? (
-                          <span className="font-medium text-gray-700">{item.label}</span>
+                          <span className="font-medium text-foreground">{item.label}</span>
                         ) : (
                           <Link
                             href={item.href}
-                            className="transition-colors hover:text-gray-900"
+                            className="transition-colors hover:text-foreground"
                           >
                             {item.label}
                           </Link>
                         )}
                         {index < breadcrumbItems.length - 1 && (
-                          <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </span>
                     ))}
@@ -112,6 +115,26 @@ export function Header() {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="hidden h-9 w-64 justify-start gap-2 text-sm font-normal text-muted-foreground sm:flex"
+                  onClick={() => openPalette("search")}
+                >
+                  <Search className="h-4 w-4" aria-hidden />
+                  <span className="flex-1 text-left">Search…</span>
+                  <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium">
+                    ⌘K
+                  </kbd>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 sm:hidden"
+                  onClick={() => openPalette("search")}
+                  aria-label="Search"
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

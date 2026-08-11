@@ -20,6 +20,7 @@ import type { DealDto, PipelineStageDto } from "@/lib/api/api/dto/crm.dto";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { DealDialog } from "@/components/crm/deal-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
+import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 
@@ -149,14 +150,14 @@ function StageColumn({
 
 export function DealKanban() {
   const router = useRouter();
-  const { data: pipelines } = usePipelinesQuery();
+  const { data: pipelines, isError: isPipelinesError, refetch: refetchPipelines, isRefetching: isPipelinesRefetching } = usePipelinesQuery();
   const defaultPipeline = useMemo(
     () => pipelines?.find((p) => p.es_predeterminado) ?? pipelines?.[0],
     [pipelines]
   );
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | undefined>(undefined);
   const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? defaultPipeline;
-  const { data: deals } = useDealsQuery({ pipeline_id: pipeline?.id });
+  const { data: deals, isError: isDealsError, refetch: refetchDeals, isRefetching: isDealsRefetching } = useDealsQuery({ pipeline_id: pipeline?.id });
   const moveStage = useMoveDealStage();
   const deleteMutation = useDeleteDeal();
   const canManage = useFeature("crm_deals");
@@ -192,9 +193,13 @@ export function DealKanban() {
 
   const handleDelete = async () => {
     if (!deleting) return;
-    await deleteMutation.mutateAsync(deleting.id);
-    toast.success("Negocio eliminado");
-    setDeleting(null);
+    try {
+      await deleteMutation.mutateAsync(deleting.id);
+      toast.success("Negocio eliminado");
+      setDeleting(null);
+    } catch {
+      // error toast handled by mutation
+    }
   };
 
   const handleExport = async () => {
@@ -242,6 +247,24 @@ export function DealKanban() {
           </Button>
         )}
       </div>
+
+      {isPipelinesError && (
+        <ErrorState
+          title="Error al cargar los pipelines"
+          description="No se pudieron cargar los pipelines. Inténtalo de nuevo."
+          onRetry={() => refetchPipelines()}
+          isRetrying={isPipelinesRefetching}
+        />
+      )}
+
+      {!isPipelinesError && isDealsError && (
+        <ErrorState
+          title="Error al cargar los negocios"
+          description="No se pudieron cargar los negocios. Inténtalo de nuevo."
+          onRetry={() => refetchDeals()}
+          isRetrying={isDealsRefetching}
+        />
+      )}
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div data-testid="kanban-board" className="flex gap-4 overflow-x-auto pb-4">

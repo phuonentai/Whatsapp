@@ -71,6 +71,7 @@ type ConnectionRepository interface {
 	UpdateCredentials(ctx context.Context, orgID int32, clientIDEnc, clientSecretEnc []byte, nit, companyName string) (*OrgConnection, error)
 	Delete(ctx context.Context, orgID int32) error
 	ListByStatus(ctx context.Context, provider string, status ConnectionStatus) ([]*OrgConnection, error)
+	ListAll(ctx context.Context) ([]*OrgConnection, error)
 }
 
 // CredentialProvider supplies plaintext Siigo credentials for an organization

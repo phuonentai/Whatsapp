@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { sendMagicLink } from "@/lib/actions/auth/send-magic-link";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 
 const highlights = [
@@ -223,10 +224,10 @@ export default function AuthPage() {
 
   if (!isInitialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-muted/40">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary-500" />
-          <p className="text-sm text-gray-600">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-border border-t-primary" />
+          <p className="text-sm text-muted-foreground">
             Checking your workspace session…
           </p>
         </div>
@@ -236,22 +237,22 @@ export default function AuthPage() {
 
   if (isRedirecting || member) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-gray-200 bg-white px-8 py-10 shadow-lg">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary-500" />
+      <div className="flex min-h-screen items-center justify-center bg-muted/40">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-8 py-10 shadow-lg">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-border border-t-primary" />
           <div className="text-center">
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-foreground">
               Redirecting to your dashboard
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {(status && status.message) ||
                 "We’re setting up your workspace now."}
             </p>
-            <p className="mt-4 text-xs text-gray-500">
+            <p className="mt-4 text-xs text-muted-foreground">
               Taking longer than expected?{" "}
               <a
                 href={targetAfterLogin}
-                className="font-medium text-primary-600 hover:underline"
+                className="font-medium text-primary hover:underline"
               >
                 Open your workspace
               </a>
@@ -264,28 +265,28 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 py-16">
+    <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-muted/40 py-16">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 lg:flex-row lg:items-start">
         <section className="flex-1 space-y-8">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Badge
                 variant="outline"
-                className="w-fit items-center gap-2 border-primary/30 bg-primary/5 text-xs font-medium text-primary-700"
+                className="w-fit items-center gap-2 border-primary/30 bg-primary/5 text-xs font-medium text-primary"
               >
                 <Mail className="h-3.5 w-3.5" aria-hidden />
                 Secure email sign-in
               </Badge>
-              <Link href="/" className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors">
+              <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Home className="h-4 w-4" />
                 <span>Home</span>
               </Link>
             </div>
             <div className="space-y-4">
-              <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl">
-                Welcome back to Your App
+              <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">
+                Welcome back to {PRODUCT_NAME}
               </h1>
-              <p className="max-w-xl text-base text-gray-600">
+              <p className="max-w-xl text-base text-muted-foreground">
                 Use your work email to receive a one-time, organization-aware
                 sign-in link. We’ll land you back where you left off as soon as
                 you’re authenticated.
@@ -296,24 +297,24 @@ export default function AuthPage() {
             {highlights.map((item) => (
               <div
                 key={item}
-                className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+                className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
               >
                 <CheckCircle2
-                  className="mt-1 h-5 w-5 flex-none text-primary-600"
+                  className="mt-1 h-5 w-5 flex-none text-primary"
                   aria-hidden
                 />
-                <p className="text-sm text-gray-600">{item}</p>
+                <p className="text-sm text-muted-foreground">{item}</p>
               </div>
             ))}
           </dl>
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-foreground">
               Need a hand?
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-muted-foreground">
               Reach out at{" "}
               <a
-                className="font-medium text-primary-600 hover:underline"
+                className="font-medium text-primary hover:underline"
                 href="mailto:support@yourapp.com"
               >
                 support@yourapp.com
@@ -324,12 +325,12 @@ export default function AuthPage() {
         </section>
 
         <aside className="w-full max-w-md lg:sticky lg:top-24">
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
+          <div className="rounded-2xl border border-border bg-card p-8 shadow-lg">
             <div className="mb-6 space-y-2 text-center">
-              <h2 className="text-2xl font-semibold text-gray-900">
-                Sign in to Your App
+              <h2 className="text-2xl font-semibold text-foreground">
+                Sign in to {PRODUCT_NAME}
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Enter your work email to receive a secure sign-in link. We’ll
                 handle redirects automatically.
               </p>
@@ -349,7 +350,7 @@ export default function AuthPage() {
                 )}
                 <form onSubmit={handleSendMagicLink} className="space-y-4">
                   <div className="space-y-2 text-left">
-                    <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                    <label htmlFor="email" className="text-sm font-medium text-muted-foreground">
                       Work email address
                     </label>
                     <Input
@@ -373,29 +374,29 @@ export default function AuthPage() {
                     {isSubmitting ? "Working…" : "Email me a sign-in link"}
                   </Button>
                 </form>
-                <p className="mt-6 text-center text-xs text-gray-400">
+                <p className="mt-6 text-center text-xs text-muted-foreground">
                   By continuing you agree to the terms of service and
                   acknowledge the privacy notice.
                 </p>
-                <p className="mt-4 text-center text-sm text-gray-600">
+                <p className="mt-4 text-center text-sm text-muted-foreground">
                   Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="text-primary-600 hover:underline font-medium">
+                  <Link href="/signup" className="text-primary hover:underline font-medium">
                     Sign up
                   </Link>
                 </p>
               </>
             ) : (
               <div className="space-y-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Inbox className="h-7 w-7" aria-hidden />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  <h3 className="text-xl font-semibold text-foreground">
                     Check your email
                   </h3>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     We sent a secure link to {" "}
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-foreground">
                       {lastSubmittedEmail}
                     </span>
                     . Open it on any device to finish signing in.
@@ -410,9 +411,9 @@ export default function AuthPage() {
                       </a>
                     </Button>
                   ))}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Prefer another inbox? Open your mail app and look for an
-                    email from Your App security.
+                    email from {PRODUCT_NAME} security.
                   </p>
                 </div>
                 {status && status.type === "error" && (
@@ -438,13 +439,13 @@ export default function AuthPage() {
                   </Button>
                 </div>
                 {status && status.type !== "error" && status.message && (
-                  <p className="text-xs text-gray-500">{status.message}</p>
+                  <p className="text-xs text-muted-foreground">{status.message}</p>
                 )}
               </div>
             )}
-            <div className="mt-8 flex items-center justify-center gap-2 text-xs text-gray-400">
+            <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <span>Powered by</span>
-              <span className="font-semibold text-gray-600">Stytch</span>
+              <span className="font-semibold text-muted-foreground">Stytch</span>
             </div>
           </div>
         </aside>

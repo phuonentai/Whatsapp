@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 )
 
 // MiddlewareConfig configures the subscription middleware behavior.
@@ -85,7 +85,7 @@ func (m *Middleware) RequireActiveSubscription() gin.HandlerFunc {
 		}
 
 		// Get organization ID from auth context
-		orgID := auth.GetOrganizationID(c)
+		orgID := authcontext.GetOrganizationID(c)
 		if orgID == 0 {
 			m.config.ErrorHandler(c, http.StatusInternalServerError, &ErrorResponse{
 				Error:   "configuration_error",
@@ -206,7 +206,7 @@ func (m *Middleware) OptionalSubscriptionStatus() gin.HandlerFunc {
 		}
 
 		// Get organization ID from auth context
-		orgID := auth.GetOrganizationID(c)
+		orgID := authcontext.GetOrganizationID(c)
 		if orgID == 0 {
 			// No org context, continue without subscription info
 			c.Next()

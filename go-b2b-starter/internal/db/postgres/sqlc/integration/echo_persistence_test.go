@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"errors"
 	"context"
 	"sync"
 	"testing"
@@ -47,7 +48,10 @@ func TestEchoMessageConcurrentDeliveriesYieldOneRow(t *testing.T) {
 			defer wg.Done()
 			row, err := testStore.InsertMessageIdempotent(ctx, params())
 			if err != nil {
-				errs[i] = err
+				// ON CONFLICT DO NOTHING losers get ErrNoRows: not an error.
+				if !errors.Is(err, pgx.ErrNoRows) {
+					errs[i] = err
+				}
 				return
 			}
 			inserted[i] = row.MessageData != nil
@@ -71,6 +75,8 @@ func TestEchoMessageConcurrentDeliveriesYieldOneRow(t *testing.T) {
 	rows, err := testStore.ListMessagesByConversation(ctx, sqlc.ListMessagesByConversationParams{
 		OrganizationID: orgA,
 		ConversationID: convID,
+		Limit:          100,
+		Offset:         0,
 	})
 	if err != nil {
 		t.Fatalf("list messages: %v", err)

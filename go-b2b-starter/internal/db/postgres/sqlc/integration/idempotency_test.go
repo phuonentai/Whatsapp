@@ -130,7 +130,7 @@ func TestMessageIdempotentConcurrentInserts(t *testing.T) {
 	}
 
 	count := countRows(t, ctx, fmt.Sprintf(
-		"SELECT count(*) FROM crm.messages WHERE organization_id = %d AND whatsapp_message_id = 'wamid-conc-1'", orgA))
+		"SELECT count(*) FROM crm.messages WHERE organization_id = %d AND provider_message_id = 'wamid-conc-1'", orgA))
 	if count != 1 {
 		t.Fatalf("expected exactly 1 row after concurrent inserts, got %d", count)
 	}
@@ -159,6 +159,7 @@ func TestConversationOneActivePerContact(t *testing.T) {
 	active, err := testStore.GetActiveConversationByContact(ctx, sqlc.GetActiveConversationByContactParams{
 		ContactID:      contactID,
 		OrganizationID: orgA,
+		Channel:        "whatsapp",
 	})
 	if err != nil {
 		t.Fatalf("get active conversation: %v", err)

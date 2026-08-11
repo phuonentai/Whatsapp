@@ -138,9 +138,17 @@ func (m *mockContactRepo) GetByPhone(ctx context.Context, orgID int32, phone str
 func (m *mockContactRepo) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.Contact, error) {
 	return nil, nil
 }
+func (m *mockContactRepo) CountFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo int32) (int32, error) {
+	return 0, nil
+}
+
 func (m *mockContactRepo) ListFiltered(ctx context.Context, orgID int32, source, leadStatus string, companyID, assignedTo, limit, offset int32) ([]*domain.Contact, error) {
 	return nil, nil
 }
+func (m *mockContactRepo) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	return 0, nil
+}
+
 func (m *mockContactRepo) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.Contact, error) {
 	return nil, nil
 }
@@ -161,9 +169,17 @@ func (m *mockCompanyRepo) GetByID(ctx context.Context, orgID, companyID int32) (
 func (m *mockCompanyRepo) GetByNit(ctx context.Context, orgID int32, nit string) (*domain.Company, error) {
 	return nil, errors.New("company not found")
 }
+func (m *mockCompanyRepo) CountList(ctx context.Context, orgID int32) (int32, error) {
+	return int32(len(m.companies)), nil
+}
+
 func (m *mockCompanyRepo) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
 	return nil, nil
 }
+func (m *mockCompanyRepo) CountSearch(ctx context.Context, orgID int32, query string) (int32, error) {
+	return 0, nil
+}
+
 func (m *mockCompanyRepo) Search(ctx context.Context, orgID int32, query string, limit, offset int32) ([]*domain.CompanyWithCounts, error) {
 	return nil, nil
 }
@@ -204,17 +220,17 @@ type mockActivitySvc struct{}
 func (m *mockActivitySvc) Create(ctx context.Context, orgID int32, req *crmServices.CreateActivityRequest) (*domain.Activity, error) {
 	return nil, nil
 }
-func (m *mockActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *mockActivitySvc) ListByOrganization(ctx context.Context, orgID int32, tipo, entityType string, entityID, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
-func (m *mockActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *mockActivitySvc) ListByContact(ctx context.Context, contactID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
-func (m *mockActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *mockActivitySvc) ListByDeal(ctx context.Context, dealID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
-func (m *mockActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) ([]*domain.ActivityWithActor, error) {
-	return nil, nil
+func (m *mockActivitySvc) ListByCompany(ctx context.Context, companyID, orgID int32, limit, offset int32) (crmServices.ListResult[*domain.ActivityWithActor], error) {
+	return crmServices.ListResult[*domain.ActivityWithActor]{}, nil
 }
 
 type mockOutbound struct {

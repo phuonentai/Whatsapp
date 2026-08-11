@@ -59,6 +59,14 @@ func (m *mockConnectionRepo) Delete(ctx context.Context, orgID int32) error {
 	return nil
 }
 
+func (m *mockConnectionRepo) ListAll(ctx context.Context) ([]*domain.OrgConnection, error) {
+	out := make([]*domain.OrgConnection, 0, len(m.conns))
+	for _, c := range m.conns {
+		out = append(out, c)
+	}
+	return out, nil
+}
+
 func (m *mockConnectionRepo) ListByStatus(ctx context.Context, provider string, status domain.ConnectionStatus) ([]*domain.OrgConnection, error) {
 	var out []*domain.OrgConnection
 	for _, c := range m.conns {

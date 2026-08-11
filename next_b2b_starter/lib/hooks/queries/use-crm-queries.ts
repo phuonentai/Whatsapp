@@ -3,10 +3,11 @@ import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { queryKeys } from "./query-keys";
 
 export function useContactsQuery(params?: { source?: string; lead_status?: string; limit?: number; offset?: number }) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.crm.contacts(params),
     queryFn: () => crmRepository.listContacts(params),
   });
+  return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
 
 export function useContactQuery(id: number) {
@@ -18,10 +19,11 @@ export function useContactQuery(id: number) {
 }
 
 export function useCompaniesQuery(params?: { limit?: number; offset?: number }) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.crm.companies(params),
     queryFn: () => crmRepository.listCompanies(params),
   });
+  return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
 
 export function useCompanyQuery(id: number) {
@@ -56,22 +58,24 @@ export function usePipelinesQuery() {
 }
 
 export function useActivitiesQuery(params?: { tipo?: string; limit?: number; offset?: number }) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.crm.activities(params),
     queryFn: () => crmRepository.listActivities(params),
   });
+  return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
 
 export function useContactActivitiesQuery(contactId: number) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.crm.contactActivities(contactId),
     queryFn: () => crmRepository.listActivitiesByContact(contactId),
     enabled: !!contactId,
   });
+  return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
 
 export function useDealActivitiesQuery(dealId: number) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.crm.dealActivities(dealId),
     queryFn: () => crmRepository.listActivitiesByDeal(dealId),
     enabled: !!dealId,
@@ -80,6 +84,7 @@ export function useDealActivitiesQuery(dealId: number) {
     // timeline when a deal was moved while viewing another route.
     refetchOnMount: true,
   });
+  return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
 
 export function useTagsQuery() {
