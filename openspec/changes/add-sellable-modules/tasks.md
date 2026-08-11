@@ -65,7 +65,11 @@
   - [x] Migrations 000001–000017 on fresh scratch DB — PASS (incl. seed row, org module config, ticket lifecycle, CHECK constraint rejections)
   - [x] `pnpm build` — PASS
   - [x] `npx tsc --noEmit` — PASS
-  - [ ] `pnpm lint` — FAIL pre-existing: Next 16 removed `next lint` (script errors before analyzing files). Not a regression of this change; tsc + build green instead.
+  - [x] `pnpm lint` — PASS (2026-08-11 central re-verification): ESLint flat config landed (archived `fix-frontend-eslint-flat-config`); 0 errors, 4 pre-existing warnings. Earlier FAIL note (Next 16 removed `next lint`) obsolete.
 
 
 **Archive deferred:** live-environment verification pending — tasks 5.2, 5.3, 8.1, 8.2 require Stytch + Polar/MercadoPago credentials and a deployed environment (dogfood org #0 enablement, RBAC scope resolution, provider add-on metadata shape). These are verification tasks, so archiving is blocked per governance. All code-side verification (build, tests, vet, migrations, frontend build + tsc) is green.
+
+## Central re-verification (2026-08-11, Phase 1 of repo-wide active-changes run)
+
+Re-ran gates on current tree: `go build ./...` PASS, `go vet ./...` PASS, `go test ./internal/modules/registry/... ./internal/modules/tickets/...` PASS, `npx tsc --noEmit` PASS, `pnpm lint` PASS (0 errors / 4 pre-existing warnings), `pnpm build` PASS (baseline sweep). Migrations 000001–000017 intact. Remaining open tasks (5.2, 5.3, 8.1, 8.2) stay deferred-external per their recorded reasons. Archive remains deferred per governance (verification tasks outstanding). Backend code was already committed (dabc95f/63405c4); change artifacts committed in this pass.
