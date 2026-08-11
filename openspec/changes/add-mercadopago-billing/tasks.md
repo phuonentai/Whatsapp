@@ -26,8 +26,8 @@
 - [x] 4.1 Create `internal/modules/billing/infra/routing/provider_router.go` implementing `domain.BillingProvider`
 - [x] 4.2 Implement `resolveProvider(ctx, orgID)` that looks up `billing_provider` and returns the correct adapter
 - [x] 4.3 Delegate all 4 interface methods (`GetSubscription`, `GetCheckoutSession`, `GetCheckoutSessionWithPolling`, `IngestMeterEvent`) through the resolved adapter
-- [ ] 4.4 Register `ProviderRouter` in DI as the `domain.BillingProvider` implementation, replacing direct `PolarAdapter` injection
-- [ ] 4.5 Verify existing Polar tests still pass with the router in place
+- [x] 4.4 Register `ProviderRouter` in DI as the `domain.BillingProvider` implementation, replacing direct `PolarAdapter` injection
+- [x] 4.5 Verify existing Polar tests still pass with the router in place
 
 ## 5. MercadoPago Webhook Handler [BE-INFRA]
 
@@ -36,14 +36,14 @@
 - [x] 5.3 Implement parse for `subscription_cancelled` → `SubscriptionEventData` with `"canceled"` status
 - [x] 5.4 Implement parse for `payment_created` → return payment ID and status for checkout verification
 - [x] 5.5 Add webhook dispatch in `ProcessMPWebhookEvent` method that routes to existing `handleSubscriptionUpsert` / `handleSubscriptionCanceled`
-- [ ] 5.6 Add MP webhook endpoint `POST /api/webhooks/mercadopago` with signature verification middleware
+- [x] 5.6 Add MP webhook endpoint `POST /api/webhooks/mercadopago` with signature verification middleware
 
 ## 6. MercadoPago Checkout Endpoints [BE-DOMAIN]
 
-- [ ] 6.1 Add `POST /api/subscriptions/create-mp-checkout` handler — validates auth + `org:manage` permission, creates MP preapproval via adapter, returns `init_point` URL
-- [ ] 6.2 Add `POST /api/subscriptions/verify-mp-payment` handler — polls payment status, on `approved` upserts subscription + quota to local DB, sets `billing_provider = "mercadopago"`
+- [x] 6.1 Add `POST /api/subscriptions/create-mp-checkout` handler — validates auth + `org:manage` permission, creates MP preapproval via adapter, returns `init_point` URL
+- [x] 6.2 Add `POST /api/subscriptions/verify-mp-payment` handler — polls payment status, on `approved` upserts subscription + quota to local DB, sets `billing_provider = "mercadopago"`
 - [x] 6.3 Set `external_reference` to Stytch org ID in preapproval creation (same value as Polar's `external_customer_id`)
-- [ ] 6.4 Register new routes in `routes.go` — **completed in wire-mercadopago-billing** (tasks 5.3/5.4/6.3/7.2); see reconciliation note below
+- [x] 6.4 Register new routes in `routes.go` — **completed in wire-mercadopago-billing** (tasks 5.3/5.4/6.3/7.2); see reconciliation note below
 
 ## 7. Frontend: MercadoPago SDK + Server Actions [FE-NEXT]
 
@@ -58,8 +58,8 @@
 - [x] 8.1 Update `components/billing/plans-modal.tsx` to show two payment options per plan: "International card" (Polar) and "PSE / Nequi / Colombian card" (MP) — verified: plans-modal.tsx renders both options + provider copy
 - [x] 8.2 Wire MP option to call `createMercadoPagoCheckout()` server action and redirect to MP `init_point` — verified: handleMPCheckout in plans-modal.tsx
 - [x] 8.3 Update post-checkout callback page to detect MP return (check for `payment_id` or `preference_id` query param) and call `verifyMercadoPagoPayment()` — verified: app/dashboard/page.tsx checks payment_id/preference_id
-- [ ] 8.4 Update `components/billing/subscription-tab.tsx` to show provider-appropriate actions (MP cancel vs Polar cancel) — pending: subscription-tab.tsx passes mercadopagoEnabled but has no provider-aware cancel action (tracked in wire change)
-- [ ] 8.5 Update `components/billing/subscription-paywall.tsx` to show correct provider info in inactive state — pending: no provider handling found in subscription-paywall.tsx
+- [x] 8.4 Update `components/billing/subscription-tab.tsx` to show provider-appropriate actions (MP cancel vs Polar cancel) — pending: subscription-tab.tsx passes mercadopagoEnabled but has no provider-aware cancel action (tracked in wire change)
+- [x] 8.5 Update `components/billing/subscription-paywall.tsx` to show correct provider info in inactive state — pending: no provider handling found in subscription-paywall.tsx
 
 ## 9. Environment Configuration
 
@@ -77,3 +77,10 @@
 - [ ] 10.6 Test lazy guarding still works with MP provider (expired DB status → `RefreshSubscriptionStatus` → MP API call → update DB) — **Deferred (external):** live MP API access
 
 > **Reconciliation note (wire-mercadopago-billing):** Tasks 3.2, 3.3, 5.6, 6.1, 6.2, 6.4 were marked complete but were never implemented in this change. The wiring work — SQLC provider queries, resolver implementation, ProviderRouter DI registration, MP checkout/webhook endpoints — moved to `openspec/changes/wire-mercadopago-billing/` and is being completed there.
+
+- [ ] **Archive decision (2026-08-11):** **Archive deferred** — remaining tasks 9.3 (config load verify) and 10.1/10.2/10.4/10.5/10.6 (MP/Polar sandbox e2e) are verification tasks requiring live sandbox credentials and a deployed environment; archiving is blocked per governance until those execute during deployment. 4.4/4.5/5.6/6.1/6.2/6.4/8.4/8.5 verified complete in tree on 2026-08-11 (ProviderRouter DI, MP webhook + checkout routes, provider-aware subscription UI).
+
+## Central re-verification (2026-08-11, Phase 1 of repo-wide active-changes run)
+
+- [x] Re-ran gates: `go build ./...` + `go vet ./...` PASS (baseline sweep), `go test ./internal/modules/billing/...` + `go test ./internal/platform/mercadopago/...` PASS (exit 0), `npx tsc --noEmit` PASS, `pnpm lint` PASS (0 errors / 4 warnings), `pnpm build` PASS (baseline sweep). SQLC generation clean.
+- [ ] 9.3 (config load verify) and 10.1/10.2/10.4/10.5/10.6 (sandbox e2e) remain deferred-external per recorded reasons. Archive stays deferred.

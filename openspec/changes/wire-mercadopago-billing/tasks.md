@@ -98,3 +98,10 @@
 - [ ] `pnpm lint` — BLOCKED (pre-existing): `next lint` is broken in Next 16 and ESLint 9 requires flat config while the repo has legacy `.eslintrc.json`; not caused by this change
 - [ ] 13.2–13.6 — BLOCKED (external): require live Polar/MercadoPago sandbox credentials, dashboard webhook re-pointing, and a running DB — must be executed during deployment/integration
 - [ ] Migration ops — Polar dashboard webhook URL re-pointed to `/api/v1/webhooks/polar`; MP dashboard webhook configured for `/api/v1/webhooks/mercadopago`
+
+- [ ] **Archive decision (2026-08-11):** **Archive deferred** — remaining tasks 11.3 (config load verify), 13.2–13.6 (Polar/MP sandbox webhook replay, MP checkout e2e, Polar regression, lazy-guard) and migration ops (dashboard webhook re-pointing) are verification tasks requiring live Polar/MercadoPago sandbox credentials and a deployed environment; archiving is blocked per governance until those execute during deployment. The stale "pnpm lint BLOCKED" note is obsolete (flat config landed via archived fix-frontend-eslint-flat-config; lint is green at 0 errors). The lint check was re-run during the 2026-08-11 centralized gate: PASS.
+
+## Central re-verification (2026-08-11, Phase 1 of repo-wide active-changes run)
+
+- [x] Re-ran gates: `go build ./...` + `go vet ./...` + `go test ./...` PASS (baseline sweep), `sqlc generate` clean, `pnpm lint` PASS (0 errors / 4 warnings — the stale BLOCKED note is obsolete, flat config landed), `npx tsc --noEmit` PASS, `pnpm build` PASS (baseline sweep).
+- [ ] 11.3 (config load), 13.2–13.6 (Polar/MP sandbox webhook replay, checkout e2e, regression, lazy-guard) and dashboard webhook re-pointing remain deferred-external per recorded reasons. Archive stays deferred.
