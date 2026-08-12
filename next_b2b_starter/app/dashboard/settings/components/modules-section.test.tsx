@@ -17,6 +17,8 @@ vi.mock("@/lib/hooks/queries/use-modules-queries", () => ({
 
 vi.mock("@/lib/hooks/use-entitlement", () => ({
   useModule: (key: string) => mocks.moduleState(key),
+  // Plan source for the "Incluido en plan X" badge (design language).
+  useEntitlementQuery: () => ({ data: { plan: "Pro" } }),
 }));
 
 vi.mock("@/lib/hooks/mutations/use-tickets-mutations", () => ({
@@ -52,7 +54,7 @@ describe("ModulesSection", () => {
     const user = userEvent.setup();
     mocks.moduleState.mockReturnValue({ enabled: true, config: undefined });
     renderWithProviders(<ModulesSection />);
-    expect(screen.getByText("Activo")).toBeInTheDocument();
+    expect(screen.getByText("Incluido en plan Pro")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("high:8,normal:24,low:48")).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText("high:8,normal:24,low:48"), "high:8,low:48");

@@ -19,6 +19,7 @@ import (
 	documents "github.com/moasq/go-b2b-starter/internal/modules/documents/cmd"
 	files "github.com/moasq/go-b2b-starter/internal/modules/files/cmd"
 	instagram "github.com/moasq/go-b2b-starter/internal/modules/instagram/cmd"
+	inquiryschedule "github.com/moasq/go-b2b-starter/internal/modules/inquiryschedule/cmd"
 	invoicing "github.com/moasq/go-b2b-starter/internal/modules/invoicing/cmd"
 	organizations "github.com/moasq/go-b2b-starter/internal/modules/organizations/cmd"
 	orgDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
@@ -26,6 +27,7 @@ import (
 	paywall "github.com/moasq/go-b2b-starter/internal/modules/paywall/cmd"
 	playbooks "github.com/moasq/go-b2b-starter/internal/modules/playbooks"
 	playbooksDomain "github.com/moasq/go-b2b-starter/internal/modules/playbooks/domain"
+	procurement "github.com/moasq/go-b2b-starter/internal/modules/procurement/cmd"
 	registry "github.com/moasq/go-b2b-starter/internal/modules/registry"
 	whatsapp "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/cmd"
 	eventbus "github.com/moasq/go-b2b-starter/internal/platform/eventbus/cmd"
@@ -94,7 +96,8 @@ func InitMods(container *dig.Container) {
 	}
 
 	// Stytch client package must be initialized before app/auth (for organization/member management)
-	// This provides: stytch.Config, stytch.Client, stytch.RBACPolicyService
+	// This provides: stytch.Config, stytch.Client (with the two-tier circuit breaker)
+	// The RBAC policy service is consolidated in modules/auth/adapters/stytch and wired by auth/cmd.Init.
 	if err := stytchCmd.ProvideStytchDependencies(container); err != nil {
 		panic(err)
 	}
@@ -215,8 +218,21 @@ func InitMods(container *dig.Container) {
 	}
 
 	// Agent module (agentic WhatsApp assistant). Subscribes to the same
-	// whatsapp.message.received event alongside the CRM listener.
+	// whatsapp.message.received event alongside the CRM listener. The
+	// procurement module MUST be initialized before the agent module so the
+	// agent subscriber can inject the ActiveInquiryChecker skip seam.
+	if err := procurement.Init(container); err != nil {
+		panic(err)
+	}
 	if err := cmd.Init(container); err != nil {
+		panic(err)
+	}
+
+	// Inquiry scheduling (scheduled runs + follow-up automation). MUST be
+	// initialized after procurement (consumes the sibling's run/recipient
+	// state and drafting service by reference) and subscribes to the same
+	// whatsapp.message.received event for the reply-arrival follow-up check.
+	if err := inquiryschedule.Init(container); err != nil {
 		panic(err)
 	}
 

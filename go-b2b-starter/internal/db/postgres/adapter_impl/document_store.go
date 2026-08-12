@@ -52,8 +52,8 @@ func (s *documentStore) DeleteDocument(ctx context.Context, arg sqlc.DeleteDocum
 	return s.store.DeleteDocument(ctx, arg)
 }
 
-func (s *documentStore) CountDocumentsByOrganization(ctx context.Context, organizationID int32) (int64, error) {
-	return s.store.CountDocumentsByOrganization(ctx, organizationID)
+func (s *documentStore) CountDocumentsByOrganization(ctx context.Context, arg sqlc.CountDocumentsByOrganizationParams) (int64, error) {
+	return s.store.CountDocumentsByOrganization(ctx, arg)
 }
 
 func (s *documentStore) CountDocumentsByStatus(ctx context.Context, arg sqlc.CountDocumentsByStatusParams) (int64, error) {

@@ -161,6 +161,11 @@ func registerDomainStores(container *dig.Container) error {
 	}); err != nil {
 		return fmt.Errorf("failed to provide whatsapp webhook log repository: %w", err)
 	}
+	if err := container.Provide(func(sqlcStore sqlc.Store) whatsappDomain.TemplateRepository {
+		return whatsappRepos.NewTemplateRepository(sqlcStore)
+	}); err != nil {
+		return fmt.Errorf("failed to provide whatsapp template repository: %w", err)
+	}
 	if err := container.Provide(func(sqlcStore sqlc.Store) whatsappDomain.SignupFlowRepository {
 		return whatsappRepos.NewSignupFlowRepository(sqlcStore)
 	}); err != nil {

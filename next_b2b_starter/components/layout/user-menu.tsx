@@ -21,6 +21,7 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { useAuthContext } from "@/lib/contexts/auth-context";
 import { resetCachedToken } from "@/lib/api/api/client/api-client";
 import { logout } from "@/lib/actions/auth/logout";
+import { ui } from "@/lib/copy/ui";
 
 function getInitials(name?: string) {
   if (!name) return "?";
@@ -62,20 +63,20 @@ export function UserMenu() {
 
   if (!profile) {
     return (
-      <Button asChild variant="default" className="h-9">
-        <a href={loginHref}>Log in</a>
+      <Button asChild variant="default" className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white">
+        <a href={loginHref}>{ui.layout.login}</a>
       </Button>
     );
   }
 
-  const display = profile.name || profile.email || "Account";
+  const display = profile.name || profile.email || "Cuenta";
   const initials = getInitials(profile.name || profile.email);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="h-9 gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        <Button variant="outline" className="h-9 gap-2 border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-semibold text-white">
             {initials}
           </span>
           <span className="hidden max-w-[160px] truncate text-sm md:inline">{display}</span>
@@ -83,11 +84,11 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem asChild>
-          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard">{ui.layout.navDashboard}</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Theme
+          {ui.layout.theme}
         </DropdownMenuLabel>
         <DropdownMenuGroup>
           <DropdownMenuItem
@@ -96,7 +97,7 @@ export function UserMenu() {
           >
             <span className="inline-flex items-center gap-2">
               <Sun className="h-4 w-4" aria-hidden />
-              Light
+              {ui.layout.themeLight}
             </span>
             {theme === "light" && <Check className="h-4 w-4" aria-hidden />}
           </DropdownMenuItem>
@@ -106,7 +107,7 @@ export function UserMenu() {
           >
             <span className="inline-flex items-center gap-2">
               <Moon className="h-4 w-4" aria-hidden />
-              Dark
+              {ui.layout.themeDark}
             </span>
             {theme === "dark" && <Check className="h-4 w-4" aria-hidden />}
           </DropdownMenuItem>
@@ -116,14 +117,14 @@ export function UserMenu() {
           >
             <span className="inline-flex items-center gap-2">
               <Monitor className="h-4 w-4" aria-hidden />
-              System
+              {ui.layout.themeSystem}
             </span>
             {theme === "system" && <Check className="h-4 w-4" aria-hidden />}
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} disabled={isPending}>
-          {isPending ? "Logging out..." : "Log out"}
+          {isPending ? ui.layout.logoutPending : ui.layout.logout}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

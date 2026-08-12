@@ -1,9 +1,7 @@
 ## Purpose
 
 Define the E2E test infrastructure for the CRM suite: a Playwright project in `next_b2b_starter/e2e/`, a mock authentication middleware gated by `AUTH_MOCK_ENABLED`, a seeded test database, and shared fixtures/page objects.
-
 ## Requirements
-
 ### Requirement: Playwright project configured in next_b2b_starter
 
 The system SHALL have a Playwright test project at `next_b2b_starter/e2e/` with TypeScript configuration.
@@ -31,13 +29,19 @@ The system SHALL provide a mock authentication middleware activated by `AUTH_MOC
 
 ### Requirement: Test database seeded with test organizations
 
-The system SHALL seed the test database in `global-setup.ts` with three organizations at different plan tiers and one organization for RBAC testing.
+The system SHALL seed the test database via the `cmd/seed-e2e` command, invoked by the canonical e2e bootstrap and by CI after migrations are applied. The Playwright `global-setup.ts` SHALL validate that the seeded organizations exist; it SHALL NOT create them.
 
-#### Scenario: Global setup seeds test orgs
+#### Scenario: Bootstrap seeds test orgs before the suite runs
+- **WHEN** `make test-e2e` (via `scripts/run_e2e.sh`) or a CI e2e job runs
+- **THEN** database migrations are applied to `saas_db_test`
+- **AND** `cmd/seed-e2e` SHALL create `test-org-free` (Free plan), `test-org-pro` (Pro plan), `test-org-enterprise` (Enterprise plan), and `test-org-rbac` (Pro plan)
+- **AND** `seed-e2e` SHALL create an admin account for each org and manager and member accounts for `test-org-rbac`
+- **AND** the suite boots only after seeding completes
+
+#### Scenario: Global setup validates preconditions without seeding
 - **WHEN** `global-setup.ts` runs
-- **THEN** it SHALL create `test-org-free` (Free plan), `test-org-pro` (Pro plan), `test-org-enterprise` (Enterprise plan), and `test-org-rbac` (Pro plan)
-- **AND** SHALL create admin accounts for each org
-- **AND** SHALL create manager and member accounts for `test-org-rbac`
+- **THEN** it SHALL verify the expected test orgs exist (or log instructions to run `make test-e2e`)
+- **AND** it SHALL NOT create or modify organizations, accounts, subscriptions, or quotas
 
 ### Requirement: Shared test fixtures and page objects
 
@@ -109,3 +113,55 @@ The seed command SHALL create a dedicated `test-org-siigo` organization (Pro pla
 - **WHEN** `cmd/seed-e2e` runs
 - **THEN** `test-org-siigo` SHALL exist with admin and member accounts
 - **AND** the general-purpose seeded orgs SHALL remain available for their existing suites
+
+
+
+### Requirement: Cross-organization data isolation is E2E-tested
+
+The E2E tests SHALL verify that data created by one seeded organization is invisible to another seeded organization at the API level.
+
+#### Scenario: Org A data absent from Org B list
+
+- **WHEN** an org creates a contact under its own seeded org
+- **THEN** the same contact SHALL NOT appear in another org's contacts list
+
+### Requirement: Pagination behavior is E2E-tested
+
+The E2E tests SHALL verify the CRM list pagination contract: default `limit` of 20, explicit `limit`/`offset` parameters, and full result retrieval beyond the default page size.
+
+#### Scenario: Default limit returns 20 rows
+
+- **WHEN** an org has more than 20 contacts and a list request is made without `limit`/`offset`
+- **THEN** exactly 20 rows SHALL be returned
+
+#### Scenario: Explicit limit and offset retrieve the remainder
+
+- **WHEN** a list request specifies `limit` and `offset` beyond the first page
+- **THEN** the remaining rows SHALL be returned
+
+### Requirement: Outbound reply persistence is E2E-tested
+
+The E2E tests SHALL verify that sending a reply via `POST /crm/conversaciones/:id/mensajes` persists an outbound message retrievable through the messages API.
+
+#### Scenario: Reply persists as an outbound message
+
+- **WHEN** a reply is sent to an existing conversation via the messages endpoint
+- **THEN** the persisted message retrieved via `/crm/conversaciones/:id/mensajes` SHALL have `direction` equal to `outbound`
+
+### Requirement: Mock-auth guard is E2E-tested
+
+The E2E tests SHALL verify that, with `AUTH_MOCK_ENABLED`, a request without an `X-Test-Org-ID` header is rejected with 401.
+
+#### Scenario: Missing mock header returns 401
+
+- **WHEN** a request is made with `AUTH_MOCK_ENABLED=true` and no `X-Test-Org-ID` header
+- **THEN** the response SHALL have status 401
+
+### Requirement: RBAC boundary is E2E-tested
+
+The E2E tests SHALL verify that a member without the `org:manage` permission cannot access org-management-gated endpoints, returning 403.
+
+#### Scenario: Member access to org-manage-gated endpoint is rejected with 403
+
+- **WHEN** a member account attempts to access an endpoint gated by the `org:manage` permission (e.g., `GET /api/v1/whatsapp/config`)
+- **THEN** the response SHALL have status 403

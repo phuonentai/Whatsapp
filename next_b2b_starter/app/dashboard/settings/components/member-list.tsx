@@ -40,6 +40,20 @@ interface MemberListProps {
   organizationId: string;
   isFetching?: boolean;
   onMemberUpdate?: () => void;
+  /**
+   * Role selector options + descriptions sourced from the SAME query as the
+   * matrix (`/rbac/roles`, Stytch policy). When omitted, the built-in role
+   * labels are used. Descriptions shown here MUST match the matrix.
+   */
+  roleOptions?: RoleOption[];
+  /** Invoked after a successful role change (used to show the propagation note). */
+  onRoleChange?: () => void;
+}
+
+export interface RoleOption {
+  id: MemberRole;
+  name: string;
+  description: string;
 }
 
 const ROLE_OPTIONS: MemberRole[] = ["admin", "approver", "member"];
@@ -51,6 +65,8 @@ export function MemberList({
   organizationId,
   isFetching = false,
   onMemberUpdate,
+  roleOptions,
+  onRoleChange,
 }: MemberListProps) {
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
   const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
@@ -128,6 +144,7 @@ export function MemberList({
         description: `${memberName} is now ${targetLabel}`,
       });
       onMemberUpdate?.();
+      onRoleChange?.();
     } catch (error) {
       console.error("[MemberList] Role change error:", error);
       const message = error instanceof Error ? error.message : "Failed to update role";
@@ -148,14 +165,14 @@ export function MemberList({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <Table>
         <TableHeader>
-          <TableRow className="border-gray-200 bg-gray-50/50">
-            <TableHead className="font-medium text-gray-700">Member</TableHead>
-            <TableHead className="font-medium text-gray-700">Role</TableHead>
-            <TableHead className="font-medium text-gray-700">Status</TableHead>
-            <TableHead className="font-medium text-gray-700">Joined</TableHead>
+          <TableRow className="border-slate-200 bg-slate-50/50">
+            <TableHead className="font-medium text-slate-700">Member</TableHead>
+            <TableHead className="font-medium text-slate-700">Role</TableHead>
+            <TableHead className="font-medium text-slate-700">Status</TableHead>
+            <TableHead className="font-medium text-slate-700">Joined</TableHead>
             {canManage && <TableHead className="w-[50px]"></TableHead>}
           </TableRow>
         </TableHeader>
@@ -164,7 +181,7 @@ export function MemberList({
             <TableRow>
               <TableCell colSpan={canManage ? 5 : 4} className="py-8 text-center">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-gray-200 border-t-primary-500" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-4 border-slate-200 border-t-primary-500" />
                   <p className="text-sm text-muted-foreground">Loading team members...</p>
                 </div>
               </TableCell>
@@ -180,18 +197,18 @@ export function MemberList({
             const showRoleError = roleErrorMemberId === member.id && roleErrorMessage;
 
             return (
-              <TableRow key={member.id} className="border-gray-100 hover:bg-gray-50/50 transition-colors">
+              <TableRow key={member.id} className="border-slate-100 hover:bg-slate-50/50 transition-colors">
                 <TableCell className="py-4">
                   <div className="flex items-center gap-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-slate-900">
                         {member.name || member.email}
                         {isCurrentUser && (
-                          <span className="ml-2 text-xs font-normal text-gray-500">(You)</span>
+                          <span className="ml-2 text-xs font-normal text-slate-500">(You)</span>
                         )}
                       </p>
                       {member.name && (
-                        <p className="text-xs text-gray-500">{member.email}</p>
+                        <p className="text-xs text-slate-500">{member.email}</p>
                       )}
                     </div>
                   </div>
@@ -218,9 +235,21 @@ export function MemberList({
                         <SelectContent>
                           {ROLE_OPTIONS.map((role) => {
                             const cfg = MemberHelpers.getRoleConfig(role);
+                            const option = roleOptions?.find((o) => o.id === role);
                             return (
                               <SelectItem key={role} value={role}>
-                                {cfg.label}
+                                {option ? (
+                                  <div className="space-y-1 text-left">
+                                    <p className="font-medium">{option.name}</p>
+                                    {option.description && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {option.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  cfg.label
+                                )}
                               </SelectItem>
                             );
                           })}
@@ -244,12 +273,12 @@ export function MemberList({
                   )}
                 </TableCell>
                 <TableCell className="py-4">
-                  <span className="text-sm font-medium text-gray-700">{statusConfig.label}</span>
+                  <span className="text-sm font-medium text-slate-700">{statusConfig.label}</span>
                 </TableCell>
-                <TableCell className="py-4 text-sm text-gray-600">
+                <TableCell className="py-4 text-sm text-slate-600">
                   {joinedDate}
                   {member.invitedBy && (
-                    <div className="text-xs text-gray-500 mt-0.5">by {member.invitedBy}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">by {member.invitedBy}</div>
                   )}
                 </TableCell>
                 {canManage && (
@@ -263,7 +292,7 @@ export function MemberList({
                             disabled={pendingMemberId === member.id || isFetching}
                             className="h-8 w-8 p-0"
                           >
-                            <MoreVertical className="h-4 w-4 text-gray-500" />
+                            <MoreVertical className="h-4 w-4 text-slate-500" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">

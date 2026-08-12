@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2026-08-12T16:19:20.885Z",
+  "viewports": [
+    "1440x900",
+    "768x1024",
+    "390x844"
+  ],
+  "pages": {
+    "pro": {
+      "ok": true,
+      "shots": [
+        "/home/phuongbinhnguyentai/project/Whatsapp/openspec/changes/dashboard-home-redesign/qa/dashboard-pro-1440x900.png",
+        "/home/phuongbinhnguyentai/project/Whatsapp/openspec/changes/dashboard-home-redesign/qa/dashboard-pro-768x1024.png",
+        "/home/phuongbinhnguyentai/project/Whatsapp/openspec/changes/dashboard-home-redesign/qa/dashboard-pro-390x844.png"
+      ],
+      "checks": {
+        "conversationsPanel": true,
+        "conversationItem": true,
+        "teamPanel": true,
+        "siigoPanel": true,
+        "siigoEmpty": true,
+        "autopilotBanner": true,
+        "quickActionBroadcast": true,
+        "quickActionExport": true,
+        "kpiSales": true,
+        "kpiNoData": true,
+        "onboardingSection": true
+      },
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Error: API Error 404: No WhatsApp configuration found for this organization\n    at ApiClient.buildApiError (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:577:16)\n    at async ApiClient.request (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:486:31)\n    at async WhatsAppConfigRepository.getConfig (http://localhost:3001/_next/static/chunks/_7cec8924._.js:776:26)",
+        "Error: API Error 404: No WhatsApp configuration found for this organization\n    at ApiClient.buildApiError (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:577:16)\n    at async ApiClient.request (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:486:31)\n    at async WhatsAppConfigRepository.getConfig (http://localhost:3001/_next/static/chunks/_7cec8924._.js:776:26)",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-516fe29d-229b-4694-9fea-a105091a7938\n\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+        "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-fa78f17a-a3f9-49e5-b0d7-c41c6d3ce123\n\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+        "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+      ]
+    },
+    "free": {
+      "ok": true,
+      "shots": [
+        "/home/phuongbinhnguyentai/project/Whatsapp/openspec/changes/dashboard-home-redesign/qa/dashboard-free-1440x900.png"
+      ],
+      "checks": {
+        "conversationsEmpty": true,
+        "siigoEmpty": true,
+        "teamEmpty": false,
+        "autopilotStatic": true,
+        "salesChartEmpty": true
+      },
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Error: API Error 404: No WhatsApp configuration found for this organization\n    at ApiClient.buildApiError (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:577:16)\n    at async ApiClient.request (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:486:31)\n    at async WhatsAppConfigRepository.getConfig (http://localhost:3001/_next/static/chunks/_7cec8924._.js:776:26)",
+        "Error: API Error 404: No WhatsApp configuration found for this organization\n    at ApiClient.buildApiError (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:577:16)\n    at async ApiClient.request (http://localhost:3001/_next/static/chunks/_1074d0b7._.js:486:31)\n    at async WhatsAppConfigRepository.getConfig (http://localhost:3001/_next/static/chunks/_7cec8924._.js:776:26)",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-5083e890-d65d-4fd2-bc7b-d5ad146fa873\n\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+        "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-801aa66a-c1ef-4cbf-a0f6-4b61b0de377b\n\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+        "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+      ]
+    }
+  },
+  "findings": {
+    "horizontalOverflow390": {
+      "status": "fixed",
+      "detail": "El grid de onboarding ensanchaba su track a 546px en móvil (min-content de las tarjetas) → overflow horizontal de 570px. Corregido con `[&>*]:min-w-0` en el grid (dashboard-home.tsx): scrollWidth 570 → 409.",
+      "residual": "~19px residual preexistente fuera del alcance de este change: fila de paso de FirstRunChecklist (componente compartido de ai-onboarding) y topbar del shell (~3px). No introducido por la recomposición; el baseline previo era 570px."
+    },
+    "snippetOnly": {
+      "status": "pass",
+      "detail": "El panel Conversaciones Recientes renderiza solo nombre/avatar, canal y hora relativa (campos de la bandeja); sin cuerpos de mensaje (hasFullMessageBody=false). Ítems enlazan a /dashboard/inbox."
+    },
+    "honestEmptyStates": {
+      "status": "pass",
+      "detail": "Facturas Siigo: estado vacío + CTA (gate invoice:view). Ventas sin módulo: '—'/estado vacío + CTA reportes. Equipo sin permiso/datos: vacío honesto. Auto-Piloto sin agent-settings: sugerencia estática sin afirmar modo."
+    },
+    "deltaBadges": {
+      "status": "pass",
+      "detail": "Sin datos de comparación → sin badge de delta (0 badges renderizados)."
+    },
+    "rbacGates": {
+      "status": "pass",
+      "detail": "Pro (admin, invoice:view, ORG_MANAGE): CTA siigo visible, miembros visibles, agent-settings consultado. Free (sin invoice:view): CTA siigo oculto, chart gated."
+    },
+    "onboardingToggle": {
+      "status": "pass",
+      "detail": "Toggle de plegado con aria-expanded=true (visible por defecto en primer uso), preferencia persistida en localStorage."
+    },
+    "consoleErrors": {
+      "status": "environment-noise",
+      "detail": "Errores de consola preexistentes del harness mock: Stytch placeholder token (public_token_not_found) y 'No WhatsApp configuration found' de useWhatsAppConfigQuery (FirstRunChecklist, org sin config). Sin errores de React/hidratación."
+    },
+    "viewports": {
+      "status": "pass",
+      "detail": "Capturas a 1440x900, 768x1024, 390x844 (fullPage) en qa/."
+    }
+  }
+}

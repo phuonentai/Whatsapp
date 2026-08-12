@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getStytchB2BClient } from "@/lib/auth/stytch/server";
+import { getStytchB2BClient, decodeJWT } from "@/lib/auth/stytch/server";
+import { recordAuthAudit } from "@/lib/auth/audit";
 import {
   SESSION_COOKIE_NAME,
   SESSION_JWT_COOKIE_NAME,
@@ -21,6 +22,36 @@ export async function logout(returnTo?: string): Promise<never> {
 
   const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const sessionJwt = cookieStore.get(SESSION_JWT_COOKIE_NAME)?.value;
+
+  // Record the logout before revoking the session — the JWT must still be
+  // valid for the audit POST to the Go activity endpoint. Best-effort: the
+  // helper never throws, so logout always proceeds.
+  if (sessionToken || sessionJwt) {
+    const claims = sessionJwt ? decodeJWT(sessionJwt) : null;
+    const stytchSession = claims
+      ? claims["https://stytch.com/session"]
+      : undefined;
+    const memberId =
+      stytchSession &&
+      typeof stytchSession === "object" &&
+      "member_id" in stytchSession &&
+      typeof stytchSession.member_id === "string"
+        ? stytchSession.member_id
+        : undefined;
+    const organizationId =
+      stytchSession &&
+      typeof stytchSession === "object" &&
+      "organization_id" in stytchSession &&
+      typeof stytchSession.organization_id === "string"
+        ? stytchSession.organization_id
+        : undefined;
+
+    await recordAuthAudit({
+      type: "logout",
+      memberId,
+      organizationId,
+    });
+  }
 
   // Revoke the session with Stytch if we have a token
   if (sessionToken || sessionJwt) {

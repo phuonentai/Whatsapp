@@ -1,0 +1,137 @@
+[
+  {
+    "page": "/",
+    "viewport": "390x844",
+    "lang": "es",
+    "h1": "El CRM nativo para WhatsApp que automatiza tus ventas",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-82142258-1af6-4cf3-8e65-4be4548a1644\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-97bb92f7-8261-44b5-9244-bc3150934649\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "landing-390x844.png"
+  },
+  {
+    "page": "/onboarding-info",
+    "viewport": "390x844",
+    "lang": "es",
+    "h1": "Cómo funciona tu onboarding",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-c352e28b-b819-4043-b6a0-1c508c241f18\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-3114702b-9124-4e76-b7e4-47587d215fc4\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "onboarding-info-390x844.png"
+  },
+  {
+    "page": "/auth",
+    "viewport": "390x844",
+    "lang": "es",
+    "h1": "Bienvenido de nuevo a NexoChat",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-1c8a640c-79fe-40f0-b73e-2c16fb5c590c\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-51157956-600e-419c-904e-4e8c40cba049\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "sign-in-390x844.png"
+  },
+  {
+    "page": "/",
+    "viewport": "768x1024",
+    "lang": "es",
+    "h1": "El CRM nativo para WhatsApp que automatiza tus ventas",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-7a9902e5-ed7c-467c-adc3-2ecaece23e4b\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-d68e7185-e6cf-4beb-8e2d-f9f8727cd010\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "landing-768x1024.png"
+  },
+  {
+    "page": "/onboarding-info",
+    "viewport": "768x1024",
+    "lang": "es",
+    "h1": "Cómo funciona tu onboarding",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-80511b09-2cef-4ea2-99f7-d45e54673a0e\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-fb247310-f942-422e-acb8-04fde9a30dce\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "onboarding-info-768x1024.png"
+  },
+  {
+    "page": "/auth",
+    "viewport": "768x1024",
+    "lang": "es",
+    "h1": "Bienvenido de nuevo a NexoChat",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-401637da-9893-4f49-a46a-5434b0cfbe1c\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-f96bc104-d8e4-44cb-8a65-60045431b685\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "sign-in-768x1024.png"
+  },
+  {
+    "page": "/",
+    "viewport": "1440x900",
+    "lang": "es",
+    "h1": "El CRM nativo para WhatsApp que automatiza tus ventas",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-0092a2f2-2ab5-4087-8a3e-501f40e23e5d\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-4a2d75ed-362f-444f-ba2f-09ce5a3c03db\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "landing-1440x900.png"
+  },
+  {
+    "page": "/onboarding-info",
+    "viewport": "1440x900",
+    "lang": "es",
+    "h1": "Cómo funciona tu onboarding",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-a97a3f40-914b-45c2-bafe-3a8f92dc83b8\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-29133dcf-0cc7-4b41-90ba-db6a52804bfa\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "onboarding-info-1440x900.png"
+  },
+  {
+    "page": "/auth",
+    "viewport": "1440x900",
+    "lang": "es",
+    "h1": "Bienvenido de nuevo a NexoChat",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-606a237a-e7f1-4dbd-b6ae-73bc376ad8c8\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Failed to load resource: the server responded with a status of 404 ()",
+      "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-test-bc2967eb-658b-42de-89b9-72cda42e1379\n\n    at http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1751:27\n    at Generator.<anonymous> (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1396:63)\n    at Generator.next (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1442:29)\n    at fulfilled (http://localhost:3000/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSYQQjTb_bd9c7319.js:1587:32)",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ],
+    "screenshot": "sign-in-1440x900.png"
+  }
+]

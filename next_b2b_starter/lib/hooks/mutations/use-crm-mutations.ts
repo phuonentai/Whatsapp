@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { crmRepository } from "../../api/api/repositories/crm-repository";
 import { queryKeys } from "../queries/query-keys";
 import { toSpanishMutationError } from "../../crm/errors";
+import type { DealDto } from "../../api/api/dto/crm.dto";
 
 function onMutationError(error: unknown) {
   toast.error(toSpanishMutationError(error));
@@ -88,8 +89,26 @@ export function useMoveDealStage() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Parameters<typeof crmRepository.moveDealStage>[1] }) =>
       crmRepository.moveDealStage(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
-    onError: onMutationError,
+    // Optimistic: move the card to the target stage in every cached deals
+    // list immediately, snapshotting the previous state for rollback.
+    onMutate: async ({ id, data }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.crm.deals() });
+      const previous = qc.getQueriesData<DealDto[]>({ queryKey: queryKeys.crm.deals() });
+      qc.setQueriesData<DealDto[]>({ queryKey: queryKeys.crm.deals() }, (old) =>
+        old?.map((deal) => (deal.id === id ? { ...deal, stage_id: data.stage_id } : deal))
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      // Restore the snapshot so the card returns to its original stage.
+      if (context?.previous) {
+        for (const [key, deals] of context.previous) {
+          qc.setQueryData(key, deals);
+        }
+      }
+      onMutationError(error);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.crm.all }),
   });
 }
 

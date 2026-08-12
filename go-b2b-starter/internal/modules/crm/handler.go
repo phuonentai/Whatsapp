@@ -6,11 +6,16 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
+
+	"github.com/moasq/go-b2b-starter/internal/modules/auth/adapters/stytch"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
+	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
+	"github.com/moasq/go-b2b-starter/pkg/httperr"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 )
 
@@ -23,7 +28,9 @@ type CRMHandler struct {
 	tagService          services.TagService
 	conversationService services.ConversationService
 	outboundService     services.OutboundService
+	sendGovernance      services.ManualSendGovernance
 	featureProvider     features.FeatureProvider
+	memberDirectory     *stytch.MemberDirectoryService
 	logger              logger.Logger
 }
 
@@ -33,7 +40,10 @@ func NewCRMHandler(
 	activityService services.ActivityService, tagService services.TagService,
 	conversationService services.ConversationService,
 	outboundService services.OutboundService,
-	featureProvider features.FeatureProvider, logger logger.Logger,
+	sendGovernance services.ManualSendGovernance,
+	featureProvider features.FeatureProvider,
+	memberDirectory *stytch.MemberDirectoryService,
+	logger logger.Logger,
 ) *CRMHandler {
 	return &CRMHandler{
 		contactService: contactService, companyService: companyService,
@@ -41,7 +51,10 @@ func NewCRMHandler(
 		activityService: activityService, tagService: tagService,
 		conversationService: conversationService,
 		outboundService:     outboundService,
-		featureProvider:     featureProvider, logger: logger,
+		sendGovernance:      sendGovernance,
+		featureProvider:     featureProvider,
+		memberDirectory:     memberDirectory,
+		logger:              logger,
 	}
 }
 
@@ -537,8 +550,10 @@ func (h *CRMHandler) ListConversaciones(c *gin.Context) {
 	limit, offset := parsePagination(c)
 	statusFilter := c.Query("status")
 	channelFilter := c.Query("channel")
+	view := conversationscope.ParseViewScope(c.Query("scope"))
+	scope := conversationscope.GetScope(c)
 
-	convs, err := h.conversationService.ListConversations(c.Request.Context(), ctx.OrganizationID, limit, offset, statusFilter, channelFilter)
+	convs, err := h.conversationService.ListConversations(c.Request.Context(), ctx.OrganizationID, limit, offset, statusFilter, channelFilter, view, scope)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Error al listar conversaciones", err)
 		return
@@ -550,8 +565,9 @@ func (h *CRMHandler) ListMensajes(c *gin.Context) {
 	ctx := authcontext.GetRequestContext(c)
 	convID := parseID(c)
 	limit, offset := parsePagination(c)
+	scope := conversationscope.GetScope(c)
 
-	msgs, err := h.conversationService.ListMessages(c.Request.Context(), ctx.OrganizationID, convID, limit, offset)
+	msgs, err := h.conversationService.ListMessages(c.Request.Context(), ctx.OrganizationID, convID, limit, offset, scope)
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "Error al listar mensajes", err)
 		return
@@ -562,6 +578,7 @@ func (h *CRMHandler) ListMensajes(c *gin.Context) {
 func (h *CRMHandler) UpdateEstadoConversacion(c *gin.Context) {
 	ctx := authcontext.GetRequestContext(c)
 	convID := parseID(c)
+	scope := conversationscope.GetScope(c)
 
 	var req struct {
 		Status string `json:"status"`
@@ -571,9 +588,116 @@ func (h *CRMHandler) UpdateEstadoConversacion(c *gin.Context) {
 		return
 	}
 
-	conv, err := h.conversationService.UpdateStatus(c.Request.Context(), ctx.OrganizationID, convID, domain.ConversationStatus(req.Status))
+	conv, err := h.conversationService.UpdateStatus(c.Request.Context(), ctx.OrganizationID, convID, domain.ConversationStatus(req.Status), scope)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Error al actualizar estado", err)
+		return
+	}
+	response.Success(c, http.StatusOK, conv)
+}
+
+// HandleListMemberDirectory devuelve el directorio de miembros activos del org
+// (solo stytch_member_id) para el picker de re-asignación. 503
+// member_directory_unavailable si el directorio no está disponible (circuit
+// abierto / cache vacía) — el picker muestra estado de retry, la bandeja
+// sigue funcional.
+func (h *CRMHandler) HandleListMemberDirectory(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+
+	if h.memberDirectory == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "member_directory_unavailable",
+			"success": false,
+			"detail":  "El directorio de miembros no está disponible.",
+		})
+		return
+	}
+
+	ids, err := h.memberDirectory.ListActiveMemberIDs(c.Request.Context(), reqCtx.ProviderOrgID)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "member_directory_unavailable",
+			"success": false,
+			"detail":  "El directorio de miembros no está disponible. Inténtalo de nuevo en un momento.",
+		})
+		return
+	}
+	response.Success(c, http.StatusOK, gin.H{"members": ids})
+}
+
+// HandleUpdateAssignee re-asigna una conversación (PATCH
+// /crm/conversaciones/:id/assignee). Permiso inbox:reassign (route-level);
+// destino validado contra el directorio Stytch (mismo org, activo); auditoría
+// actor/origen/destino. 404 fuera de scope o inexistente; 503 si el directorio
+// no está disponible (circuit abierto / cache vacía) — la bandeja sigue
+// funcional.
+func (h *CRMHandler) HandleUpdateAssignee(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	convID := parseID(c)
+	scope := conversationscope.GetScope(c)
+
+	var req struct {
+		Assignee *string `json:"assignee_stytch_member_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
+		return
+	}
+
+	if h.memberDirectory == nil {
+		// Directorio no disponible (development sin cliente Stytch o circuito
+		// abierto con cache vacía): degradación visible 503.
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "member_directory_unavailable",
+			"success": false,
+			"detail":  "El directorio de miembros no está disponible. Inténtalo de nuevo en un momento.",
+		})
+		return
+	}
+
+	// Validación del destino contra el directorio: mismo org, miembro activo.
+	// assignee nil = liberar la conversación (unassign).
+	if req.Assignee != nil && *req.Assignee != "" {
+		memberID := reqCtx.Identity.UserID
+		if memberID != *req.Assignee {
+			ok, dirErr := h.memberDirectory.IsActiveMember(c.Request.Context(), reqCtx.ProviderOrgID, *req.Assignee)
+			if dirErr != nil {
+				// Circuit abierto o cache vacía con API inalcanzable: 503.
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error":   "member_directory_unavailable",
+					"success": false,
+					"detail":  "El directorio de miembros no está disponible. Inténtalo de nuevo en un momento.",
+				})
+				return
+			}
+			if !ok {
+				// Destino fuera del org o inactivo: rechazo mismo-org (no 404:
+				// el destino no es una conversación).
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "invalid_assignee",
+					"success": false,
+					"detail":  "El miembro destino no pertenece a la organización o no está activo.",
+				})
+				return
+			}
+		}
+	}
+
+	var assignee *string
+	if req.Assignee != nil && *req.Assignee != "" {
+		assignee = req.Assignee
+	}
+
+	conv, err := h.conversationService.UpdateAssignee(c.Request.Context(), reqCtx.OrganizationID, convID, assignee, reqCtx.Identity.UserID, scope)
+	if err != nil {
+		if strings.Contains(err.Error(), "conversation not found") {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "conversation_not_found",
+				"success": false,
+			})
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al re-asignar la conversación", err)
 		return
 	}
 	response.Success(c, http.StatusOK, conv)
@@ -593,17 +717,112 @@ func (h *CRMHandler) HandleSendMessage(c *gin.Context) {
 		return
 	}
 
-	msg, err := h.outboundService.SendMessage(c.Request.Context(), ctx.OrganizationID, convID, req.Content)
+	// Manual sends (member with inbox:reply, or admin) traverse the
+	// agent-governance guardrails via the shared seam: denials are audited
+	// and the send is NOT performed (no role exemption).
+	actorID := ""
+	if ctx != nil && ctx.Identity != nil {
+		actorID = ctx.Identity.UserID
+	}
+	deniedReasons, msg, err := h.sendGovernance.GovernManualSend(
+		c.Request.Context(), ctx.OrganizationID, convID, req.Content, actorID,
+	)
+	if err != nil {
+		if contains(err.Error(), "message content is required") {
+			response.Error(c, http.StatusBadRequest, "El contenido del mensaje es requerido", err)
+			return
+		}
+		if contains(err.Error(), "conversation not found") {
+			response.Error(c, http.StatusNotFound, "Conversación no encontrada", err)
+			return
+		}
+		if contains(err.Error(), "whatsapp_not_configured") {
+			response.Error(c, http.StatusBadRequest, "WhatsApp no esta configurado", err)
+			return
+		}
+		if contains(err.Error(), "whatsapp_no_access_token") {
+			response.Error(c, http.StatusBadRequest, "Token de acceso no configurado", err)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Error al enviar mensaje", err)
+		return
+	}
+	if len(deniedReasons) > 0 {
+		response.Error(c, http.StatusForbidden,
+			"Envio denegado por guardrails: "+strings.Join(deniedReasons, ", "),
+			nil)
+		return
+	}
+
+	response.Success(c, http.StatusOK, msg)
+}
+
+// HandleSendTemplateMessage sends a Meta-approved template message to the
+// conversation's contact. Template sends bypass the 24-hour messaging window
+// (Meta-approved templates are business-initiated); the response never carries
+// the outside_24h_window warning.
+func (h *CRMHandler) HandleSendTemplateMessage(c *gin.Context) {
+	ctx := authcontext.GetRequestContext(c)
+	convID := parseID(c)
+
+	var req struct {
+		TemplateID int64    `json:"template_id"`
+		Params     []string `json:"params"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_request",
+			"Solicitud inválida: "+err.Error(),
+		))
+		return
+	}
+
+	msg, err := h.outboundService.SendTemplateMessage(c.Request.Context(), ctx.OrganizationID, convID, req.TemplateID, req.Params)
 	if err != nil {
 		switch {
-		case err.Error() == "message content is required":
-			response.Error(c, http.StatusBadRequest, "El contenido del mensaje es requerido", err)
-		case contains(err.Error(), "whatsapp_not_configured"):
-			response.Error(c, http.StatusBadRequest, "WhatsApp no esta configurado", err)
-		case contains(err.Error(), "whatsapp_no_access_token"):
-			response.Error(c, http.StatusBadRequest, "Token de acceso no configurado", err)
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found",
+				"Plantilla no encontrada para esta organización",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateNotApproved):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"template_not_approved",
+				"La plantilla debe estar aprobada para poder enviarse",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateParamCountMismatch):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"template_param_count_mismatch",
+				err.Error(),
+			))
+		case contains(err.Error(), "whatsapp_api_error"):
+			c.JSON(http.StatusBadGateway, httperr.NewHTTPError(
+				http.StatusBadGateway,
+				"whatsapp_api_error",
+				"Error de la API de WhatsApp al enviar la plantilla",
+			))
+		case contains(err.Error(), "rate_limit"):
+			c.JSON(http.StatusTooManyRequests, httperr.NewHTTPError(
+				http.StatusTooManyRequests,
+				"rate_limit",
+				"Límite de envío excedido (10 mensajes por 10 segundos)",
+			))
+		case contains(err.Error(), "whatsapp_not_configured") || contains(err.Error(), "whatsapp_no_access_token"):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"whatsapp_not_configured",
+				"WhatsApp no está configurado",
+			))
 		default:
-			response.Error(c, http.StatusInternalServerError, "Error al enviar mensaje", err)
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"template_send_failed",
+				"Error al enviar la plantilla",
+			))
 		}
 		return
 	}

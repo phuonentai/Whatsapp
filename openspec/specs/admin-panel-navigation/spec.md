@@ -1,12 +1,10 @@
 ## Purpose
 
 Defines admin panel sidebar navigation exposing Inbox and CRM sections, with dead header actions removed or wired.
-
 ## Requirements
-
 ### Requirement: Sidebar exposes Inbox and CRM navigation
 
-The dashboard sidebar SHALL include "Inbox" linking to `/dashboard/inbox` and "CRM" linking to `/dashboard/crm`, following the existing permission-filtered navigation pattern.
+The dashboard sidebar SHALL include "Inbox" linking to `/dashboard/inbox` and "CRM" linking to `/dashboard/crm`, following the existing permission-filtered navigation pattern. The sidebar SHALL also include a "Dashboard" entry linking to `/dashboard`, and each active entry SHALL carry `aria-current="page"`.
 
 #### Scenario: Entitled user sees Inbox and CRM
 
@@ -21,7 +19,12 @@ The dashboard sidebar SHALL include "Inbox" linking to `/dashboard/inbox` and "C
 #### Scenario: Sidebar entry is active on nested routes
 
 - **WHEN** a user is on `/dashboard/inbox` or `/dashboard/crm?view=...`
-- **THEN** the matching sidebar entry SHALL be highlighted as active
+- **THEN** the matching sidebar entry SHALL be highlighted as active and SHALL carry `aria-current="page"`
+
+#### Scenario: Dashboard entry always present
+
+- **WHEN** any authenticated user views the sidebar
+- **THEN** the sidebar SHALL display a "Dashboard" entry linking to `/dashboard`, highlighted when the current route is `/dashboard`
 
 ### Requirement: Dead header actions are removed or wired
 
@@ -57,3 +60,4 @@ The system SHALL render an onboarding overview in the admin surface listing orga
 
 - **WHEN** a member without the admin role requests the onboarding overview
 - **THEN** the system SHALL deny access and SHALL NOT render the view
+

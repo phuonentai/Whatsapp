@@ -86,8 +86,8 @@ ORDER BY created_at DESC;
 -- ============================================================
 
 -- name: CreateCampaign :one
-INSERT INTO crm.campaigns (organization_id, nombre, segment_id, created_by)
-VALUES ($1, $2, $3, $4)
+INSERT INTO crm.campaigns (organization_id, nombre, segment_id, created_by, mensaje)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetCampaign :one

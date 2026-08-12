@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"go.uber.org/dig"
 
@@ -11,6 +13,8 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/adapters"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/features"
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/ledger"
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/infra/trial"
+	organizationsDomain "github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	registryServices "github.com/moasq/go-b2b-starter/internal/modules/registry/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/paywall"
 	platformFeatures "github.com/moasq/go-b2b-starter/internal/platform/features"
@@ -62,5 +66,44 @@ func ProvideDependencies(container *dig.Container) error {
 		return fmt.Errorf("failed to provide token ledger: %w", err)
 	}
 
+	// Register TrialSeeder for organizations-domain interface.
+	// Idempotent trial + quota seeding on bootstrap when TRIAL_ENABLED=true.
+	if err := container.Provide(func(
+		store postgres.Store,
+		log loggerDomain.Logger,
+	) organizationsDomain.TrialSeeder {
+		cfg := trial.Config{
+			Enabled: getEnvBool("TRIAL_ENABLED", false),
+			Days:    getEnvInt("TRIAL_DAYS", 14),
+		}
+		return trial.NewSeeder(store, cfg, log)
+	}); err != nil {
+		return fmt.Errorf("failed to provide trial seeder: %w", err)
+	}
+
 	return nil
+}
+
+func getEnvBool(key string, defaultVal bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return defaultVal
+	}
+	return b
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultVal
+	}
+	return i
 }

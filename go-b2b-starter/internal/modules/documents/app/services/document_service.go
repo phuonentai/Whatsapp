@@ -99,8 +99,8 @@ func (s *documentService) UploadDocument(ctx context.Context, orgID int32, req *
 	return createdDoc, nil
 }
 
-func (s *documentService) GetDocument(ctx context.Context, orgID, docID int32) (*domain.Document, error) {
-	doc, err := s.docRepo.GetByID(ctx, orgID, docID)
+func (s *documentService) GetDocument(ctx context.Context, orgID, docID int32, canViewAdminOnly bool) (*domain.Document, error) {
+	doc, err := s.docRepo.GetByID(ctx, orgID, docID, canViewAdminOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get document: %w", err)
 	}
@@ -108,23 +108,23 @@ func (s *documentService) GetDocument(ctx context.Context, orgID, docID int32) (
 	return doc, nil
 }
 
-func (s *documentService) ListDocuments(ctx context.Context, orgID int32, req *ListDocumentsRequest) (*ListDocumentsResponse, error) {
+func (s *documentService) ListDocuments(ctx context.Context, orgID int32, req *ListDocumentsRequest, canViewAdminOnly bool) (*ListDocumentsResponse, error) {
 	var docs []*domain.Document
 	var total int64
 	var err error
 
 	if req.Status != nil {
-		docs, err = s.docRepo.ListByStatus(ctx, orgID, *req.Status, req.Limit, req.Offset)
+		docs, err = s.docRepo.ListByStatus(ctx, orgID, *req.Status, req.Limit, req.Offset, canViewAdminOnly)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list documents by status: %w", err)
 		}
-		total, err = s.docRepo.CountByStatus(ctx, orgID, *req.Status)
+		total, err = s.docRepo.CountByStatus(ctx, orgID, *req.Status, canViewAdminOnly)
 	} else {
-		docs, err = s.docRepo.List(ctx, orgID, req.Limit, req.Offset)
+		docs, err = s.docRepo.List(ctx, orgID, req.Limit, req.Offset, canViewAdminOnly)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list documents: %w", err)
 		}
-		total, err = s.docRepo.Count(ctx, orgID)
+		total, err = s.docRepo.Count(ctx, orgID, canViewAdminOnly)
 	}
 
 	if err != nil {
@@ -140,8 +140,8 @@ func (s *documentService) ListDocuments(ctx context.Context, orgID int32, req *L
 }
 
 func (s *documentService) UpdateDocument(ctx context.Context, orgID, docID int32, req *UpdateDocumentRequest) (*domain.Document, error) {
-	// Get existing document
-	doc, err := s.docRepo.GetByID(ctx, orgID, docID)
+	// Get existing document (admin-only surface: sees admin_only docs too).
+	doc, err := s.docRepo.GetByID(ctx, orgID, docID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get document: %w", err)
 	}
@@ -153,6 +153,12 @@ func (s *documentService) UpdateDocument(ctx context.Context, orgID, docID int32
 	if req.Metadata != nil {
 		doc.Metadata = req.Metadata
 	}
+	if req.Visibility != nil {
+		if !req.Visibility.IsValid() {
+			return nil, domain.ErrInvalidVisibility
+		}
+		doc.Visibility = *req.Visibility
+	}
 
 	updatedDoc, err := s.docRepo.Update(ctx, doc)
 	if err != nil {
@@ -163,8 +169,8 @@ func (s *documentService) UpdateDocument(ctx context.Context, orgID, docID int32
 }
 
 func (s *documentService) DeleteDocument(ctx context.Context, orgID, docID int32) error {
-	// Get document to verify it exists
-	doc, err := s.docRepo.GetByID(ctx, orgID, docID)
+	// Get document to verify it exists (admin surface).
+	doc, err := s.docRepo.GetByID(ctx, orgID, docID, true)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
 	}
@@ -183,22 +189,22 @@ func (s *documentService) DeleteDocument(ctx context.Context, orgID, docID int32
 }
 
 func (s *documentService) GetDocumentStats(ctx context.Context, orgID int32) (*domain.DocumentStats, error) {
-	total, err := s.docRepo.Count(ctx, orgID)
+	total, err := s.docRepo.Count(ctx, orgID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count documents: %w", err)
 	}
 
-	pending, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusPending)
+	pending, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusPending, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count pending documents: %w", err)
 	}
 
-	processed, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusProcessed)
+	processed, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusProcessed, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count processed documents: %w", err)
 	}
 
-	failed, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusFailed)
+	failed, err := s.docRepo.CountByStatus(ctx, orgID, domain.DocumentStatusFailed, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count failed documents: %w", err)
 	}
@@ -209,6 +215,15 @@ func (s *documentService) GetDocumentStats(ctx context.Context, orgID int32) (*d
 		ProcessedCount: processed,
 		FailedCount:    failed,
 	}, nil
+}
+
+func (s *documentService) ExportComplianceDocuments(ctx context.Context, orgID int32) ([]domain.ComplianceDocument, error) {
+	docs, err := s.docRepo.ListIndexedForCompliance(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export compliance documents: %w", err)
+	}
+
+	return docs, nil
 }
 
 func (s *documentService) ProcessDocument(ctx context.Context, orgID, docID int32) (*domain.Document, error) {

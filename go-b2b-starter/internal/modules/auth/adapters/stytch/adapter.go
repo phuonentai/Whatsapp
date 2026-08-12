@@ -42,6 +42,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"github.com/moasq/go-b2b-starter/internal/platform/redis"
+	platformstytch "github.com/moasq/go-b2b-starter/internal/platform/stytch"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/b2bstytchapi"
 )
 
@@ -60,10 +61,13 @@ type StytchAuthAdapter struct {
 // Ensure StytchAuthAdapter implements auth.AuthProvider.
 var _ auth.AuthProvider = (*StytchAuthAdapter)(nil)
 
-// It initializes the Stytch client, JWKS cache, and RBAC policy service.
+// NewStytchAuthAdapter initializes the Stytch client, JWKS cache, and RBAC
+// policy service. When a breaker client is provided, the RBAC policy fetch is
+// guarded by the shared two-tier circuit breaker (Client.Run).
 // Returns an error if configuration or client initialization fails.
 func NewStytchAuthAdapter(
 	cfg *Config,
+	breakerClient *platformstytch.Client,
 	redisClient redis.Client,
 	log logger.Logger,
 ) (*StytchAuthAdapter, error) {
@@ -72,17 +76,25 @@ func NewStytchAuthAdapter(
 		return nil, fmt.Errorf("invalid stytch config: %w", err)
 	}
 
-	// Create Stytch API client
-	client, err := b2bstytchapi.NewClient(cfg.ProjectID, cfg.Secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stytch client: %w", err)
+	// Create Stytch API client (reuse the breaker client's raw API when
+	// available so the adapter and the RBAC service share one client)
+	var client *b2bstytchapi.API
+	if breakerClient != nil {
+		client = breakerClient.API()
+	} else {
+		var err error
+		client, err = b2bstytchapi.NewClient(cfg.ProjectID, cfg.Secret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stytch client: %w", err)
+		}
 	}
 
 	// Create JWKS cache for local JWT verification
 	jwksCache := NewJWKSCache(cfg.JWKSURL, redisClient, log)
 
-	// Create RBAC policy service for permission resolution
-	policyService := NewRBACPolicyService(client, redisClient, log)
+	// Create RBAC policy service for permission resolution (breaker-guarded
+	// when a breaker client is wired)
+	policyService := NewRBACPolicyServiceWithBreaker(client, breakerClient, redisClient, log)
 
 	// Create token verifier with two-tier strategy
 	tokenVerifier := NewTokenVerifier(client, jwksCache, policyService, cfg, log)

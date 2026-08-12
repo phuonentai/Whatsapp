@@ -7,7 +7,19 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
+	logger "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 )
+
+type noopLogger struct{}
+
+func (noopLogger) Debug(msg string, fields ...logger.Fields) {}
+func (noopLogger) Info(msg string, fields ...logger.Fields)  {}
+func (noopLogger) Warn(msg string, fields ...logger.Fields)  {}
+func (noopLogger) Error(msg string, fields ...logger.Fields) {}
+func (noopLogger) Fatal(msg string, fields ...logger.Fields) {}
+func (noopLogger) WithFields(fields logger.Fields) logger.Logger {
+	return noopLogger{}
+}
 
 // --- Fakes ---------------------------------------------------------------
 
@@ -133,6 +145,20 @@ type fakeAuthMemberRepo struct {
 	err       error
 }
 
+type fakeSessionRevoker struct {
+	orgID    string
+	memberID string
+	calls    int
+	err      error
+}
+
+func (f *fakeSessionRevoker) RevokeMemberSessions(ctx context.Context, stytchOrgID, stytchMemberID string) error {
+	f.calls++
+	f.orgID = stytchOrgID
+	f.memberID = stytchMemberID
+	return f.err
+}
+
 func (f *fakeAuthMemberRepo) CreateMember(ctx context.Context, req *domain.CreateAuthMemberRequest) (*domain.AuthMember, error) {
 	return nil, nil
 }
@@ -162,8 +188,77 @@ func (f *fakeAuthMemberRepo) SendMagicLink(ctx context.Context, req *domain.Send
 	return nil
 }
 
+type fakeMfaPolicyUpdater struct {
+	err        error
+	lastOrgID  string
+	lastPolicy domain.MfaPolicy
+	lastCalls  int
+}
+
+func (f *fakeMfaPolicyUpdater) UpdateMfaPolicy(
+	ctx context.Context,
+	orgID string,
+	policy domain.MfaPolicy,
+	methods domain.MfaMethods,
+	allowedMethods []domain.MfaMethod,
+) error {
+	f.lastCalls++
+	f.lastOrgID = orgID
+	f.lastPolicy = policy
+	return f.err
+}
+
+// fakeAuthPolicyUpdater satisfies domain.OrgAuthPolicyUpdater for service
+// tests. It records the last update call and can inject errors.
+type fakeAuthPolicyUpdater struct {
+	err          error
+	lastOrgID    string
+	lastEmailJIT domain.JitPolicy
+	lastCalls    int
+	policy       *domain.AuthPolicy
+}
+
+func (f *fakeAuthPolicyUpdater) GetAuthPolicy(ctx context.Context, orgID string) (*domain.AuthPolicy, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.policy, nil
+}
+
+func (f *fakeAuthPolicyUpdater) UpdateAuthPolicy(
+	ctx context.Context,
+	orgID string,
+	emailJitPolicy domain.JitPolicy,
+	allowedDomains []string,
+	allowedAuthMethods []domain.AllowedAuthMethod,
+	ssoJitPolicy domain.SsoJitPolicy,
+	ssoJitAllowedConnections []string,
+	ssoDefaultConnectionID string,
+) error {
+	f.lastCalls++
+	f.lastOrgID = orgID
+	f.lastEmailJIT = emailJitPolicy
+	return f.err
+}
+
 func newService(org *fakeOrgRepo, acc *fakeAccountRepo, authOrg *fakeAuthOrgRepo, authMember *fakeAuthMemberRepo) services.OrganizationService {
-	return services.NewOrganizationService(org, acc, authOrg, authMember)
+	return newServiceWithDeps(org, acc, authOrg, authMember, &fakeSessionRevoker{}, &fakeMfaPolicyUpdater{}, &fakeAuthPolicyUpdater{})
+}
+
+func newServiceWithRevoker(org *fakeOrgRepo, acc *fakeAccountRepo, authOrg *fakeAuthOrgRepo, authMember *fakeAuthMemberRepo, revoker *fakeSessionRevoker) services.OrganizationService {
+	return newServiceWithDeps(org, acc, authOrg, authMember, revoker, &fakeMfaPolicyUpdater{}, &fakeAuthPolicyUpdater{})
+}
+
+func newServiceWithDeps(
+	org *fakeOrgRepo,
+	acc *fakeAccountRepo,
+	authOrg *fakeAuthOrgRepo,
+	authMember *fakeAuthMemberRepo,
+	revoker *fakeSessionRevoker,
+	updater *fakeMfaPolicyUpdater,
+	authPolicyUpdater *fakeAuthPolicyUpdater,
+) services.OrganizationService {
+	return services.NewOrganizationService(org, acc, authOrg, authMember, revoker, updater, authPolicyUpdater, noopLogger{})
 }
 
 // --- UpdateOrganization tests ---------------------------------------------
@@ -314,5 +409,168 @@ func TestUpdateAccountAdminDemotionAllowedWithSecondAdmin(t *testing.T) {
 	}
 	if accRepo.updateArgs == nil || accRepo.updateArgs.Role != "member" {
 		t.Fatalf("local account not updated: %+v", accRepo.updateArgs)
+	}
+}
+
+// --- Deactivation revocation tests ------------------------------------------
+
+func TestUpdateAccountDeactivationRevokesSessionsAfterStatusUpdate(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active", StytchOrgID: "stytch-org-1"}}
+	accRepo := &fakeAccountRepo{accounts: []*domain.Account{
+		{ID: 1, OrganizationID: 1, Email: "a@x.com", FullName: "A", StytchMemberID: "stytch-member-1", Role: "member", Status: "active"},
+	}}
+	revoker := &fakeSessionRevoker{}
+	svc := newServiceWithRevoker(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, revoker)
+
+	updated, err := svc.UpdateAccount(context.Background(), 1, 1, &services.UpdateAccountRequest{
+		FullName: "A", Role: "member", Status: "inactive",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Local status update must complete first...
+	if accRepo.updateArgs == nil || accRepo.updateArgs.Status != "inactive" {
+		t.Fatalf("local status update not applied: %+v", accRepo.updateArgs)
+	}
+	if updated.Status != "inactive" {
+		t.Fatalf("expected inactive status, got %q", updated.Status)
+	}
+	// ...then the Stytch session revocation runs with the org+member IDs.
+	if revoker.calls != 1 {
+		t.Fatalf("expected exactly 1 revocation call, got %d", revoker.calls)
+	}
+	if revoker.orgID != "stytch-org-1" || revoker.memberID != "stytch-member-1" {
+		t.Fatalf("unexpected revocation target: org=%q member=%q", revoker.orgID, revoker.memberID)
+	}
+	if updated.SessionRevocationPending {
+		t.Fatal("revocation succeeded; must not carry pending notice")
+	}
+}
+
+func TestUpdateAccountRevocationFailureCompletesDeactivationWithNotice(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active", StytchOrgID: "stytch-org-1"}}
+	accRepo := &fakeAccountRepo{accounts: []*domain.Account{
+		{ID: 1, OrganizationID: 1, Email: "a@x.com", FullName: "A", StytchMemberID: "stytch-member-1", Role: "member", Status: "active"},
+	}}
+	revoker := &fakeSessionRevoker{err: errors.New("stytch circuit breaker open")}
+	svc := newServiceWithRevoker(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, revoker)
+
+	updated, err := svc.UpdateAccount(context.Background(), 1, 1, &services.UpdateAccountRequest{
+		FullName: "A", Role: "member", Status: "inactive",
+	})
+	if err != nil {
+		t.Fatalf("deactivation must not fail when revocation fails: %v", err)
+	}
+
+	if accRepo.updateArgs == nil || accRepo.updateArgs.Status != "inactive" {
+		t.Fatalf("local deactivation must still be applied: %+v", accRepo.updateArgs)
+	}
+	if revoker.calls != 1 {
+		t.Fatalf("expected revocation attempt, got %d calls", revoker.calls)
+	}
+	if !updated.SessionRevocationPending {
+		t.Fatal("expected session_revocation_pending notice when revocation fails")
+	}
+}
+
+func TestUpdateAccountActiveRoleChangeSkipsRevocation(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active", StytchOrgID: "stytch-org-1"}}
+	accRepo := &fakeAccountRepo{accounts: []*domain.Account{
+		{ID: 1, OrganizationID: 1, Email: "a@x.com", FullName: "A", StytchMemberID: "stytch-member-1", Role: "member", Status: "active"},
+	}}
+	revoker := &fakeSessionRevoker{}
+	svc := newServiceWithRevoker(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, revoker)
+
+	_, err := svc.UpdateAccount(context.Background(), 1, 1, &services.UpdateAccountRequest{
+		FullName: "A", Role: "approver", Status: "active",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if revoker.calls != 0 {
+		t.Fatalf("expected no revocation for a non-deactivation update, got %d calls", revoker.calls)
+	}
+}
+
+func TestUpdateAccountDeactivationWithoutStytchMemberSkipsRevocation(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active", StytchOrgID: "stytch-org-1"}}
+	accRepo := &fakeAccountRepo{accounts: []*domain.Account{
+		{ID: 1, OrganizationID: 1, Email: "a@x.com", FullName: "A", Role: "member", Status: "active"},
+	}}
+	revoker := &fakeSessionRevoker{}
+	svc := newServiceWithRevoker(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, revoker)
+
+	updated, err := svc.UpdateAccount(context.Background(), 1, 1, &services.UpdateAccountRequest{
+		FullName: "A", Role: "member", Status: "inactive",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if revoker.calls != 0 {
+		t.Fatalf("expected no revocation without a Stytch member id, got %d calls", revoker.calls)
+	}
+	if updated.SessionRevocationPending {
+		t.Fatal("must not carry pending notice when no revocation was attempted")
+	}
+}
+
+// --- UpdateMfaPolicy tests --------------------------------------------------
+
+func TestUpdateMfaPolicyDelegatesToUpdater(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active"}}
+	accRepo := &fakeAccountRepo{}
+	authOrg := &fakeAuthOrgRepo{}
+	authMember := &fakeAuthMemberRepo{}
+	updater := &fakeMfaPolicyUpdater{}
+	svc := newServiceWithDeps(orgRepo, accRepo, authOrg, authMember, &fakeSessionRevoker{}, updater, &fakeAuthPolicyUpdater{})
+
+	err := svc.UpdateMfaPolicy(
+		context.Background(),
+		"stytch-org-1",
+		domain.MfaPolicyRequiredForAll,
+		domain.MfaMethodsRestricted,
+		[]domain.MfaMethod{domain.MfaMethodTOTP},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updater.lastCalls != 1 {
+		t.Fatalf("expected 1 updater call, got %d", updater.lastCalls)
+	}
+	if updater.lastOrgID != "stytch-org-1" {
+		t.Fatalf("expected org id stytch-org-1, got %q", updater.lastOrgID)
+	}
+	if updater.lastPolicy != domain.MfaPolicyRequiredForAll {
+		t.Fatalf("expected REQUIRED_FOR_ALL policy, got %q", updater.lastPolicy)
+	}
+}
+
+func TestUpdateMfaPolicyValidationRejectsBadPayload(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active"}}
+	accRepo := &fakeAccountRepo{}
+	updater := &fakeMfaPolicyUpdater{}
+	svc := newServiceWithDeps(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, &fakeSessionRevoker{}, updater, &fakeAuthPolicyUpdater{})
+
+	if err := svc.UpdateMfaPolicy(context.Background(), "", domain.MfaPolicyOptional, domain.MfaMethodsAllAllowed, nil); !errors.Is(err, domain.ErrAuthOrganizationIDRequired) {
+		t.Fatalf("expected ErrAuthOrganizationIDRequired, got: %v", err)
+	}
+	if err := svc.UpdateMfaPolicy(context.Background(), "org-1", domain.MfaPolicy("NEVER"), domain.MfaMethodsAllAllowed, nil); !errors.Is(err, domain.ErrInvalidMfaPolicy) {
+		t.Fatalf("expected ErrInvalidMfaPolicy, got: %v", err)
+	}
+	if updater.lastCalls != 0 {
+		t.Fatalf("expected no updater calls on invalid payload, got %d", updater.lastCalls)
+	}
+}
+
+func TestUpdateMfaPolicyUpdaterErrorPropagates(t *testing.T) {
+	orgRepo := &fakeOrgRepo{org: &domain.Organization{ID: 1, Name: "Acme", Status: "active"}}
+	accRepo := &fakeAccountRepo{}
+	updater := &fakeMfaPolicyUpdater{err: domain.ErrMfaPolicyUnavailable}
+	svc := newServiceWithDeps(orgRepo, accRepo, &fakeAuthOrgRepo{}, &fakeAuthMemberRepo{}, &fakeSessionRevoker{}, updater, &fakeAuthPolicyUpdater{})
+
+	err := svc.UpdateMfaPolicy(context.Background(), "org-1", domain.MfaPolicyOptional, domain.MfaMethodsAllAllowed, nil)
+	if !errors.Is(err, domain.ErrMfaPolicyUnavailable) {
+		t.Fatalf("expected ErrMfaPolicyUnavailable to propagate, got: %v", err)
 	}
 }

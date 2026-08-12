@@ -70,7 +70,7 @@ export class SettingsPage {
   }
 
   async assertWhatsappConfigVisible() {
-    await expect(this.page.getByLabel(/active/i).first()).toBeVisible();
+    await expect(this.page.getByRole("switch")).toBeVisible();
   }
 
   /** Edit the workspace name in the profile view and save. */

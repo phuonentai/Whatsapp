@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger"
@@ -41,6 +44,7 @@ type memberService struct {
 	authRoleRepo     domain.AuthRoleRepository
 	localOrgRepo     domain.OrganizationRepository
 	localAccountRepo domain.AccountRepository
+	trialSeeder      domain.TrialSeeder
 	logger           loggerDomain.Logger
 }
 
@@ -50,6 +54,7 @@ func NewMemberService(
 	authRoleRepo domain.AuthRoleRepository,
 	localOrgRepo domain.OrganizationRepository,
 	localAccountRepo domain.AccountRepository,
+	trialSeeder domain.TrialSeeder,
 	logger loggerDomain.Logger,
 ) MemberService {
 	return &memberService{
@@ -58,6 +63,7 @@ func NewMemberService(
 		authRoleRepo:     authRoleRepo,
 		localOrgRepo:     localOrgRepo,
 		localAccountRepo: localAccountRepo,
+		trialSeeder:      trialSeeder,
 		logger:           logger,
 	}
 }
@@ -237,6 +243,15 @@ func (s *memberService) BootstrapOrganizationWithOwner(
 		member.EmailVerified,
 	); err != nil {
 		return nil, fmt.Errorf("failed to map auth member locally: %w", err)
+	}
+
+	// Step 6: Seed trial subscription (idempotent, config-gated).
+	// Best-effort — trial seeding failure does not roll back bootstrap.
+	if err := s.seedTrial(ctx, localOrg.ID); err != nil {
+		s.logger.Warn("trial seeding failed (non-fatal)", loggerDomain.Fields{
+			"organization_id": localOrg.ID,
+			"error":           err.Error(),
+		})
 	}
 
 	// Success! Disable rollback
@@ -533,10 +548,13 @@ func (s *memberService) GetCurrentUserProfile(
 		EmailVerified: member.EmailVerified,
 		Status:        member.Status,
 		Organization: ProfileOrganization{
-			OrganizationID: organization.OrganizationID,
-			Slug:           organization.Slug,
-			Name:           organization.DisplayName,
-			Status:         organization.Status,
+			OrganizationID:    organization.OrganizationID,
+			Slug:              organization.Slug,
+			Name:              organization.DisplayName,
+			Status:            organization.Status,
+			MFAPolicy:         organization.MFAPolicy,
+			MFAMethods:        organization.MFAMethods,
+			AllowedMFAMethods: organization.AllowedMFAMethods,
 		},
 		AccountID: localAccount.ID,
 		CreatedAt: member.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -721,4 +739,24 @@ func mapRoleSlugToAccountRole(slug string) string {
 	default:
 		return slug
 	}
+}
+
+// seedTrial reads trial config from environment and delegates to the TrialSeeder
+// domain port (implemented by billing infrastructure, injected via DI).
+func (s *memberService) seedTrial(ctx context.Context, organizationID int32) error {
+	if s.trialSeeder == nil {
+		return nil
+	}
+	enabled, _ := strconv.ParseBool(os.Getenv("TRIAL_ENABLED"))
+	if !enabled {
+		return nil
+	}
+	days := 14
+	if v := os.Getenv("TRIAL_DAYS"); v != "" {
+		if d, err := strconv.Atoi(v); err == nil && d > 0 {
+			days = d
+		}
+	}
+	trialEnd := time.Now().Add(time.Duration(days) * 24 * time.Hour)
+	return s.trialSeeder.SeedTrial(ctx, organizationID, trialEnd)
 }

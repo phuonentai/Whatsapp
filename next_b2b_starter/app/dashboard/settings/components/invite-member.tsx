@@ -15,6 +15,7 @@ import { Send, CheckCircle2 } from "lucide-react";
 import { MemberRole } from "@/lib/models/member.model";
 import { useToast } from "@/hooks/use-toast";
 import { rbacRepository } from "@/lib/api/api/repositories/rbac-repository";
+import { ui } from "@/lib/copy/ui";
 
 interface InviteMemberProps {
   canInvite: boolean;
@@ -33,26 +34,29 @@ interface RoleOption {
   typicalUsers: string;
 }
 
-// Default roles matching the backend RBAC system
-// Used as fallback if API call fails
+// Default roles matching the backend RBAC system.
+// Used ONLY as a fallback if the /rbac/roles API call fails; the primary
+// source of role options + descriptions is the Stytch policy query (same one
+// the matrix uses). Copy is Spanish-first (lib/copy/ui.ts) — the English
+// hardcoded descriptions were removed as a primary source.
 const DEFAULT_ROLES: RoleOption[] = [
   {
     id: "member",
-    name: "Member",
-    description: "Basic access - can view and create resources",
-    typicalUsers: "Team members, staff",
+    name: ui.teamPermissions.roleFallbackMember,
+    description: ui.teamPermissions.roleFallbackMemberDesc,
+    typicalUsers: "Equipo, staff",
   },
   {
     id: "approver",
-    name: "Approver",
-    description: "Elevated access - can edit, delete, approve resources and view organization",
-    typicalUsers: "Team leads, supervisors, managers",
+    name: ui.teamPermissions.roleFallbackApprover,
+    description: ui.teamPermissions.roleFallbackApproverDesc,
+    typicalUsers: "Líderes de equipo, supervisores",
   },
   {
     id: "admin",
-    name: "Admin",
-    description: "Full system control - all permissions and organization management",
-    typicalUsers: "Directors, system administrators",
+    name: ui.teamPermissions.roleFallbackAdmin,
+    description: ui.teamPermissions.roleFallbackAdminDesc,
+    typicalUsers: "Directores, administradores",
   },
 ];
 
@@ -228,7 +232,7 @@ export function InviteMember({
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm font-medium text-gray-900">
+            <Label htmlFor="name" className="text-sm font-medium text-slate-900">
               Full Name
             </Label>
             <Input
@@ -242,7 +246,7 @@ export function InviteMember({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-gray-900">
+            <Label htmlFor="email" className="text-sm font-medium text-slate-900">
               Email Address
             </Label>
             <Input
@@ -257,7 +261,7 @@ export function InviteMember({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="role" className="text-sm font-medium text-gray-900">
+          <Label htmlFor="role" className="text-sm font-medium text-slate-900">
             Role
           </Label>
           <Select

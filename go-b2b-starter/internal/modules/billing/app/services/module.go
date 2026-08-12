@@ -31,9 +31,11 @@ type providerRouterParams struct {
 	dig.In
 
 	PolarAdapter domain.BillingProvider `name:"polar"`
-	MPAdapter    domain.BillingProvider `name:"mercadopago"`
-	Resolver     routing.BillingProviderResolver
-	OrgAdapter   domain.OrganizationAdapter
+	// MercadoPago is optional: Polar-only deployments skip config/client
+	// registration, so the router receives nil and degrades to Polar-only.
+	MPAdapter  domain.BillingProvider        `name:"mercadopago" optional:"true"`
+	Resolver   routing.BillingProviderResolver
+	OrgAdapter domain.OrganizationAdapter
 }
 
 // billingServiceParams collects the dependencies for constructing the
@@ -46,8 +48,10 @@ type billingServiceParams struct {
 	AiRepo             domain.AiUsageRepository
 	OrgAdapter         domain.OrganizationAdapter
 	BillingProvider    domain.BillingProvider
-	MPProvider         domain.BillingProvider `name:"mercadopago"`
-	Resolver           routing.BillingProviderResolver
+	// MPProvider is optional: when MercadoPago is unconfigured the service
+	// methods return a clear "mercadopago not configured" error.
+	MPProvider  domain.BillingProvider        `name:"mercadopago" optional:"true"`
+	Resolver    routing.BillingProviderResolver
 	ModuleService      registryServices.ModuleService
 	Logger             logger.Logger
 	PaymentEventHandler payments.PaymentEventHandler `optional:"true"`
@@ -71,7 +75,7 @@ func (m *Module) Configure(container *dig.Container) error {
 
 	// Register MPAdapter (named so the router and MP-specific services can consume it)
 	if err := container.Provide(func(client *mercadopagopkg.Client, cfg *mercadopagopkg.Config, log logger.Logger) domain.BillingProvider {
-		return mercadopago.NewMPAdapter(client, log, cfg.BackURL)
+		return mercadopago.NewMPAdapter(client, log, cfg)
 	}, dig.Name("mercadopago")); err != nil {
 		return err
 	}

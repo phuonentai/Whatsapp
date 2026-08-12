@@ -9,6 +9,18 @@ const WEBHOOK_SECRET = "inbox_ui_secret_e2e";
 const VERIFY_TOKEN = "inbox_ui_verify_token";
 const ORG = { orgSlug: "test-org-pro", email: "admin-pro@test.com" };
 
+/** Disables the org kill switch so real manual sends pass guardrails (the
+ *  seeded e2e org runs with KillSwitch=true, which denies ALL sends). */
+async function disableKillSwitch(org: { orgSlug: string; email: string } = ORG) {
+  const current = await apiRequest<Record<string, unknown>>("/agent/settings", org);
+  await apiRequest("/agent/settings", {
+    method: "PUT",
+    body: { ...current, KillSwitch: false },
+    ...org,
+  });
+}
+
+
 interface ConversationDto {
   id: number;
   contact_phone?: string;
@@ -122,7 +134,7 @@ test.describe("Inbox UI", () => {
     });
 
     await inbox.sendReply(reply);
-    await expect(page.getByPlaceholder("Type a message...")).toHaveValue("");
+    await expect(page.getByPlaceholder("Escribe un mensaje...")).toHaveValue("");
   });
 
   test("empty reply is not sent", async ({ page }) => {
@@ -210,7 +222,7 @@ test.describe("Inbox UI", () => {
     await inbox.goto();
     await inbox.openConversation(phone);
 
-    const input = page.getByPlaceholder("Type a message...");
+    const input = page.getByPlaceholder("Escribe un mensaje...");
     const stepOne = "¡Perfecto! ¿Qué producto(s) quieres y en qué cantidad?";
     const stepTwo = "¿A qué dirección lo enviamos? ¿Algún punto de referencia?";
     const stepThree = "Te enviamos el link de pago: puedes pagar con PSE, Nequi o tarjeta. Cuando esté confirmado, lo despachamos.";
@@ -253,7 +265,7 @@ test.describe("Inbox UI", () => {
       }
     });
 
-    const input = page.getByPlaceholder("Type a message...");
+    const input = page.getByPlaceholder("Escribe un mensaje...");
     const stepOne = "¡Perfecto! ¿Qué producto(s) quieres y en qué cantidad?";
 
     await page.getByRole("button", { name: /Confirmar pedido/ }).click();
@@ -292,7 +304,7 @@ test.describe("Inbox UI", () => {
     await inbox.goto();
     await inbox.openConversation(first.phone);
 
-    const input = page.getByPlaceholder("Type a message...");
+    const input = page.getByPlaceholder("Escribe un mensaje...");
     const stepOne = "¡Perfecto! ¿Qué producto(s) quieres y en qué cantidad?";
 
     await page.getByRole("button", { name: /Confirmar pedido/ }).click();
@@ -304,49 +316,19 @@ test.describe("Inbox UI", () => {
     await expect(input).toHaveValue("");
   });
 
-  test("approving a pending suggestion removes it from the panel", async ({ page }) => {
-    const { phone, conv } = await createConversation("approve");
-    await seedSuggestion(conv.id, `Borrador aprobable ${Date.now()}`);
-    let resolved = false;
+  test("approving a pending suggestion prefills the composer (no silent send)", async ({ page }) => {
+    const { phone, conv } = await createConversation("approve-prefill");
+    const body = `Borrador aprobable ${Date.now()}`;
+    await seedSuggestion(conv.id, body);
 
-    // Mock both the suggestions list and the approve call so the panel
-    // transitions deterministically (approve would otherwise hit Meta outbound).
-    await page.route("**/api/agent/suggestions?status=pending", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          suggestions: resolved
-            ? []
-            : [
-                {
-                  id: 999,
-                  conversation_id: conv.id,
-                  type: "reply",
-                  body: "Borrador aprobable",
-                  status: "pending",
-                  source: "copilot",
-                },
-              ],
-        }),
-      })
-    );
+    // Approve must NEVER call the approve/send API: it prefills the composer.
+    let approveCalls = 0;
     await page.route("**/api/agent/suggestions/*/approve", (route) => {
-      resolved = true;
+      approveCalls++;
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          data: {
-            id: 999,
-            conversation_id: conv.id,
-            type: "reply",
-            body: "mock",
-            status: "approved",
-            source: "copilot",
-          },
-        }),
+        body: JSON.stringify({ success: true }),
       });
     });
 
@@ -355,8 +337,14 @@ test.describe("Inbox UI", () => {
     await inbox.goto();
     await inbox.openConversation(phone);
 
-    await expect(page.getByRole("button", { name: "Aprobar y enviar" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Aprobar" }).first()).toBeVisible();
     await inbox.approveSuggestion();
+
+    // The draft is prefilled for explicit review/send; nothing was sent and
+    // the suggestion stays in the panel.
+    await expect(page.getByPlaceholder("Escribe un mensaje...")).toHaveValue(body);
+    await expect(page.getByRole("button", { name: "Aprobar" }).first()).toBeVisible();
+    expect(approveCalls).toBe(0);
   });
   test("rejecting a pending suggestion dismisses it from the panel", async ({ page }) => {
     const { phone, conv } = await createConversation("reject");
@@ -428,6 +416,7 @@ test.describe("Inbox UI", () => {
 
   test("long reply sends intact", async ({ page }) => {
     const { phone } = await createConversation("long");
+    await disableKillSwitch();
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-pro:admin-pro@test.com" });
     const inbox = new InboxPage(page);
     await inbox.goto();
@@ -440,6 +429,7 @@ test.describe("Inbox UI", () => {
 
   test("unicode reply round-trips in the thread", async ({ page }) => {
     const { phone } = await createConversation("unicode");
+    await disableKillSwitch();
     await page.setExtraHTTPHeaders({ "X-Test-Org-ID": "test-org-pro:admin-pro@test.com" });
     const inbox = new InboxPage(page);
     await inbox.goto();
@@ -470,8 +460,8 @@ test.describe("Inbox UI", () => {
     });
 
     const text = `Fallo ${Date.now()}`;
-    await page.getByPlaceholder("Type a message...").fill(text);
-    await page.getByPlaceholder("Type a message...").press("Enter");
+    await page.getByPlaceholder("Escribe un mensaje...").fill(text);
+    await page.getByPlaceholder("Escribe un mensaje...").press("Enter");
     await page.waitForResponse((res) => res.url().includes("/mensajes") && res.status() === 500);
     await expect(page.locator(`[data-testid="message-thread"] :text("${text}")`).first()).not.toBeVisible();
   });

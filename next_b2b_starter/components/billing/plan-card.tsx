@@ -2,6 +2,7 @@
 
 import type { PolarPlan } from "@/lib/polar/plans";
 import { ui } from "@/lib/copy/ui";
+import { coerceNumericMetadata } from "@/lib/polar/plan-metadata";
 
 interface PlanCardProps {
   plan: PolarPlan & { isCurrent: boolean };
@@ -10,6 +11,9 @@ interface PlanCardProps {
   isCurrent: boolean;
   onPolarCheckout: () => void;
   onMPCheckout?: () => void;
+  /** MercadoPago is enabled and Polar is known to be unconfigured: promote the
+   * MP CTA to primary and demote the Polar button. */
+  mpPrimary?: boolean;
 }
 
 export function PlanCard({
@@ -19,6 +23,7 @@ export function PlanCard({
   isCurrent,
   onPolarCheckout,
   onMPCheckout,
+  mpPrimary = false,
 }: PlanCardProps) {
   const aiCredits = getAiCredits(plan);
 
@@ -91,7 +96,11 @@ export function PlanCard({
             type="button"
             onClick={onPolarCheckout}
             disabled={disabled}
-            className="inline-flex w-full items-center justify-center rounded-full bg-gray-900 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+            className={`inline-flex w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 ${
+              mpPrimary
+                ? "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-gray-300"
+                : "bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline-gray-900"
+            }`}
           >
             {isSelected ? ui.billing.processingDots : ui.billing.internationalCard}
           </button>
@@ -100,7 +109,11 @@ export function PlanCard({
               type="button"
               onClick={onMPCheckout}
               disabled={disabled}
-              className="inline-flex w-full items-center justify-center rounded-full border border-blue-600 bg-white px-5 py-2 text-sm font-semibold text-blue-600 shadow hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-500 disabled:bg-gray-50"
+              className={`inline-flex w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-500 disabled:bg-gray-50 ${
+                mpPrimary
+                  ? "bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline-gray-900"
+                  : "border border-blue-600 bg-white text-blue-600 hover:bg-blue-50 focus-visible:outline-blue-600"
+              }`}
             >
               {isSelected ? ui.billing.processingDots : ui.billing.mpCard}
             </button>
@@ -112,8 +125,7 @@ export function PlanCard({
 }
 
 export function getAiCredits(plan: PolarPlan): number | null {
-  const value = plan.metadata?.ai_credits_max;
-  return typeof value === "number" ? value : null;
+  return coerceNumericMetadata(plan.metadata?.ai_credits_max);
 }
 
 function formatCurrency(amount: number) {

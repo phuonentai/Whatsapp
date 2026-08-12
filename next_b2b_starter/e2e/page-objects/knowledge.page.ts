@@ -9,23 +9,23 @@ export class KnowledgePage {
 
   constructor(page: Page) {
     this.page = page;
-    this.chatInput = page.getByPlaceholder("Type a message...");
+    this.chatInput = page.getByPlaceholder("Nueva conversación");
   }
 
   async goto() {
     await this.page.goto("/dashboard/knowledge");
-    await this.page.getByRole("button", { name: "Sources" }).waitFor({ state: "visible" });
+    await this.page.getByRole("button", { name: "Documentos" }).waitFor({ state: "visible" });
   }
 
-  /** Switch to the Sources tab where upload + document list live. */
+  /** Switch to the Documentos mode where upload + document list live. */
   async openSources() {
-    await this.page.getByRole("button", { name: "Sources" }).click();
+    await this.page.getByRole("button", { name: "Documentos" }).click();
   }
 
-  /** Upload a PDF through the upload dialog. */
+  /** Upload a PDF through the upload dialog (admin-only surface). */
   async uploadPdf(fileName: string, title?: string) {
-    await this.page.getByRole("button", { name: "Upload" }).click();
-    const dialog = this.page.getByRole("dialog", { name: "Upload Document" });
+    await this.page.getByRole("button", { name: "Agregar documento" }).first().click();
+    const dialog = this.page.getByRole("dialog", { name: "Agregar documento" });
     await expect(dialog).toBeVisible();
     await dialog.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, fileName));
     const titleInput = this.page.getByPlaceholder("My Document");
@@ -38,8 +38,8 @@ export class KnowledgePage {
 
   /** Drop a rejected (non-PDF) file in the dialog and assert the error. */
   async dropRejectedFile(fileName: string) {
-    await this.page.getByRole("button", { name: "Upload" }).click();
-    const dialog = this.page.getByRole("dialog", { name: "Upload Document" });
+    await this.page.getByRole("button", { name: "Agregar documento" }).first().click();
+    const dialog = this.page.getByRole("dialog", { name: "Agregar documento" });
     await expect(dialog).toBeVisible();
     await dialog.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, fileName));
   }

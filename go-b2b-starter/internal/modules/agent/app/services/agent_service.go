@@ -14,6 +14,8 @@ import (
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
 	billingServices "github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
+	crmdomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 	crmServices "github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	igEvents "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
@@ -173,8 +175,22 @@ func (s *agentService) runPipeline(
 }
 
 // analyze runs the consolidated metered LLM call. Returns the suggested reply,
-// a skip reason when credits are exhausted (empty otherwise), and an error.
+// a skip reason when credits are exhausted or the org lacks a subscription
+// (empty otherwise), and an error.
 func (s *agentService) analyze(ctx context.Context, orgID int32, settings *domain.AgentSettings, content, senderLabel string, contact *domain.ContactRef) (string, string, error) {
+	// Subscription gate: the inbound webhook path is not paywalled, so the
+	// metered LLM call requires an active/trialing subscription. Refusing here
+	// (escalating instead) keeps lapsed or never-subscribed orgs from accruing
+	// unbilled metered AI consumption.
+	billingStatus, err := s.billing.GetBillingStatus(ctx, orgID)
+	if err != nil {
+		s.log.Warn("billing status unavailable, refusing metered analysis", loggerdomain.Fields{"org_id": orgID, "error": err.Error()})
+		return "", "subscription_required", nil
+	}
+	if billingStatus == nil || !billingStatus.HasActiveSubscription {
+		return "", "subscription_required", nil
+	}
+
 	status, err := s.billing.GetAiUsageStatus(ctx, orgID)
 	if err != nil {
 		s.log.Warn("ai usage status unavailable, proceeding fail-open", loggerdomain.Fields{"org_id": orgID, "error": err.Error()})
@@ -421,6 +437,73 @@ func (s *agentService) ApproveSuggestion(ctx context.Context, orgID, suggestionI
 	return approved, nil
 }
 
+// GovernManualSend implements the CRM module's ManualSendGovernance seam:
+// every manual inbox send (member with inbox:reply, or admin) traverses the
+// same send_message guardrails as agent sends — kill switch, discount cap,
+// forbidden terms, escalation terms, consent, send window, daily limit — and
+// the decision (allow or deny) is recorded in the audit ledger with the actor.
+// Denied sends return their reasons and never reach the outbound path.
+func (s *agentService) GovernManualSend(ctx context.Context, orgID, convID int32, content, actorID string) ([]string, *crmdomain.Message, error) {
+	if strings.TrimSpace(content) == "" {
+		return nil, nil, fmt.Errorf("message content is required")
+	}
+
+	conv, err := s.repo.GetConversationRef(ctx, orgID, convID, conversationscope.FromContext(ctx))
+	if err != nil {
+		return nil, nil, err
+	}
+	contact, err := s.repo.GetContactRef(ctx, orgID, conv.ContactID)
+	if err != nil {
+		return nil, nil, err
+	}
+	settings, err := s.getSettingsOrDefault(ctx, orgID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sentToday, err := s.repo.CountMessagesSentToday(ctx, orgID, startOfDayUTC())
+	if err != nil {
+		// The daily limit must not fail the send path; treat as unknown (0).
+		sentToday = 0
+	}
+
+	dec, err := s.guardrails.Evaluate(ctx, orgID, domain.GuardrailInput{
+		Action:     domain.GuardrailActionSendMessage,
+		Draft:      content,
+		Settings:   *settings,
+		Contact:    toContactFacts(contact),
+		SentToday:  sentToday,
+		Autonomous: false, // human-initiated manual send
+		Approver:   actorID,
+		Now:        time.Now(),
+	})
+	if err != nil {
+		dec = domain.GuardrailDecision{Allowed: false, Reasons: []string{"guardrail_error"}}
+	}
+
+	// Audit every manual send decision with the same immutable format as agent
+	// actions (no flow context for manual sends — zero-value flow reference).
+	flow := &domain.ConversationFlow{
+		ID:             0,
+		OrganizationID: orgID,
+		ConversationID: convID,
+		ContactID:      conv.ContactID,
+	}
+	if err := s.audit(ctx, orgID, flow, domain.GuardrailActionSendMessage, decisionOf(dec), dec.Reasons, actorID, "", contact); err != nil {
+		return nil, nil, fmt.Errorf("failed to audit manual send: %w", err)
+	}
+
+	if !dec.Allowed {
+		return dec.Reasons, nil, nil
+	}
+
+	msg, err := s.outbound.SendMessage(ctx, orgID, convID, content)
+	if err != nil {
+		return nil, nil, fmt.Errorf("manual send failed: %w", err)
+	}
+	return nil, msg, nil
+}
+
 func (s *agentService) RejectSuggestion(ctx context.Context, orgID, suggestionID int32) (*domain.Suggestion, error) {
 	suggestion, err := s.repo.GetSuggestion(ctx, orgID, suggestionID)
 	if err != nil {
@@ -456,7 +539,7 @@ func (s *agentService) ListPendingSuggestions(ctx context.Context, orgID int32, 
 // without running the LLM pipeline. Mock-auth only; used by e2e tests to drive
 // the approve/reject UI without a live AI backend.
 func (s *agentService) SeedPendingSuggestion(ctx context.Context, orgID, conversationID int32, body string) (*domain.Suggestion, error) {
-	conv, err := s.repo.GetConversationRef(ctx, orgID, conversationID)
+	conv, err := s.repo.GetConversationRef(ctx, orgID, conversationID, conversationscope.FromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -534,6 +617,71 @@ func (s *agentService) UpdateSettings(ctx context.Context, orgID int32, settings
 		merged.Guardrails.Escalate = settings.Guardrails.Escalate
 	}
 	return s.repo.UpsertSettings(ctx, &merged)
+}
+
+// ---------- Writing assist (composer rephrase) ----------
+
+// ErrAICreditsExhausted is returned when the org has a credit cap with no
+// remaining AI credits; the handler maps it to HTTP 402.
+var ErrAICreditsExhausted = errors.New("ai credits exhausted")
+
+// rephraseModes are the supported draft transformation modes.
+var rephraseModes = map[string]bool{
+	"rephrase":  true,
+	"formal":    true,
+	"casual":    true,
+	"summarize": true,
+}
+
+// IsRephraseMode reports whether mode is a supported transformation mode.
+func IsRephraseMode(mode string) bool {
+	return rephraseModes[mode]
+}
+
+// RephraseText transforms a user-authored draft (design D2): credit gate via
+// billing.GetAiUsageStatus (ledger error -> warn + fail-open; capped with no
+// remaining credits -> ErrAICreditsExhausted), org-scoped metering context,
+// metered LLM completion with the mode-specific system prompt, trimmed text
+// return. No WithPiiFacts here: the input is text the user typed themselves,
+// not third-party contact data — masking applies to inbound analysis only.
+// The returned text is a suggestion for the user to review; nothing is sent.
+func (s *agentService) RephraseText(ctx context.Context, orgID int32, text, mode string) (string, error) {
+	if !rephraseModes[mode] {
+		return "", fmt.Errorf("invalid rephrase mode %q", mode)
+	}
+
+	status, err := s.billing.GetAiUsageStatus(ctx, orgID)
+	if err != nil {
+		s.log.Warn("ai usage status unavailable, proceeding fail-open", loggerdomain.Fields{"org_id": orgID, "error": err.Error()})
+	} else if status != nil && status.CreditsMax > 0 && status.CreditsRemaining <= 0 {
+		return "", ErrAICreditsExhausted
+	}
+
+	ctx = llmdomain.WithOrgID(ctx, orgID)
+
+	resp, err := s.llm.Complete(ctx, llmdomain.CompletionRequest{
+		Prompt: rephraseSystemPrompt(mode) + "\n\n" + strings.TrimSpace(text),
+	})
+	if err != nil {
+		return "", fmt.Errorf("agent rephrase failed: %w", err)
+	}
+
+	return strings.TrimSpace(resp.Text), nil
+}
+
+// rephraseSystemPrompt builds the fixed instruction for a transformation mode.
+func rephraseSystemPrompt(mode string) string {
+	instruction := "Reescribe el borrador manteniendo el significado, en español."
+	switch mode {
+	case "formal":
+		instruction = "Reescribe el borrador en un registro formal colombiano (use 'usted'), cortés y profesional."
+	case "casual":
+		instruction = "Reescribe el borrador en un registro informal colombiano (use 'tú' o 'vos'), cercano y amigable."
+	case "summarize":
+		instruction = "Resume el borrador conservando la idea principal, en español."
+	}
+	return "Eres un asistente de redacción para WhatsApp. " + instruction +
+		" Responde ÚNICAMENTE con el texto transformado, sin comillas ni explicaciones."
 }
 
 // ---------- helpers ----------

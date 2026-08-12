@@ -51,7 +51,7 @@ func (s *billingService) ConsumeInvoiceQuota(ctx context.Context, organizationID
 	// Step 4: Return updated billing status
 	return &domain.BillingStatus{
 		OrganizationID:        organizationID,
-		HasActiveSubscription: quotaStatus.SubscriptionStatus == "active",
+		HasActiveSubscription: isActiveSubscriptionStatus(quotaStatus.SubscriptionStatus),
 		CanProcessInvoices:    updatedQuota.InvoiceCount > 0,
 		InvoiceCount:          updatedQuota.InvoiceCount,
 		Reason:                "quota consumed successfully",

@@ -56,6 +56,13 @@ func (p *billingFeatureProvider) GetEntitlement(ctx context.Context, orgID int32
 
 	featuresMap := parseCRMFeatures(sub.Metadata, isActive || isGracePeriod)
 	featuresMap = parseAIFeatures(featuresMap, sub.Metadata, isActive || isGracePeriod)
+
+	// Grant-base paid-plan flags (conversation-row-scoping, Decisión 8 del
+	// design): siempre activos para suscripciones activas/trialing/past_due;
+	// free/inactiva → false (bandeja org-scope).
+	for k, v := range basePaidPlanFeatures(isActive || isGracePeriod) {
+		featuresMap[k] = v
+	}
 	quotas := parseQuotas(sub.Metadata)
 	usage := p.getUsage(ctx, orgID)
 
@@ -84,6 +91,18 @@ func (p *billingFeatureProvider) GetEntitlement(ctx context.Context, orgID int32
 // defaultGrantedModules are always enabled for active subscriptions,
 // independent of purchased product metadata (read-only base features).
 var defaultGrantedModules = []string{"analytics"}
+
+// basePaidPlanFeatures devuelve los flags de grant base de planes pagos.
+// conversation_row_scoping (conversation-row-scoping) solo es true con
+// suscripción activa/trialing/past_due; free/inactiva → vacío (flag false).
+func basePaidPlanFeatures(enabled bool) map[string]bool {
+	if !enabled {
+		return map[string]bool{}
+	}
+	return map[string]bool{
+		"conversation_row_scoping": true,
+	}
+}
 
 // resolveModules determines per-org module state from subscription metadata
 // module keys (e.g., "module_tickets") merged with stored per-org configs.

@@ -18,6 +18,7 @@ import {
   ScrollText,
   FileText,
   ServerCog,
+  MessageSquarePlus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -30,6 +31,7 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { useWhatsAppConfigQuery } from "@/lib/hooks/queries/use-whatsapp-config-query";
 import { WhatsAppConfigSection } from "./whatsapp-config-section";
+import { TemplatesSection } from "./templates-section";
 import { useInstagramConfigQuery } from "@/lib/hooks/queries/use-instagram-config-query";
 import { InstagramConfigSection } from "./instagram-config-section";
 import {
@@ -53,9 +55,14 @@ import { ModulesSection } from "./modules-section";
 import { PlaybookSetupCard } from "./playbooks-section";
 import { AgentSettingsSection } from "./agent-settings-section";
 import { ComplianceSection } from "./compliance-section";
+import { SecuritySection } from "./security-section";
+import { MfaPolicySection } from "./mfa-policy-section";
 import { AuditLogView } from "./audit-log-view";
 import { SiigoIntegrationSection } from "./siigo-integration-section";
 import { SiigoAdminView } from "./siigo-admin-view";
+import { EquipoPermisos } from "./equipo-permisos";
+import { SsoAdminView } from "./sso-admin-view";
+import { ScimAdminView } from "./scim-admin-view";
 
 // Query hooks - Component depends ONLY on these hooks
 import { useProfileQuery } from "@/lib/hooks/queries/use-profile-query";
@@ -64,12 +71,13 @@ import { useSubscriptionQuery } from "@/lib/hooks/queries/use-subscription-query
 import { useInviteMember } from "@/lib/hooks/mutations/use-invite-member";
 import type { InviteMemberRequest } from "@/lib/models/member.model";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ui } from "@/lib/copy/ui";
 
 interface SettingsContentProps {
   // No props required - component fetches its own data
 }
 
-type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp" | "instagram" | "siigo" | "siigo-admin";
+type SettingsView = "overview" | "profile" | "members" | "subscription" | "modules" | "ai" | "compliance" | "audit" | "whatsapp" | "instagram" | "siigo" | "siigo-admin" | "templates" | "access" | "sso" | "scim";
 
 interface OverviewSection {
   key: Exclude<SettingsView, "overview">;
@@ -114,6 +122,10 @@ const DETAIL_META: Record<Exclude<SettingsView, "overview">, { title: string; de
     title: "Messaging",
     description: "Connect and manage your WhatsApp Business integration.",
   },
+  templates: {
+    title: "Message templates",
+    description: "Manage Meta-approved WhatsApp message templates.",
+  },
   instagram: {
     title: "Instagram",
     description: "Connect and manage your Instagram DMs integration.",
@@ -126,6 +138,42 @@ const DETAIL_META: Record<Exclude<SettingsView, "overview">, { title: string; de
     title: "Onboarding Siigo",
     description: "Vista de operación: estado de conexión por organización.",
   },
+  access: {
+    title: "Equipo y permisos",
+    description: "Miembros, matriz de permisos y módulos activos del espacio de trabajo.",
+  },
+  sso: {
+    title: "SSO (SAML / OIDC)",
+    description: "Conexiones de inicio de sesión único gestionadas en el portal de Stytch.",
+  },
+  scim: {
+    title: "SCIM",
+    description: "Aprovisionamiento de usuarios y roles desde el directorio de la empresa.",
+  },
+};
+
+// Design language: tinted icon tile per module (identity: icons on `-50`
+// tinted tiles with matching accent). Used by the overview list and the
+// detail-page summary card.
+const TILE_TONES: Record<
+  Exclude<SettingsView, "overview">,
+  { tile: string; icon: string }
+> = {
+  profile: { tile: "bg-blue-50", icon: "text-blue-600" },
+  members: { tile: "bg-violet-50", icon: "text-violet-600" },
+  subscription: { tile: "bg-cyan-50", icon: "text-cyan-600" },
+  modules: { tile: "bg-indigo-50", icon: "text-indigo-600" },
+  ai: { tile: "bg-purple-50", icon: "text-purple-600" },
+  compliance: { tile: "bg-teal-50", icon: "text-teal-600" },
+  audit: { tile: "bg-slate-100", icon: "text-slate-600" },
+  whatsapp: { tile: "bg-emerald-50", icon: "text-emerald-600" },
+  templates: { tile: "bg-sky-50", icon: "text-sky-600" },
+  instagram: { tile: "bg-pink-50", icon: "text-pink-600" },
+  siigo: { tile: "bg-orange-50", icon: "text-orange-600" },
+  "siigo-admin": { tile: "bg-amber-50", icon: "text-amber-600" },
+  access: { tile: "bg-violet-50", icon: "text-violet-600" },
+  sso: { tile: "bg-blue-50", icon: "text-blue-600" },
+  scim: { tile: "bg-cyan-50", icon: "text-cyan-600" },
 };
 
 function parseViewParam(raw: string | null): SettingsView | null {
@@ -140,9 +188,13 @@ function parseViewParam(raw: string | null): SettingsView | null {
     normalized === "compliance" ||
     normalized === "audit" ||
     normalized === "whatsapp" ||
+    normalized === "templates" ||
     normalized === "instagram" ||
     normalized === "siigo" ||
-    normalized === "siigo-admin"
+    normalized === "siigo-admin" ||
+    normalized === "access" ||
+    normalized === "sso" ||
+    normalized === "scim"
   ) {
     return normalized as SettingsView;
   }
@@ -301,14 +353,18 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     if (requestedView) {
       const isAllowed =
         (requestedView === "members" && canManageMembers) ||
+        (requestedView === "access" && canManageMembers) ||
         (requestedView === "subscription" && hasSubscriptionPermission) ||
         (requestedView === "ai" && canManageMembers) ||
         (requestedView === "compliance" && canManageMembers) ||
         (requestedView === "audit" && canViewAudit) ||
         (requestedView === "whatsapp" && canManageMembers) ||
+        (requestedView === "templates" && canManageMembers) ||
         (requestedView === "instagram" && canManageMembers) ||
         (requestedView === "siigo" && canManageMembers) ||
-        (requestedView === "siigo-admin" && canManageMembers);
+        (requestedView === "siigo-admin" && canManageMembers) ||
+        (requestedView === "sso" && canManageMembers) ||
+        (requestedView === "scim" && canManageMembers);
       if (isAllowed) {
         setViewStack((stack) =>
           stack[stack.length - 1] === requestedView ? stack : ["overview", requestedView]
@@ -326,10 +382,14 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   }
   if (
     (currentView === "members" ||
+      currentView === "access" ||
       currentView === "ai" ||
       currentView === "compliance" ||
       currentView === "whatsapp" ||
-      currentView === "instagram") &&
+      currentView === "templates" ||
+      currentView === "instagram" ||
+      currentView === "sso" ||
+      currentView === "scim") &&
     !canManageMembers &&
     viewStack[viewStack.length - 1] !== "overview"
   ) {
@@ -344,12 +404,16 @@ export function SettingsContent({}: SettingsContentProps = {}) {
     const requested = parseViewParam(viewParam);
     if (!requested) return;
     if (requested === "members" && !canManageMembers) return;
+    if (requested === "access" && !canManageMembers) return;
     if (requested === "subscription" && !hasSubscriptionPermission) return;
     if (requested === "ai" && !canManageMembers) return;
     if (requested === "compliance" && !canManageMembers) return;
     if (requested === "audit" && !canViewAudit) return;
     if (requested === "whatsapp" && !canManageMembers) return;
+    if (requested === "templates" && !canManageMembers) return;
     if (requested === "instagram" && !canManageMembers) return;
+    if (requested === "sso" && !canManageMembers) return;
+    if (requested === "scim" && !canManageMembers) return;
 
     // Intentionally syncs the view stack from the URL query param (deep links,
     // refresh, back/forward). Cannot be derived during render without losing the
@@ -516,6 +580,48 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         icon: Users,
         disabled,
       });
+
+      // Vista consolidada "Equipo y permisos" (view=access): overview section
+      // with a summary (member count + own role); click navigates to
+      // `?view=access`. Gate: org:manage (allowlist above).
+      sections.push({
+        key: "access",
+        title: ui.teamPermissions.title,
+        description: ui.teamPermissions.description,
+        value: disabled
+          ? "No organization"
+          : membersErrorMessage
+            ? "Needs attention"
+            : isMembersLoading && members.length === 0
+              ? "Loading…"
+              : members.length > 0
+                ? `${members.length} ${members.length === 1 ? "miembro" : "miembros"}`
+                : "Invitar equipo",
+        helper: disabled
+          ? "Join or create an organization to manage access."
+          : `${roleConfig.label} · ${ui.teamPermissions.policySource}`,
+        icon: Users,
+        disabled,
+      });
+
+      // SSO / SCIM enterprise surfaces (stytch-enterprise-suite): Admin
+      // Portal views, org:manage gated. Entries render only for admins.
+      sections.push({
+        key: "sso",
+        title: "SSO (SAML / OIDC)",
+        description: "Inicio de sesión único con el IdP de tu empresa.",
+        value: "Gestionar conexiones",
+        helper: "Conexiones y credenciales gestionadas en el portal de Stytch.",
+        icon: ShieldCheck,
+      });
+      sections.push({
+        key: "scim",
+        title: "SCIM",
+        description: "Aprovisionamiento automático desde el directorio.",
+        value: "Gestionar conexiones",
+        helper: "Sincroniza usuarios y roles desde Okta, Azure AD, etc.",
+        icon: ServerCog,
+      });
     }
 
     if (hasSubscriptionPermission) {
@@ -605,6 +711,15 @@ export function SettingsContent({}: SettingsContentProps = {}) {
       });
 
       sections.push({
+        key: "templates",
+        title: ui.templates.title,
+        description: ui.templates.description,
+        value: "Administrar plantillas",
+        helper: "Plantillas aprobadas por Meta para enviar fuera de la ventana de 24 h.",
+        icon: MessageSquarePlus,
+      });
+
+      sections.push({
         key: "siigo-admin",
         title: "Onboarding Siigo",
         description: "Vista de operación: estado de conexión por organización.",
@@ -690,6 +805,7 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         return (
           <div className="space-y-6">
             <ProfileSection profile={profile} />
+            <SecuritySection />
           </div>
         );
       case "members":
@@ -707,15 +823,15 @@ export function SettingsContent({}: SettingsContentProps = {}) {
           <>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <h3 className="text-xl font-semibold text-gray-900">Team roster</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-semibold text-slate-900">Team roster</h3>
+                <p className="text-sm text-slate-600">
                   Review every teammate in your workspace and keep roles current.
                 </p>
               </div>
               <Button
                 onClick={() => setInviteModalOpen(true)}
                 disabled={!canInviteMembers}
-                className="w-full bg-gray-900 text-white hover:bg-gray-800 sm:w-auto"
+                className="w-full bg-emerald-500 text-white hover:bg-emerald-600 sm:w-auto"
               >
                 Add member
               </Button>
@@ -766,10 +882,10 @@ export function SettingsContent({}: SettingsContentProps = {}) {
             >
               <DialogContent id="invite-member-dialog" className="sm:max-w-lg">
                 <DialogHeader className="space-y-2 text-left">
-                  <DialogTitle className="text-xl font-semibold text-gray-900">
+                  <DialogTitle className="text-xl font-semibold text-slate-900">
                     Add a teammate
                   </DialogTitle>
-                  <DialogDescription className="text-sm text-gray-600">
+                  <DialogDescription className="text-sm text-slate-600">
                     Send a secure invitation and assign the right access before they join.
                   </DialogDescription>
                 </DialogHeader>
@@ -783,6 +899,48 @@ export function SettingsContent({}: SettingsContentProps = {}) {
             </Dialog>
           </>
         );
+      case "access":
+        // 403 sin datos: el allowlist de gates ya bloquea la vista; el
+        // componente aplica su propio gate de defensa en profundidad.
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Acceso restringido</AlertTitle>
+              <AlertDescription>
+                No tienes permisos para gestionar el equipo y los permisos.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <EquipoPermisos />;
+      case "sso":
+        // Admin Portal SSO surface (enterprise-sso capability). Gated by
+        // org:manage via the view allowlist above + the component's own gate.
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Acceso restringido</AlertTitle>
+              <AlertDescription>
+                No tienes permisos para administrar las conexiones SSO.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <SsoAdminView />;
+      case "scim":
+        // Admin Portal SCIM surface (scim-provisioning capability). Gated by
+        // org:manage via the view allowlist above + the component's own gate.
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Acceso restringido</AlertTitle>
+              <AlertDescription>
+                No tienes permisos para administrar el aprovisionamiento SCIM.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <ScimAdminView />;
       case "subscription":
         if (!hasSubscriptionPermission) {
           return (
@@ -808,7 +966,12 @@ export function SettingsContent({}: SettingsContentProps = {}) {
       case "ai":
         return <AgentSettingsSection />;
       case "compliance":
-        return <ComplianceSection />;
+        return (
+          <div className="space-y-6">
+            <ComplianceSection />
+            <MfaPolicySection profile={profile} />
+          </div>
+        );
       case "audit":
         if (!canViewAudit) {
           return (
@@ -845,6 +1008,18 @@ export function SettingsContent({}: SettingsContentProps = {}) {
           );
         }
         return <InstagramConfigSection />;
+      case "templates":
+        if (!canManageMembers) {
+          return (
+            <Alert variant="destructive" className="border border-red-200 bg-red-50">
+              <AlertTitle>Access restricted</AlertTitle>
+              <AlertDescription>
+                You don&apos;t have permission to manage message templates.
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return <TemplatesSection />;
       case "siigo":
         if (!canManageMembers) {
           return (
@@ -910,7 +1085,7 @@ export function SettingsContent({}: SettingsContentProps = {}) {
             variant="ghost"
             size="sm"
             onClick={goBack}
-            className="group inline-flex items-center gap-2 px-0 text-gray-600 hover:text-gray-900"
+            className="group inline-flex items-center gap-2 px-0 text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
             Back
@@ -918,28 +1093,28 @@ export function SettingsContent({}: SettingsContentProps = {}) {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-gray-900">
+          <h1 className="text-3xl font-semibold text-slate-900">
             {activeDetailMeta.title}
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             {activeDetailMeta.description}
           </p>
         </div>
 
         {activeSectionSummary && SummaryIcon ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                <SummaryIcon className="h-5 w-5 text-gray-600" />
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${TILE_TONES[currentView].tile}`}>
+                <SummaryIcon className={`h-5 w-5 ${TILE_TONES[currentView].icon}`} />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   {activeSectionSummary.title}
                 </p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
+                <p className="mt-2 text-lg font-semibold text-slate-900">
                   {activeSectionSummary.value}
                 </p>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-slate-600">
                   {activeSectionSummary.helper}
                 </p>
               </div>
@@ -957,19 +1132,20 @@ export function SettingsContent({}: SettingsContentProps = {}) {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold text-gray-900">Workspace settings</h1>
-        <p className="text-sm text-gray-600">
+        <h1 className="text-3xl font-semibold text-slate-900">Workspace settings</h1>
+        <p className="text-sm text-slate-600">
           Open a section below to review the full details without the clutter.
         </p>
       </div>
 
       <PlaybookSetupCard />
 
-      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <ul className="divide-y divide-gray-100">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <ul className="divide-y divide-slate-100">
           {overviewSections.map((section) => {
             const SectionIcon = section.icon;
             const isDisabled = Boolean(section.disabled);
+            const tone = TILE_TONES[section.key];
 
             return (
               <li key={section.key}>
@@ -984,32 +1160,32 @@ export function SettingsContent({}: SettingsContentProps = {}) {
                   className={`flex w-full items-start justify-between gap-6 px-6 py-5 text-left transition ${
                     isDisabled
                       ? "cursor-not-allowed opacity-60"
-                      : "hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900/10"
+                      : "hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-900/10"
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                      <SectionIcon className="h-5 w-5 text-gray-600" />
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${tone.tile}`}>
+                      <SectionIcon className={`h-5 w-5 ${tone.icon}`} />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-slate-900">
                         {section.title}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-slate-600">
                         {section.description}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-base font-semibold text-gray-900">
+                      <p className="text-base font-semibold text-slate-900">
                         {section.value}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-slate-500">
                         {section.helper}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                    <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden="true" />
                   </div>
                 </button>
               </li>

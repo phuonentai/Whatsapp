@@ -36,6 +36,8 @@ type fakeGraphClient struct {
 	subscribeWABAFn     func() error
 	registerSubsFn      func() error
 	sendTestMessageFn   func() error
+	submitTemplateFn    func(name, language, category, body string) (string, error)
+	getTemplateStatusFn func(metaTemplateID string) (string, error)
 }
 
 func (f *fakeGraphClient) ExchangeCode(_ context.Context, code string) (string, error) {
@@ -80,6 +82,18 @@ func (f *fakeGraphClient) SendTestMessage(context.Context, string, string, strin
 	}
 	return nil
 }
+func (f *fakeGraphClient) SubmitTemplate(_ context.Context, _, _, _, _, name, language, category, body string) (string, error) {
+	if f.submitTemplateFn != nil {
+		return f.submitTemplateFn(name, language, category, body)
+	}
+	return "meta-1", nil
+}
+func (f *fakeGraphClient) GetTemplateStatus(_ context.Context, _, _, _, _, metaTemplateID string) (string, error) {
+	if f.getTemplateStatusFn != nil {
+		return f.getTemplateStatusFn(metaTemplateID)
+	}
+	return "APPROVED", nil
+}
 
 type fakeConfigRepo struct {
 	configs map[int32]*whatsappDomain.WhatsAppConfig
@@ -98,6 +112,9 @@ func (f *fakeConfigRepo) GetByOrganizationID(_ context.Context, orgID int32) (*w
 	return nil, errors.New("not found")
 }
 func (f *fakeConfigRepo) GetByVerifyToken(_ context.Context, _ string) (*whatsappDomain.WhatsAppConfig, error) {
+	return nil, errors.New("not found")
+}
+func (f *fakeConfigRepo) GetByWABAID(_ context.Context, _ string) (*whatsappDomain.WhatsAppConfig, error) {
 	return nil, errors.New("not found")
 }
 func (f *fakeConfigRepo) clone(c *whatsappDomain.WhatsAppConfig) *whatsappDomain.WhatsAppConfig {

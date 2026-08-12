@@ -232,6 +232,12 @@ class MemberRepository {
       organizationId: dto.organization?.organization_id || "",
       organizationName: dto.organization?.name || "",
       organizationStatus: dto.organization?.status,
+      // Display-only mirrors of the Stytch org MFA policy (never used to gate
+      // authorization — Stytch enforces MFA at session mint).
+      organizationMfaPolicy: dto.organization?.mfa_policy || undefined,
+      organizationMfaMethods: dto.organization?.mfa_methods || undefined,
+      organizationAllowedMfaMethods:
+        dto.organization?.allowed_mfa_methods || undefined,
     };
   }
 

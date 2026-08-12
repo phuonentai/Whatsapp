@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"time"
+
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 )
 
 type ContactRepository interface {
@@ -22,14 +24,40 @@ type ContactRepository interface {
 }
 
 type ConversationRepository interface {
-	GetByID(ctx context.Context, orgID, convID int32) (*Conversation, error)
+	// GetByID respeta el scope del miembro (regla de unión): fuera de scope
+	// devuelve un error de no-encontrado (404 sin filtrar existencia).
+	GetByID(ctx context.Context, orgID, convID int32, scope conversationscope.Scope) (*Conversation, error)
 	GetActiveByContact(ctx context.Context, orgID, contactID int32) (*Conversation, error)
 	GetActiveByContactChannel(ctx context.Context, orgID, contactID int32, channel string) (*Conversation, error)
 	Create(ctx context.Context, conv *Conversation) (*Conversation, error)
 	EnsureActive(ctx context.Context, conv *Conversation) (*Conversation, error)
 	UpdateLastMessageAt(ctx context.Context, orgID, convID int32, lastMessageAt *time.Time) (*Conversation, error)
-	UpdateStatus(ctx context.Context, orgID, convID int32, status ConversationStatus) (*Conversation, error)
-	ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*ConversationWithContact, error)
+	// UpdateStatus queda acotado a filas visibles (scope del miembro).
+	UpdateStatus(ctx context.Context, orgID, convID int32, status ConversationStatus, scope conversationscope.Scope) (*Conversation, error)
+	ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string, view conversationscope.ViewScope, scope conversationscope.Scope) ([]*ConversationWithContact, error)
+	// UpdateAssignee re-asigna la conversación (permiso inbox:reassign,
+	// validado en el service; destino validado contra el directorio Stytch).
+	UpdateAssignee(ctx context.Context, orgID, convID int32, assignee *string) (*Conversation, error)
+	// InsertEvent registra el evento en el audit ledger append-only.
+	InsertEvent(ctx context.Context, event *ConversationEvent) error
+	// ResolveContactAssignee resuelve el stytch_member_id de asignación para un
+	// contacto en el org: prioridad assigned_to → fallback owner de empresa
+	// (puente accounts.stytch_member_id). nil = cola (sin ruta de asignación).
+	ResolveContactAssignee(ctx context.Context, orgID, contactID int32) (*string, error)
+	// ResolveCompanyOwnerMemberByPhone resuelve el stytch_member_id del owner de
+	// una empresa del mismo org cuyo teléfono coincide con el contacto entrante
+	// (auto-match org-scoped; nunca cross-tenant). nil = sin match.
+	ResolveCompanyOwnerMemberByPhone(ctx context.Context, orgID int32, phone string) (*string, error)
+}
+
+// ConversationEvent es un evento append-only de conversación (audit ledger,
+// patrón crm.ticket_events).
+type ConversationEvent struct {
+	OrganizationID      int32
+	ConversationID      int32
+	EventType           string
+	ActorStytchMemberID *string
+	Payload             map[string]interface{}
 }
 
 type MessageRepository interface {

@@ -6,13 +6,18 @@ import (
 	"fmt"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations/domain"
+	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger"
 )
 
 type organizationService struct {
-	orgRepo       domain.OrganizationRepository
-	accountRepo   domain.AccountRepository
-	authOrgRepo   domain.AuthOrganizationRepository
-	authMemberRepo domain.AuthMemberRepository
+	orgRepo           domain.OrganizationRepository
+	accountRepo       domain.AccountRepository
+	authOrgRepo       domain.AuthOrganizationRepository
+	authMemberRepo    domain.AuthMemberRepository
+	sessionRevoker    domain.SessionRevoker
+	mfaPolicyUpdater  domain.MfaPolicyUpdater
+	authPolicyUpdater domain.OrgAuthPolicyUpdater
+	logger            loggerDomain.Logger
 }
 
 func NewOrganizationService(
@@ -20,12 +25,20 @@ func NewOrganizationService(
 	accountRepo domain.AccountRepository,
 	authOrgRepo domain.AuthOrganizationRepository,
 	authMemberRepo domain.AuthMemberRepository,
+	sessionRevoker domain.SessionRevoker,
+	mfaPolicyUpdater domain.MfaPolicyUpdater,
+	authPolicyUpdater domain.OrgAuthPolicyUpdater,
+	logger loggerDomain.Logger,
 ) OrganizationService {
 	return &organizationService{
-		orgRepo:        orgRepo,
-		accountRepo:    accountRepo,
-		authOrgRepo:    authOrgRepo,
-		authMemberRepo: authMemberRepo,
+		orgRepo:           orgRepo,
+		accountRepo:       accountRepo,
+		authOrgRepo:       authOrgRepo,
+		authMemberRepo:    authMemberRepo,
+		sessionRevoker:    sessionRevoker,
+		mfaPolicyUpdater:  mfaPolicyUpdater,
+		authPolicyUpdater: authPolicyUpdater,
+		logger:            logger,
 	}
 }
 
@@ -145,6 +158,86 @@ func (s *organizationService) GetOrganizationStats(ctx context.Context, orgID in
 	return s.orgRepo.GetStats(ctx, orgID)
 }
 
+// UpdateMfaPolicy validates the policy payload and delegates to the auth
+// provider adapter. The adapter routes the call through the shared circuit
+// breaker; breaker-open/5xx errors surface as domain.ErrMfaPolicyUnavailable
+// (503 at the API boundary) and leave the organization's policy unchanged.
+func (s *organizationService) UpdateMfaPolicy(
+	ctx context.Context,
+	orgID string,
+	policy domain.MfaPolicy,
+	methods domain.MfaMethods,
+	allowedMethods []domain.MfaMethod,
+) error {
+	if orgID == "" {
+		return domain.ErrAuthOrganizationIDRequired
+	}
+	if err := domain.ValidateMfaPolicyUpdate(policy, methods, allowedMethods); err != nil {
+		return err
+	}
+	if err := s.mfaPolicyUpdater.UpdateMfaPolicy(ctx, orgID, policy, methods, allowedMethods); err != nil {
+		return fmt.Errorf("failed to update MFA policy: %w", err)
+	}
+	s.logger.Info("organization MFA policy updated", loggerDomain.Fields{
+		"org_id":     orgID,
+		"mfa_policy": string(policy),
+	})
+	return nil
+}
+
+// GetAuthPolicy reads the organization's auth policy mirror from the auth
+// provider (display-only; Stytch enforces at authentication time). Breaker-
+// open/5xx errors surface as domain.ErrAuthPolicyUnavailable (503 at the API
+// boundary).
+func (s *organizationService) GetAuthPolicy(ctx context.Context, orgID string) (*domain.AuthPolicy, error) {
+	if orgID == "" {
+		return nil, domain.ErrAuthOrganizationIDRequired
+	}
+	policy, err := s.authPolicyUpdater.GetAuthPolicy(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth policy: %w", err)
+	}
+	return policy, nil
+}
+
+// UpdateAuthPolicy delegates the validated policy payload to the auth provider
+// adapter (SSOT). The adapter routes the read-for-preservation and the write
+// through the shared circuit breaker; breaker-open/5xx errors surface as
+// domain.ErrAuthPolicyUnavailable (503 at the API boundary) and leave the
+// organization's policy unchanged.
+func (s *organizationService) UpdateAuthPolicy(
+	ctx context.Context,
+	orgID string,
+	emailJitPolicy domain.JitPolicy,
+	allowedDomains []string,
+	allowedAuthMethods []domain.AllowedAuthMethod,
+	ssoJitPolicy domain.SsoJitPolicy,
+	ssoJitAllowedConnections []string,
+	ssoDefaultConnectionID string,
+) error {
+	if orgID == "" {
+		return domain.ErrAuthOrganizationIDRequired
+	}
+	if err := s.authPolicyUpdater.UpdateAuthPolicy(
+		ctx,
+		orgID,
+		emailJitPolicy,
+		allowedDomains,
+		allowedAuthMethods,
+		ssoJitPolicy,
+		ssoJitAllowedConnections,
+		ssoDefaultConnectionID,
+	); err != nil {
+		return fmt.Errorf("failed to update auth policy: %w", err)
+	}
+	s.logger.Info("organization auth policy updated", loggerDomain.Fields{
+		"org_id":    orgID,
+		"email_jit": string(emailJitPolicy),
+		"sso_jit":   string(ssoJitPolicy),
+	})
+	return nil
+}
+
 func (s *organizationService) CreateAccount(ctx context.Context, orgID int32, req *CreateAccountRequest) (*domain.Account, error) {
 	// Verify organization exists
 	_, err := s.orgRepo.GetByID(ctx, orgID)
@@ -191,6 +284,7 @@ func (s *organizationService) UpdateAccount(ctx context.Context, orgID, accountI
 	if err != nil {
 		return nil, err
 	}
+	previousStatus := account.Status
 
 	// Last-admin guard: never demote the only remaining admin of the organization.
 	if account.Role == "admin" && req.Role != "admin" {
@@ -205,14 +299,16 @@ func (s *organizationService) UpdateAccount(ctx context.Context, orgID, accountI
 
 	// Keep both SSOTs in phase: sync the member role to Stytch BEFORE the local write.
 	// On Stytch failure, reject the update so the local row never drifts from the auth provider.
+	var stytchOrgID string
 	if account.StytchMemberID != "" && orgID > 0 {
 		org, orgErr := s.orgRepo.GetByID(ctx, orgID)
 		if orgErr != nil {
 			return nil, orgErr
 		}
-		if org.StytchOrgID != "" && req.Role != account.Role {
+		stytchOrgID = org.StytchOrgID
+		if stytchOrgID != "" && req.Role != account.Role {
 			if err := s.authMemberRepo.AssignRoles(ctx, &domain.AssignAuthRolesRequest{
-				OrganizationID: org.StytchOrgID,
+				OrganizationID: stytchOrgID,
 				MemberID:       account.StytchMemberID,
 				Roles:          []string{req.Role},
 			}); err != nil {
@@ -236,7 +332,38 @@ func (s *organizationService) UpdateAccount(ctx context.Context, orgID, accountI
 		account.StytchEmailVerified = *req.StytchEmailVerified
 	}
 
-	return s.accountRepo.Update(ctx, account)
+	updated, err := s.accountRepo.Update(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deactivation revocation: after the local status update succeeds, revoke
+	// the member's active Stytch sessions so deactivation takes effect at the
+	// identity layer within the JWT window. Best-effort by design: the local
+	// status change is authoritative for app access, so a revocation failure
+	// logs a warning and carries a pending-revocation notice on the result
+	// instead of failing the deactivation.
+	if isDeactivationTransition(previousStatus, updated.Status) &&
+		stytchOrgID != "" && updated.StytchMemberID != "" {
+		if revokeErr := s.sessionRevoker.RevokeMemberSessions(ctx, stytchOrgID, updated.StytchMemberID); revokeErr != nil {
+			s.logger.Warn("member deactivated; session revocation deferred", loggerDomain.Fields{
+				"org_id":           orgID,
+				"account_id":       accountID,
+				"stytch_org_id":    stytchOrgID,
+				"stytch_member_id": updated.StytchMemberID,
+				"error":            revokeErr.Error(),
+			})
+			updated.SessionRevocationPending = true
+		}
+	}
+
+	return updated, nil
+}
+
+// isDeactivationTransition reports whether an account status change transitions
+// an active member into a deactivated (inactive/suspended) state.
+func isDeactivationTransition(previousStatus, nextStatus string) bool {
+	return previousStatus == "active" && nextStatus != "active"
 }
 
 func (s *organizationService) countAdmins(ctx context.Context, orgID int32) (int, error) {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTicketsQuery } from "@/lib/hooks/queries/use-modules-queries";
 import { useCreateTicket } from "@/lib/hooks/mutations/use-tickets-mutations";
 import { ErrorState } from "@/components/common/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { TicketDto } from "@/lib/api/api/repositories/ticket-repository";
 
 const STATUSES = [
@@ -59,7 +60,7 @@ export function TicketList({
         </select>
         <button
           onClick={() => setCreating(!creating)}
-          className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+          className="px-3 py-1 bg-emerald-500 text-white rounded text-sm"
         >
           Nuevo ticket
         </button>
@@ -79,7 +80,16 @@ export function TicketList({
         </div>
       )}
 
-      {isLoading && <div className="text-gray-500 text-sm">Cargando tickets...</div>}
+      {isLoading && (
+        <div className="space-y-2" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="border rounded-lg p-3 bg-white space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {isError && (
         <ErrorState

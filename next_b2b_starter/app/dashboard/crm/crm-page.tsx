@@ -92,7 +92,7 @@ export function CRMPage() {
             onClick={() => !tab.disabled && setView(tab.key)}
             className={`px-4 py-2 rounded-t text-sm font-medium ${
               view === tab.key
-                ? "bg-blue-600 text-white"
+                ? "bg-emerald-500 text-white"
                 : tab.disabled
                 ? "text-gray-400 cursor-not-allowed"
                 : "text-gray-700 hover:bg-gray-100"

@@ -1,0 +1,6 @@
+{
+  "requires_council": true,
+  "requires_market_read": true,
+  "requires_playwright": true,
+  "complexity": "high"
+}

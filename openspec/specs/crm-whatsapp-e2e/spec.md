@@ -1,9 +1,7 @@
 ## Purpose
 
 Define the E2E behavior of WhatsApp webhook simulation: payload building and HMAC-SHA256 signing, inbound message rendering in the inbox UI, idempotent duplicate delivery, signature/unknown-number rejection, the verification handshake, and observable webhook_logs stats.
-
 ## Requirements
-
 ### Requirement: WhatsApp webhook simulation helper
 
 The system SHALL provide a Playwright test helper (`e2e/helpers/whatsapp.ts`) that builds WhatsApp Cloud API webhook payloads and signs them with HMAC-SHA256 for delivery to the real webhook endpoint.
@@ -33,11 +31,11 @@ The system SHALL verify that a simulated inbound text webhook delivery results i
 
 ### Requirement: Duplicate webhook delivery persists a single message
 
-The system SHALL verify idempotent persistence when the same `whatsapp_message_id` is delivered more than once.
+The system SHALL verify idempotent persistence when the same `provider_message_id` is delivered more than once.
 
 #### Scenario: Retried delivery of the same message
 
-- **WHEN** a webhook with `whatsapp_message_id` already stored is delivered a second time
+- **WHEN** a webhook with `provider_message_id` already stored is delivered a second time
 - **THEN** the webhook SHALL return HTTP 200
 - **AND** exactly one message SHALL be visible in the conversation thread
 - **AND** the conversation SHALL not display a duplicate message
@@ -84,3 +82,40 @@ The system SHALL verify that simulated deliveries are recorded in `whatsapp.webh
 
 - **WHEN** a validly signed webhook has been delivered to a seeded org
 - **THEN** `GET /api/v1/whatsapp/config/health` for that org SHALL return stats reflecting the received webhook
+
+
+
+### Requirement: Webhook edge-case scenarios are E2E-tested
+
+The system SHALL cover the webhook error and boundary scenarios with E2E tests that exercise the real `/api/v1/webhooks/whatsapp` endpoint: inactive config, invalid `hub.verify_token` handshake, malformed JSON body, failed-webhook logging, inbound direction labeling, and echo handling.
+
+#### Scenario: Inactive config returns 404
+
+- **WHEN** a signed webhook is delivered for a `phone_number_id` whose config has `is_active = false`
+- **THEN** the response SHALL have status 404 with error code `unknown_phone_number`
+
+#### Scenario: Invalid verify_token handshake returns 403
+
+- **WHEN** a GET handshake request arrives with a `hub.verify_token` that does not match any active config
+- **THEN** the response SHALL have status 403
+
+#### Scenario: Malformed JSON payload returns 400
+
+- **WHEN** a POST request arrives with a valid signature but a non-JSON body
+- **THEN** the response SHALL have status 400 with error code `invalid_json`
+
+#### Scenario: Failed webhook is logged
+
+- **WHEN** a webhook with a valid known `phone_number_id` but invalid HMAC signature is delivered
+- **THEN** the response SHALL have status 401
+- **AND** the organization's webhook health stats SHALL reflect a `failed` status row
+
+#### Scenario: Inbound message carries direction=inbound
+
+- **WHEN** a valid signed inbound text webhook is delivered
+- **THEN** the persisted message retrieved via `/crm/conversaciones/:id/mensajes` SHALL have `direction` equal to `inbound`
+
+#### Scenario: Echo messages are not rendered as inbound
+
+- **WHEN** a signed webhook delivers a message with `origin.type = "echo"`
+- **THEN** no inbound message row SHALL be persisted for that `whatsapp_message_id`

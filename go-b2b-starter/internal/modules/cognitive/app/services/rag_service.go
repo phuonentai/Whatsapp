@@ -17,6 +17,11 @@ const (
 	SystemPrompt = `You are a helpful assistant that answers questions based on the provided context.
 If the context doesn't contain relevant information, say so clearly.
 Always cite which documents you used to answer the question.`
+
+	// HonestNotFoundResponse is the deterministic answer when RAG finds no
+	// relevant chunk: an anti-hallucination guard that refuses to invent an
+	// answer from an empty context (trust decision, per design).
+	HonestNotFoundResponse = "No encontré esto en tus documentos — ¿puedes agregarlo?"
 )
 
 type ragService struct {
@@ -40,7 +45,7 @@ func NewRAGService(
 	}
 }
 
-func (s *ragService) Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest) (*domain.ChatResponse, error) {
+func (s *ragService) Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, includeAdminOnly bool) (*domain.ChatResponse, error) {
 	var session *domain.ChatSession
 	var err error
 
@@ -85,13 +90,36 @@ func (s *ragService) Chat(ctx context.Context, orgID, accountID int32, req *doma
 			maxDocs = DefaultMaxDocuments
 		}
 
-		// Generate embedding for the query and search
-		embedding, err := s.textVectorizer.Vectorize(ctx, req.Message)
-		if err == nil {
-			docs, err := s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, int32(maxDocs))
-			if err == nil {
+		// Generate embedding for the query and search (visibility-ACL filtered)
+		embedding, embedErr := s.textVectorizer.Vectorize(ctx, req.Message)
+		if embedErr == nil {
+			docs, searchErr := s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, int32(maxDocs), includeAdminOnly)
+			if searchErr == nil {
 				referencedDocs = docs
 			}
+		}
+
+		// Anti-hallucination guard: when the retrieval ran cleanly but found no
+		// relevant chunk, answer honestly instead of generating from nothing.
+		if len(referencedDocs) == 0 && embedErr == nil {
+			assistantMessage := &domain.ChatMessage{
+				SessionID:      session.ID,
+				Role:           domain.ChatRoleAssistant,
+				Content:        HonestNotFoundResponse,
+				ReferencedDocs: nil,
+				TokensUsed:     0,
+			}
+			assistantMessage, err = s.chatRepo.CreateMessage(ctx, assistantMessage)
+			if err != nil {
+				return nil, fmt.Errorf("failed to save assistant message: %w", err)
+			}
+
+			return &domain.ChatResponse{
+				SessionID:      session.ID,
+				Message:        assistantMessage,
+				ReferencedDocs: nil,
+				TokensUsed:     0,
+			}, nil
 		}
 
 		// Build RAG prompt
@@ -152,7 +180,7 @@ func (s *ragService) Chat(ctx context.Context, orgID, accountID int32, req *doma
 	}, nil
 }
 
-func (s *ragService) ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error) (*domain.ChatResponse, error) {
+func (s *ragService) ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error, includeAdminOnly bool) (*domain.ChatResponse, error) {
 	var session *domain.ChatSession
 	var err error
 
@@ -194,12 +222,35 @@ func (s *ragService) ChatStream(ctx context.Context, orgID, accountID int32, req
 		if maxDocs <= 0 {
 			maxDocs = DefaultMaxDocuments
 		}
-		embedding, err := s.textVectorizer.Vectorize(ctx, req.Message)
-		if err == nil {
-			docs, err := s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, int32(maxDocs))
-			if err == nil {
+		embedding, embedErr := s.textVectorizer.Vectorize(ctx, req.Message)
+		if embedErr == nil {
+			docs, searchErr := s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, int32(maxDocs), includeAdminOnly)
+			if searchErr == nil {
 				referencedDocs = docs
 			}
+		}
+
+		// Anti-hallucination guard (mirrors Chat): honest answer when the
+		// retrieval ran cleanly but found no relevant chunk.
+		if len(referencedDocs) == 0 && embedErr == nil {
+			assistantMessage := &domain.ChatMessage{
+				SessionID:      session.ID,
+				Role:           domain.ChatRoleAssistant,
+				Content:        HonestNotFoundResponse,
+				ReferencedDocs: nil,
+				TokensUsed:     0,
+			}
+			assistantMessage, err = s.chatRepo.CreateMessage(ctx, assistantMessage)
+			if err != nil {
+				return nil, fmt.Errorf("failed to save assistant message: %w", err)
+			}
+
+			return &domain.ChatResponse{
+				SessionID:      session.ID,
+				Message:        assistantMessage,
+				ReferencedDocs: nil,
+				TokensUsed:     0,
+			}, nil
 		}
 		prompt = s.buildRAGPrompt(req.Message, referencedDocs)
 	} else {

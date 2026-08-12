@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { DashboardHome } from "./dashboard-home";
 import { renderWithProviders } from "@/test/render";
@@ -8,11 +9,12 @@ vi.mock("@/lib/hooks/queries/use-conversations-query", () => ({
   useConversationsQuery: vi.fn(),
 }));
 
-vi.mock("@/lib/hooks/queries/use-crm-queries", () => ({
-  useContactsQuery: vi.fn(),
-  useDealsQuery: vi.fn(),
-  usePipelinesQuery: vi.fn(),
-  useActivitiesQuery: vi.fn(),
+vi.mock("@/lib/hooks/queries/use-members-query", () => ({
+  useMembersQuery: vi.fn(),
+}));
+
+vi.mock("@/lib/hooks/queries/use-agent-settings-query", () => ({
+  useAgentSettingsQuery: vi.fn(),
 }));
 
 vi.mock("@/lib/hooks/queries/use-whatsapp-config-query", () => ({
@@ -24,20 +26,14 @@ vi.mock("@/lib/hooks/queries/use-subscription-query", () => ({
 }));
 
 import { useConversationsQuery } from "@/lib/hooks/queries/use-conversations-query";
-import {
-  useActivitiesQuery,
-  useContactsQuery,
-  useDealsQuery,
-  usePipelinesQuery,
-} from "@/lib/hooks/queries/use-crm-queries";
+import { useMembersQuery } from "@/lib/hooks/queries/use-members-query";
+import { useAgentSettingsQuery } from "@/lib/hooks/queries/use-agent-settings-query";
 import { useWhatsAppConfigQuery } from "@/lib/hooks/queries/use-whatsapp-config-query";
 import { useSubscriptionQuery } from "@/lib/hooks/queries/use-subscription-query";
 
 const mockConversations = vi.mocked(useConversationsQuery);
-const mockContacts = vi.mocked(useContactsQuery);
-const mockDeals = vi.mocked(useDealsQuery);
-const mockPipelines = vi.mocked(usePipelinesQuery);
-const mockActivities = vi.mocked(useActivitiesQuery);
+const mockMembers = vi.mocked(useMembersQuery);
+const mockAgentSettings = vi.mocked(useAgentSettingsQuery);
 const mockWhatsAppConfig = vi.mocked(useWhatsAppConfigQuery);
 const mockSubscription = vi.mocked(useSubscriptionQuery);
 
@@ -50,8 +46,10 @@ function mockQueries() {
         channel: "whatsapp",
         contactId: 10,
         contactPhone: "+57",
+        contactDisplayName: "Cliente Uno",
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
+        lastMessageAt: "2026-08-10T10:00:00Z",
       },
       {
         id: 2,
@@ -59,58 +57,24 @@ function mockQueries() {
         channel: "whatsapp",
         contactId: 11,
         contactPhone: "+58",
+        contactDisplayName: "Cliente Dos",
         createdAt: "2026-01-01T00:00:00Z",
         updatedAt: "2026-01-01T00:00:00Z",
+        lastMessageAt: "2026-08-11T09:00:00Z",
       },
     ],
     isLoading: false,
     isError: false,
   } as never);
 
-  mockContacts.mockReturnValue({
-    data: [{ id: 1 }, { id: 2 }, { id: 3 }],
+  mockMembers.mockReturnValue({
+    data: { members: [], totalCount: 0, hasMore: false },
     isLoading: false,
     isError: false,
   } as never);
 
-  mockDeals.mockReturnValue({
-    data: [
-      { id: 1, stage_id: 10, nombre: "Deal A" },
-      { id: 2, stage_id: 10, nombre: "Deal B" },
-      { id: 3, stage_id: 20, nombre: "Deal C" },
-    ],
-    isLoading: false,
-    isError: false,
-  } as never);
-
-  mockPipelines.mockReturnValue({
-    data: [
-      {
-        id: 1,
-        nombre: "Ventas",
-        es_predeterminado: true,
-        orden: 1,
-        etapas: [
-          { id: 10, nombre: "Negociación", pipeline_id: 1, orden: 1 },
-          { id: 20, nombre: "Cerrado", pipeline_id: 1, orden: 2 },
-        ],
-        created_at: "",
-        updated_at: "",
-      },
-    ],
-    isLoading: false,
-    isError: false,
-  } as never);
-
-  mockActivities.mockReturnValue({
-    data: [
-      {
-        id: 1,
-        tipo: "llamada",
-        asunto: "Llamada de seguimiento",
-        realizada_en: "2026-08-01T00:00:00Z",
-      },
-    ],
+  mockAgentSettings.mockReturnValue({
+    data: undefined,
     isLoading: false,
     isError: false,
   } as never);
@@ -137,46 +101,64 @@ describe("DashboardHome", () => {
     mockQueries();
     renderWithProviders(<DashboardHome />);
 
-    expect(screen.getByText("Conversaciones abiertas")).toBeDefined();
-    expect(screen.getByText("Contactos")).toBeDefined();
-    expect(screen.getByText("Negocios")).toBeDefined();
+    expect(screen.getByText("Conversaciones activas")).toBeDefined();
+    expect(screen.getByText("Ventas de la semana")).toBeDefined();
+    expect(screen.getByText("Facturas emitidas")).toBeDefined();
+    expect(screen.getByText("Tiempo respuesta IA")).toBeDefined();
 
-    // 2 conversations, 1 closed → 1 open (value may share text with deal badges)
+    // 2 conversations, 1 closed → 1 open
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
-    // 3 contacts
-    expect(screen.getAllByText("3")).toHaveLength(2);
+    // KPIs sin fuente de datos → "—" (spec: never fabricate values)
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    // Sin comparación de periodo disponible → sin badge de delta inventado (los "%" solo existen en badges de delta)
+    expect(screen.queryByText(/%$/)).toBeNull();
   });
 
-  it("shows deals grouped by stage and recent activity", () => {
+  it("renders the recomposed panels with honest empty states", () => {
     mockQueries();
     renderWithProviders(<DashboardHome />);
 
-    expect(screen.getByText("Negocios por etapa")).toBeDefined();
-    expect(screen.getByText("Negociación")).toBeDefined();
-    expect(screen.getByText("Cerrado")).toBeDefined();
-    expect(screen.getByText("Actividad reciente")).toBeDefined();
-    expect(screen.getByText("Llamada de seguimiento")).toBeDefined();
+    // Conversaciones recientes: snippet-level data (nombre + hora), sin cuerpos de mensaje
+    expect(screen.getByText("Conversaciones recientes")).toBeDefined();
+    expect(screen.getByText("Cliente Uno")).toBeDefined();
+    expect(screen.getByText("Cliente Dos")).toBeDefined();
+
+    // Rendimiento del equipo: sin permiso (ORG_MANAGE ausente en test) → estado vacío honesto, sin CTA
+    expect(screen.getByText("Rendimiento del equipo")).toBeDefined();
+    expect(screen.getByText("No hay datos de miembros disponibles para mostrar.")).toBeDefined();
+
+    // Facturas Siigo: sin endpoint de lista → estado vacío honesto; CTA solo con invoice:view
+    expect(screen.getByText("Facturas Siigo")).toBeDefined();
+    expect(screen.getByText("Conecta Siigo para ver tus facturas aquí.")).toBeDefined();
+    expect(screen.queryByText("Configurar Siigo")).toBeNull();
+
+    // Banner Auto-Piloto: sin agent-settings confirmado → sugerencia estática, sin afirmar modo
+    expect(screen.getByText("Auto-Piloto")).toBeDefined();
+    expect(
+      screen.getByText("Activa el Auto-Piloto para que el asistente te ayude a responder más rápido.")
+    ).toBeDefined();
   });
 
-  it("renders quick action links", () => {
+  it("renders operational quick action links", () => {
     mockQueries();
     renderWithProviders(<DashboardHome />);
 
-    expect(screen.getByText("Abrir bandeja de entrada").closest("a")).toHaveAttribute(
+    // Broadcast → la superficie real de campañas (pestaña del CRM)
+    expect(screen.getByText("Enviar broadcast").closest("a")).toHaveAttribute(
       "href",
-      "/dashboard/inbox"
+      "/dashboard/crm?view=campa%C3%B1as"
     );
-    expect(screen.getByText("Gestionar CRM").closest("a")).toHaveAttribute(
+    expect(screen.getByText("Nueva factura").closest("a")).toHaveAttribute(
+      "href",
+      "/dashboard/settings?view=siigo"
+    );
+    expect(screen.getByText("Nuevo contacto").closest("a")).toHaveAttribute(
       "href",
       "/dashboard/crm"
     );
-    // "Base de conocimiento" also appears in the assistant intro panel.
-    const knowledgeLinks = screen
-      .getAllByText("Base de conocimiento")
-      .filter((el) => el.closest("a"))
-      .map((el) => el.closest("a") as HTMLElement);
-    expect(knowledgeLinks.some((a) => a.getAttribute("href") === "/dashboard/knowledge")).toBe(
-      true
+    expect(screen.getByText("Exportar").closest("a")).toHaveAttribute(
+      "href",
+      "/dashboard/reportes"
     );
   });
 
@@ -189,5 +171,22 @@ describe("DashboardHome", () => {
     expect(screen.getByText("Elige un plan")).toBeDefined();
     expect(screen.getAllByText("Conoce a tu asistente").length).toBeGreaterThan(0);
     expect(screen.getByText("Abre tu bandeja de entrada")).toBeDefined();
+  });
+
+  it("folds the first-run checklist manually without breaking its state", async () => {
+    const user = userEvent.setup();
+    mockQueries();
+    renderWithProviders(<DashboardHome />);
+
+    const toggle = screen.getByRole("button", {
+      name: "Mostrar u ocultar los pasos de inicio",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Conecta WhatsApp")).toBeNull();
+    expect(localStorage.getItem("dashboard-home.onboarding-checklist-folded")).toBe("1");
   });
 });

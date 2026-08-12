@@ -8,12 +8,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Instagram, CheckCircle, XCircle, Loader2, Copy, RefreshCw } from "lucide-react";
+import { StatusChip } from "@/components/ui/status-chip";
+import { Instagram, CheckCircle, XCircle, Loader2, Copy, RefreshCw, PauseCircle } from "lucide-react";
 import { useInstagramConfigQuery, useInstagramWebhookHealth } from "@/lib/hooks/queries/use-instagram-config-query";
 import { useUpsertInstagramConfig } from "@/lib/hooks/mutations/use-upsert-instagram-config";
 import { useToggleInstagramConfig } from "@/lib/hooks/mutations/use-toggle-instagram-config";
 import { useRefreshInstagramToken } from "@/lib/hooks/mutations/use-refresh-instagram-token";
 import { toast } from "sonner";
+import { ui } from "@/lib/copy/ui";
 
 function isConfigNotFound(error: unknown): boolean {
   if (!error) return false;
@@ -281,10 +283,15 @@ export function InstagramConfigSection() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="text-sm font-medium">Active</p>
-                <p className="text-xs text-gray-500">
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center gap-2">
+                <StatusChip
+                  tone={isActive ? "emerald" : "gray"}
+                  icon={isActive ? CheckCircle : PauseCircle}
+                >
+                  {isActive ? ui.settings.statusConnected : ui.settings.statusPaused}
+                </StatusChip>
+                <p className="text-xs text-slate-500">
                   {isActive ? "Receiving and sending DMs" : "Instagram messaging paused"}
                 </p>
               </div>
@@ -300,7 +307,7 @@ export function InstagramConfigSection() {
             <div className="rounded-lg border p-3">
               <p className="text-sm font-medium">Webhook callback URL</p>
               <div className="mt-2 flex items-center gap-2">
-                <code className="flex-1 truncate rounded bg-gray-100 px-2 py-1 text-xs">
+                <code className="flex-1 truncate rounded bg-slate-100 px-2 py-1 text-xs">
                   {webhookUrl}
                 </code>
                 <Button variant="outline" size="sm" onClick={handleCopyUrl}>
@@ -308,32 +315,34 @@ export function InstagramConfigSection() {
                   {copied ? "Copied" : "Copy"}
                 </Button>
               </div>
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-slate-500">
                 Register this URL in your Meta app&apos;s webhook settings with the{" "}
                 <code>messages</code> field subscribed.
               </p>
             </div>
 
-            <div className="rounded-lg border p-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="text-sm font-medium">Webhook health</p>
               <div className="mt-2 flex items-center gap-2 text-xs">
                 {healthQuery.isLoading ? (
                   <Skeleton className="h-4 w-40" />
                 ) : webhookActive ? (
-                  <span className="flex items-center gap-1.5 text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    Webhooks active — last 24h: {healthQuery.data?.last_24h ?? 0} deliveries
-                  </span>
+                  <StatusChip tone="emerald" icon={CheckCircle}>
+                    Webhooks activos — últimas 24 h: {healthQuery.data?.last_24h ?? 0} entregas
+                  </StatusChip>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-yellow-600">
-                    <XCircle className="h-4 w-4" />
-                    No webhooks received in the last 24 hours
-                  </span>
+                  <StatusChip tone="amber" icon={XCircle}>
+                    Sin webhooks en las últimas 24 horas
+                  </StatusChip>
                 )}
               </div>
             </div>
 
-            <Button onClick={handleSave} disabled={upsertMutation.isPending}>
+            <Button
+              onClick={handleSave}
+              disabled={upsertMutation.isPending}
+              className="bg-emerald-500 text-white hover:bg-emerald-600"
+            >
               {upsertMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}

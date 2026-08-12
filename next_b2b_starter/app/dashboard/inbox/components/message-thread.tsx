@@ -86,7 +86,7 @@ export function MessageThread({ messages, isLoading, isError = false, onRetry, i
                   "max-w-[75%] rounded-2xl px-4 py-2.5",
                   msg.direction === "inbound"
                     ? "bg-white text-gray-900 shadow-sm"
-                    : "bg-blue-600 text-white"
+                    : "bg-emerald-500 text-white"
                 )}
               >
                 {msg.messageType === "text" ? (

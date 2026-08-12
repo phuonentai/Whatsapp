@@ -14,7 +14,7 @@ import type { B2BSessionsAuthenticateResponse } from "stytch";
  * Ensures consistent return values across all actions
  */
 export type ActionResult<T = void> =
-  | { success: true; data: T }
+  | { success: true; data: T; throttled?: boolean }
   | { success: false; error: string; details?: string };
 
 /**
@@ -91,11 +91,13 @@ export function createActionError(
  * Create a standardized success result
  * Use this to return success from Server Actions
  */
-export function createActionSuccess<T>(data: T): ActionResult<T> {
-  return {
-    success: true,
-    data,
-  };
+export function createActionSuccess<T>(
+  data: T,
+  options?: { throttled?: boolean }
+): ActionResult<T> {
+  return options?.throttled
+    ? { success: true, data, throttled: true }
+    : { success: true, data };
 }
 
 /**

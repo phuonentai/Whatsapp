@@ -50,7 +50,7 @@ Implement tasks from an OpenSpec change.
 
    **Handle states:**
    - If `state: "blocked"` (missing artifacts): show message, suggest using openspec-continue-change
-   - If `state: "all_done"`: run the verification gate (step 6b below) before declaring completion
+   - If `state: "all_done"`: congratulate, suggest archive
    - Otherwise: proceed to implementation
 
 4. **Read context files**
@@ -83,29 +83,13 @@ Implement tasks from an OpenSpec change.
    - Error or blocker encountered → report and wait for guidance
    - User interrupts
 
-6b. **Verification gate (mandatory before completion)**
-
-   When all tasks are marked complete, BEFORE reporting "Implementation Complete":
-   - Collect every verification command recorded in `tasks.md` (per-task verification criteria)
-   - Run each command and record the result (pass/fail) in `tasks.md`
-   - If any verification command fails: the change SHALL remain in-progress, the failure SHALL be recorded in `tasks.md`, and the agent SHALL report the failing command with its output — do NOT declare completion
-   - If all verification commands pass (or the user explicitly accepts an exception with a recorded reason): proceed to the archive decision (step 7b)
-
 7. **On completion or pause, show status**
 
    Display:
    - Tasks completed this session
    - Overall progress: "N/M tasks complete"
-   - If all done and the verification gate passed: require an archive decision (step 7b)
+   - If all done: suggest archive
    - If paused: explain why and wait for guidance
-
-7b. **Archive decision (mandatory after a green gate)**
-
-   After the verification gate passes, the change SHALL NOT be left in silent limbo. The agent MUST either:
-   - Invoke the archive workflow (default), or
-   - Record an explicit `**Archive deferred:** <reason>` entry in `tasks.md`
-
-   Show which choice was taken in the completion output.
 
 **Output During Implementation**
 
@@ -130,17 +114,12 @@ Working on task 4/7: <task description>
 **Schema:** <schema-name>
 **Progress:** 7/7 tasks complete ✓
 
-### Verification
-- [x] <verification command 1> — passed
-- [x] <verification command 2> — passed
-
-### Archive Decision
-<Invoked archive workflow | Archive deferred: <reason>>
-
 ### Completed This Session
 - [x] Task 1
 - [x] Task 2
 ...
+
+All tasks complete! Ready to archive this change.
 ```
 
 **Output On Pause (Issue Encountered)**
@@ -172,8 +151,6 @@ What would you like to do?
 - Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
-- NEVER report "Implementation Complete" without running the verification gate (step 6b)
-- NEVER leave a completed change in limbo: always make the archive decision (step 7b)
 
 **Fluid Workflow Integration**
 

@@ -12,13 +12,15 @@ type DocumentService interface {
 	// UploadDocument uploads a new document and extracts text from it
 	UploadDocument(ctx context.Context, orgID int32, req *UploadDocumentRequest, content io.Reader) (*domain.Document, error)
 
-	// GetDocument retrieves a document by ID
-	GetDocument(ctx context.Context, orgID, docID int32) (*domain.Document, error)
+	// GetDocument retrieves a document by ID.
+	// canViewAdminOnly=false treats admin_only documents as nonexistent.
+	GetDocument(ctx context.Context, orgID, docID int32, canViewAdminOnly bool) (*domain.Document, error)
 
-	// ListDocuments lists documents with pagination
-	ListDocuments(ctx context.Context, orgID int32, req *ListDocumentsRequest) (*ListDocumentsResponse, error)
+	// ListDocuments lists documents with pagination.
+	// canViewAdminOnly=false hides admin_only documents.
+	ListDocuments(ctx context.Context, orgID int32, req *ListDocumentsRequest, canViewAdminOnly bool) (*ListDocumentsResponse, error)
 
-	// UpdateDocument updates document metadata
+	// UpdateDocument updates document metadata (admin-only in v1).
 	UpdateDocument(ctx context.Context, orgID, docID int32, req *UpdateDocumentRequest) (*domain.Document, error)
 
 	// DeleteDocument deletes a document
@@ -26,6 +28,10 @@ type DocumentService interface {
 
 	// GetDocumentStats retrieves document statistics
 	GetDocumentStats(ctx context.Context, orgID int32) (*domain.DocumentStats, error)
+
+	// ExportComplianceDocuments lists documents that contributed chunks to the
+	// org's RAG index (title/status/visibility) for the Ley 1581 export.
+	ExportComplianceDocuments(ctx context.Context, orgID int32) ([]domain.ComplianceDocument, error)
 
 	// ProcessDocument processes a document (extract text, etc.)
 	ProcessDocument(ctx context.Context, orgID, docID int32) (*domain.Document, error)
@@ -57,6 +63,7 @@ type ListDocumentsResponse struct {
 
 // UpdateDocumentRequest represents a request to update a document
 type UpdateDocumentRequest struct {
-	Title    string                 `json:"title,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Title      string                      `json:"title,omitempty"`
+	Metadata   map[string]interface{}      `json:"metadata,omitempty"`
+	Visibility *domain.DocumentVisibility  `json:"visibility,omitempty"`
 }

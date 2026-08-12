@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -16,17 +17,21 @@ import (
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
 
+func contains(s, substr string) bool { return strings.Contains(s, substr) }
+
 type Handler struct {
 	webhookService services.WebhookService
 	configService  services.ConfigService
 	signupService  services.SignupService
+	templateService services.TemplateService
 }
 
-func NewHandler(webhookService services.WebhookService, configService services.ConfigService, signupService services.SignupService) *Handler {
+func NewHandler(webhookService services.WebhookService, configService services.ConfigService, signupService services.SignupService, templateService services.TemplateService) *Handler {
 	return &Handler{
-		webhookService: webhookService,
-		configService:  configService,
-		signupService:  signupService,
+		webhookService:  webhookService,
+		configService:   configService,
+		signupService:   signupService,
+		templateService: templateService,
 	}
 }
 
@@ -380,4 +385,279 @@ func (h *Handler) HandleToggleConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, config)
+}
+
+// ---- Template management ----
+
+func (h *Handler) HandleListTemplates(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	templates, err := h.templateService.ListTemplates(c.Request.Context(), orgID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError,
+			"templates_list_failed",
+			err.Error(),
+		))
+		return
+	}
+	c.JSON(http.StatusOK, templates)
+}
+
+func (h *Handler) HandleCreateTemplate(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	var req services.TemplateInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_request",
+			"Invalid request body: "+err.Error(),
+		))
+		return
+	}
+
+	template, err := h.templateService.CreateTemplate(c.Request.Context(), orgID, &req)
+	if err != nil {
+		if errors.Is(err, whatsappDomain.ErrTemplateNameConflict) {
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"template_name_conflict",
+				"Ya existe una plantilla con ese nombre e idioma",
+			))
+			return
+		}
+		if err.Error() == "El nombre de la plantilla es obligatorio" ||
+			err.Error() == "La categoría de la plantilla es obligatoria" ||
+			err.Error() == "El idioma de la plantilla es obligatorio" ||
+			err.Error() == "El cuerpo de la plantilla es obligatorio" {
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"validation_error",
+				err.Error(),
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError,
+			"template_create_failed",
+			err.Error(),
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, template)
+}
+
+func (h *Handler) HandleUpdateTemplate(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_template_id",
+			"template id must be an integer",
+		))
+		return
+	}
+
+	var req services.TemplateInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_request",
+			"Invalid request body: "+err.Error(),
+		))
+		return
+	}
+
+	template, err := h.templateService.UpdateTemplate(c.Request.Context(), orgID, id, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found",
+				"Plantilla no encontrada",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateNotDraft):
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"template_not_draft",
+				"Solo las plantillas en borrador pueden editarse",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateNameConflict):
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"template_name_conflict",
+				"Ya existe una plantilla con ese nombre e idioma",
+			))
+		case err.Error() == "El nombre de la plantilla es obligatorio" ||
+			err.Error() == "La categoría de la plantilla es obligatoria" ||
+			err.Error() == "El idioma de la plantilla es obligatorio" ||
+			err.Error() == "El cuerpo de la plantilla es obligatorio":
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"validation_error",
+				err.Error(),
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"template_update_failed",
+				err.Error(),
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, template)
+}
+
+func (h *Handler) HandleDeleteTemplate(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_template_id",
+			"template id must be an integer",
+		))
+		return
+	}
+
+	err = h.templateService.DeleteTemplate(c.Request.Context(), orgID, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found",
+				"Plantilla no encontrada",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateNotDraft):
+			c.JSON(http.StatusConflict, httperr.NewHTTPError(
+				http.StatusConflict,
+				"template_not_draft",
+				"Solo las plantillas en borrador pueden eliminarse; pause la plantilla en lugar de eliminarla",
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"template_delete_failed",
+				err.Error(),
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *Handler) HandleSubmitTemplate(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_template_id",
+			"template id must be an integer",
+		))
+		return
+	}
+
+	template, err := h.templateService.SubmitTemplate(c.Request.Context(), orgID, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found",
+				"Plantilla no encontrada",
+			))
+		case contains(err.Error(), "whatsapp_not_configured"):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"whatsapp_not_configured",
+				"WhatsApp no está configurado",
+			))
+		case contains(err.Error(), "whatsapp_api_error"):
+			c.JSON(http.StatusBadGateway, httperr.NewHTTPError(
+				http.StatusBadGateway,
+				"whatsapp_api_error",
+				"Error de la API de WhatsApp al enviar la plantilla",
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"template_submit_failed",
+				err.Error(),
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, template)
+}
+
+func (h *Handler) HandleSyncTemplate(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+			http.StatusBadRequest,
+			"invalid_template_id",
+			"template id must be an integer",
+		))
+		return
+	}
+
+	template, err := h.templateService.RefreshTemplateStatus(c.Request.Context(), orgID, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found",
+				"Plantilla no encontrada",
+			))
+		case errors.Is(err, whatsappDomain.ErrTemplateNotFoundAtMeta):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound,
+				"template_not_found_at_meta",
+				"La plantilla ya no existe en Meta",
+			))
+		case contains(err.Error(), "whatsapp_not_configured"):
+			c.JSON(http.StatusBadRequest, httperr.NewHTTPError(
+				http.StatusBadRequest,
+				"whatsapp_not_configured",
+				"WhatsApp no está configurado",
+			))
+		case contains(err.Error(), "whatsapp_api_error"):
+			c.JSON(http.StatusBadGateway, httperr.NewHTTPError(
+				http.StatusBadGateway,
+				"whatsapp_api_error",
+				"Error de la API de WhatsApp al sincronizar la plantilla",
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError,
+				"template_sync_failed",
+				err.Error(),
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, template)
 }

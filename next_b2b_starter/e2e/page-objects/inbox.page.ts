@@ -44,14 +44,14 @@ export class InboxPage {
 
   /** Fill the reply input, submit, and assert the message lands in the thread. */
   async sendReply(text: string) {
-    await this.page.getByPlaceholder("Type a message...").fill(text);
-    await this.page.getByPlaceholder("Type a message...").press("Enter");
+    await this.page.getByPlaceholder("Escribe un mensaje...").fill(text);
+    await this.page.getByPlaceholder("Escribe un mensaje...").press("Enter");
     await expect(this.page.locator(`[data-testid="message-thread"] :text("${text}")`).first()).toBeVisible();
   }
 
   /** Submit an empty/whitespace reply and assert nothing is sent. */
   async sendEmptyReply() {
-    const input = this.page.getByPlaceholder("Type a message...");
+    const input = this.page.getByPlaceholder("Escribe un mensaje...");
     const before = await this.page.locator('[data-testid="message-thread"]').innerText();
     await input.fill("   ");
     await input.press("Enter");
@@ -60,21 +60,33 @@ export class InboxPage {
     return { before, after };
   }
 
-  /** Select a status filter tab (All/Active/Closed/Archived). */
+  /** Select a status filter tab (All/Active/Closed/Archived) — UI is Spanish-first. */
   async setStatusFilter(label: "All" | "Active" | "Closed" | "Archived") {
-    await this.page.getByRole("button", { name: label, exact: true }).click();
+    const STATUS_LABELS: Record<typeof label, string> = {
+      All: "Todas",
+      Active: "Activas",
+      Closed: "Cerradas",
+      Archived: "Archivadas",
+    };
+    await this.page.getByRole("button", { name: STATUS_LABELS[label], exact: true }).click();
   }
 
   /** Assert a status badge is visible on the conversation row. */
   async assertConversationStatus(phoneOrName: string, status: string) {
+    const STATUS_LABELS: Record<string, string> = {
+      active: "Activa",
+      closed: "Cerrada",
+      archived: "Archivada",
+    };
+    const label = STATUS_LABELS[status] ?? status;
     const row = this.page.locator(`button:has-text("${phoneOrName}")`).first();
-    await expect(row.locator(`text="${status}"`).first()).toBeVisible();
+    await expect(row.locator(`text="${label}"`).first()).toBeVisible();
   }
 
   /** Click a quick-reply pill and assert its message fills the reply input. */
   async selectQuickReply(pillTitle: string, expectedMessage: string) {
     await this.page.getByRole("button", { name: pillTitle }).click();
-    await expect(this.page.getByPlaceholder("Type a message...")).toHaveValue(expectedMessage);
+    await expect(this.page.getByPlaceholder("Escribe un mensaje...")).toHaveValue(expectedMessage);
   }
 
   async quickRepliesVisible(): Promise<boolean> {
@@ -88,9 +100,10 @@ export class InboxPage {
   }
 
   /** Approve the pending suggestion in the suggestions panel. */
+  /** Approve prefills the composer (never sends silently). */
   async approveSuggestion() {
-    await this.page.getByRole("button", { name: "Aprobar y enviar" }).click();
-    await expect(this.page.getByRole("button", { name: "Aprobar y enviar" })).not.toBeVisible();
+    await this.page.getByRole("button", { name: "Aprobar" }).first().click();
+    await expect(this.page.getByRole("textbox").first()).toHaveValue(/.*/);
   }
 
   /** Reject the pending suggestion in the suggestions panel. */

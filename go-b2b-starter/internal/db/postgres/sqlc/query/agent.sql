@@ -153,6 +153,90 @@ SET display_name = '[ANONIMIZADO]',
 WHERE id = $1 AND organization_id = $2;
 
 -- name: ListConversationsByContact :many
-SELECT * FROM crm.conversations
-WHERE organization_id = $1 AND contact_id = $2
-ORDER BY created_at DESC;
+SELECT c.*
+FROM crm.conversations c
+LEFT JOIN crm.contacts ct ON ct.id = c.contact_id AND ct.organization_id = c.organization_id
+LEFT JOIN crm.companies co
+  ON co.id = ct.company_id AND co.organization_id = ct.organization_id
+LEFT JOIN organizations.accounts a
+  ON a.id = co.owner_account_id AND a.organization_id = co.organization_id
+WHERE c.organization_id = @organization_id AND c.contact_id = @contact_id
+  AND (
+    NOT @scope_enabled::boolean
+    OR @scope_view_all::boolean
+    OR c.assignee_stytch_member_id = @scope_member::text
+    OR a.stytch_member_id = @scope_member::text
+    OR (c.assignee_stytch_member_id IS NULL AND @scope_unassigned::boolean)
+  )
+ORDER BY c.created_at DESC;
+
+-- Conversation context (AI context intelligence)
+
+-- name: UpsertConversationContext :one
+INSERT INTO agent.conversation_contexts (
+    conversation_id,
+    summary,
+    key_facts,
+    detected_intent,
+    source_cursor,
+    consent_gated
+)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (conversation_id) DO UPDATE SET
+    summary = EXCLUDED.summary,
+    key_facts = EXCLUDED.key_facts,
+    detected_intent = EXCLUDED.detected_intent,
+    source_cursor = EXCLUDED.source_cursor,
+    consent_gated = EXCLUDED.consent_gated,
+    generated_at = NOW(),
+    updated_at = NOW()
+RETURNING *;
+
+-- name: GetConversationContext :one
+SELECT * FROM agent.conversation_contexts
+WHERE conversation_id = $1;
+
+-- name: GetConversationContextMeta :one
+SELECT
+    c.channel,
+    COUNT(m.id)::bigint AS message_count,
+    COALESCE(MAX(m.id), 0)::bigint AS latest_message_id,
+    MIN(m.created_at) AS first_message_at,
+    MAX(m.created_at) AS last_message_at
+FROM crm.conversations c
+LEFT JOIN crm.messages m
+    ON m.conversation_id = c.id AND m.organization_id = c.organization_id
+LEFT JOIN crm.contacts ct ON ct.id = c.contact_id AND ct.organization_id = c.organization_id
+LEFT JOIN crm.companies co
+    ON co.id = ct.company_id AND co.organization_id = ct.organization_id
+LEFT JOIN organizations.accounts a
+    ON a.id = co.owner_account_id AND a.organization_id = co.organization_id
+WHERE c.id = @id AND c.organization_id = @organization_id
+  AND (
+    NOT @scope_enabled::boolean
+    OR @scope_view_all::boolean
+    OR c.assignee_stytch_member_id = @scope_member::text
+    OR a.stytch_member_id = @scope_member::text
+    OR (c.assignee_stytch_member_id IS NULL AND @scope_unassigned::boolean)
+  )
+GROUP BY c.id;
+
+-- name: ListRecentConversationMessages :many
+SELECT m.id, m.direction, m.content, m.created_at
+FROM crm.messages m
+JOIN crm.conversations c ON c.id = m.conversation_id AND c.organization_id = m.organization_id
+LEFT JOIN crm.contacts ct ON ct.id = c.contact_id AND ct.organization_id = c.organization_id
+LEFT JOIN crm.companies co
+    ON co.id = ct.company_id AND co.organization_id = ct.organization_id
+LEFT JOIN organizations.accounts a
+    ON a.id = co.owner_account_id AND a.organization_id = co.organization_id
+WHERE m.conversation_id = @conversation_id AND m.organization_id = @organization_id
+  AND (
+    NOT @scope_enabled::boolean
+    OR @scope_view_all::boolean
+    OR c.assignee_stytch_member_id = @scope_member::text
+    OR a.stytch_member_id = @scope_member::text
+    OR (c.assignee_stytch_member_id IS NULL AND @scope_unassigned::boolean)
+  )
+ORDER BY m.id DESC
+LIMIT @limit_count;

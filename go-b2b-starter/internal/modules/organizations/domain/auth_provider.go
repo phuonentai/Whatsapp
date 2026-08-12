@@ -27,6 +27,12 @@ type AuthOrganization struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	// MFAPolicy mirrors the auth provider's mfa_policy (OPTIONAL | REQUIRED_FOR_ALL).
+	MFAPolicy string `json:"mfa_policy,omitempty"`
+	// MFAMethods mirrors the auth provider's mfa_methods (ALL_ALLOWED | RESTRICTED).
+	MFAMethods string `json:"mfa_methods,omitempty"`
+	// AllowedMFAMethods mirrors the auth provider's allowed_mfa_methods (totp, sms_otp).
+	AllowedMFAMethods []string `json:"allowed_mfa_methods,omitempty"`
 }
 
 // AuthRole represents an RBAC role from the auth provider.
@@ -181,6 +187,15 @@ type AuthMemberRepository interface {
 	RemoveMembers(ctx context.Context, req *RemoveAuthMembersRequest) error
 	AssignRoles(ctx context.Context, req *AssignAuthRolesRequest) error
 	SendMagicLink(ctx context.Context, req *SendMagicLinkRequest) error
+}
+
+// SessionRevoker defines auth provider session revocation operations.
+type SessionRevoker interface {
+	// RevokeMemberSessions revokes all active sessions for a member in an
+	// organization. Revoking an already-revoked session is a no-op success
+	// (idempotent). Implementations SHALL NOT persist any session state
+	// locally; sessions remain owned by the auth provider (SSOT).
+	RevokeMemberSessions(ctx context.Context, stytchOrgID, stytchMemberID string) error
 }
 
 // AuthRoleRepository defines auth provider RBAC operations.

@@ -51,6 +51,14 @@ func (f *fakeEchoConvRepo) UpdateLastMessageAt(_ context.Context, _ int32, _ int
 	return f.conv, nil
 }
 
+func (f *fakeEchoConvRepo) ResolveContactAssignee(_ context.Context, _ int32, _ int32) (*string, error) {
+	return nil, nil
+}
+
+func (f *fakeEchoConvRepo) ResolveCompanyOwnerMemberByPhone(_ context.Context, _ int32, _ string) (*string, error) {
+	return nil, nil
+}
+
 type fakeEchoMsgRepo struct {
 	domain.MessageRepository
 	inserted    bool

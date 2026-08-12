@@ -11,12 +11,12 @@ export class SignupPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.fullNameInput = page.getByPlaceholder("John Doe");
-    this.emailInput = page.getByPlaceholder("you@company.com");
-    this.continueButton = page.getByRole("button", { name: /continue/i });
-    this.organizationNameInput = page.getByPlaceholder("Acme Inc");
+    this.fullNameInput = page.getByPlaceholder("Juan Pérez");
+    this.emailInput = page.getByPlaceholder("tu@empresa.com");
+    this.continueButton = page.getByRole("button", { name: /continuar/i });
+    this.organizationNameInput = page.getByPlaceholder("Acme S.A.S.");
     this.industrySelect = page.locator("select");
-    this.createAccountButton = page.getByRole("button", { name: /create account/i });
+    this.createAccountButton = page.getByRole("button", { name: /crear cuenta/i });
   }
 
   async goto() {
@@ -34,10 +34,15 @@ export class SignupPage {
 
   async fillOrganizationStep(organizationName: string, industry: string) {
     await this.organizationNameInput.fill(organizationName);
-    await this.industrySelect.selectOption({ label: industry });
+    await this.industrySelect.selectOption(industry);
   }
 
   async submit() {
+    // Organization step → business context step (goal required to enable submit).
+    await this.continueButton.click();
+    await this.page
+      .getByPlaceholder("Ej: atender consultas de clientes, recibir pedidos, facturar…")
+      .fill("Atender consultas por WhatsApp");
     await this.createAccountButton.click();
   }
 }

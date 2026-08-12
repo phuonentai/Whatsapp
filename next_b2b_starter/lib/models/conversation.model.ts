@@ -16,7 +16,13 @@ export interface Conversation {
   contactDisplayName: string;
   contactInstagramUsername?: string;
   contactAvatarUrl?: string;
+  /** stytch_member_id del miembro asignado (conversation-row-scoping);
+   * undefined = conversación sin asignar (cola). */
+  assigneeStytchMemberId?: string;
 }
+
+/** Vistas de scope de la bandeja (parámetro `scope` de GET /crm/conversaciones). */
+export type ConversationScopeView = "" | "mine" | "queue" | "all";
 
 export interface ConversationListResponse {
   success: boolean;

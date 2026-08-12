@@ -9,13 +9,15 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 )
 
-func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*domain.BillingStatus, error) {
-	externalCustomerID := ctx.Value("stytch_org_id")
-	if externalCustomerID == nil {
+func (s *billingService) CreateMPCheckout(ctx context.Context, stytchOrgID, planID string) (*domain.BillingStatus, error) {
+	if s.mpProvider == nil {
+		return nil, fmt.Errorf("mercadopago not configured")
+	}
+	if stytchOrgID == "" {
 		return nil, fmt.Errorf("organization context required for checkout creation")
 	}
 
-	orgID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, fmt.Sprintf("%v", externalCustomerID))
+	orgID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, stytchOrgID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve organization: %w", err)
 	}
@@ -32,7 +34,7 @@ func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*
 		return nil, fmt.Errorf("MercadoPago provider does not support checkout creation")
 	}
 
-	checkoutSession, err := creator.CreateCheckoutSession(ctx, planID, fmt.Sprintf("%v", externalCustomerID))
+	checkoutSession, err := creator.CreateCheckoutSession(ctx, planID, stytchOrgID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MercadoPago checkout: %w", err)
 	}
@@ -45,7 +47,7 @@ func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*
 
 	return &domain.BillingStatus{
 		OrganizationID:        orgID,
-		ExternalID:            fmt.Sprintf("%v", externalCustomerID),
+		ExternalID:            stytchOrgID,
 		HasActiveSubscription: false,
 		CanProcessInvoices:    false,
 		InvoiceCount:          0,
@@ -55,13 +57,15 @@ func (s *billingService) CreateMPCheckout(ctx context.Context, planID string) (*
 	}, nil
 }
 
-func (s *billingService) CancelMPSubscription(ctx context.Context, subscriptionID string) (*domain.BillingStatus, error) {
-	externalCustomerID := ctx.Value("stytch_org_id")
-	if externalCustomerID == nil {
+func (s *billingService) CancelMPSubscription(ctx context.Context, stytchOrgID, subscriptionID string) (*domain.BillingStatus, error) {
+	if s.mpProvider == nil {
+		return nil, fmt.Errorf("mercadopago not configured")
+	}
+	if stytchOrgID == "" {
 		return nil, fmt.Errorf("organization context required for subscription cancellation")
 	}
 
-	organizationID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, fmt.Sprintf("%v", externalCustomerID))
+	organizationID, err := s.orgAdapter.GetOrganizationIDByStytchOrgID(ctx, stytchOrgID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve organization: %w", err)
 	}
@@ -78,11 +82,15 @@ func (s *billingService) CancelMPSubscription(ctx context.Context, subscriptionI
 	}
 
 	now := time.Now()
+	periodStart, periodEnd := s.mpCancellationPeriodBounds(ctx, organizationID, stytchOrgID, now)
+
 	subscription := &domain.Subscription{
 		OrganizationID:     organizationID,
-		ExternalCustomerID: fmt.Sprintf("%v", externalCustomerID),
+		ExternalCustomerID: stytchOrgID,
 		SubscriptionID:     subscriptionID,
 		SubscriptionStatus: "canceled",
+		CurrentPeriodStart: periodStart,
+		CurrentPeriodEnd:   periodEnd,
 		CancelAtPeriodEnd:  false,
 		CanceledAt:         &now,
 	}
@@ -98,7 +106,7 @@ func (s *billingService) CancelMPSubscription(ctx context.Context, subscriptionI
 
 	return &domain.BillingStatus{
 		OrganizationID:        organizationID,
-		ExternalID:            fmt.Sprintf("%v", externalCustomerID),
+		ExternalID:            stytchOrgID,
 		HasActiveSubscription: false,
 		CanProcessInvoices:    false,
 		InvoiceCount:          0,
@@ -107,7 +115,39 @@ func (s *billingService) CancelMPSubscription(ctx context.Context, subscriptionI
 	}, nil
 }
 
+// mpCancellationPeriodBounds derives non-null period bounds for the canceled
+// subscription row: the existing local row first, then the preapproval
+// schedule returned by the provider (next_payment_date/end_date), with a
+// final now() fallback so the NOT NULL upsert always succeeds.
+func (s *billingService) mpCancellationPeriodBounds(ctx context.Context, organizationID int32, stytchOrgID string, now time.Time) (time.Time, time.Time) {
+	var periodStart, periodEnd time.Time
+	if existing, err := s.repo.GetSubscriptionByOrgID(ctx, organizationID); err == nil {
+		periodStart, periodEnd = existing.CurrentPeriodStart, existing.CurrentPeriodEnd
+	}
+	if (periodStart.IsZero() || periodEnd.IsZero()) && s.mpProvider != nil {
+		if mpSub, err := s.mpProvider.GetSubscription(ctx, stytchOrgID); err == nil {
+			if periodStart.IsZero() {
+				periodStart = mpSub.CurrentPeriodStart
+			}
+			if periodEnd.IsZero() {
+				periodEnd = mpSub.CurrentPeriodEnd
+			}
+		}
+	}
+	if periodStart.IsZero() {
+		periodStart = now
+	}
+	if periodEnd.IsZero() {
+		periodEnd = now
+	}
+	return periodStart, periodEnd
+}
+
 func (s *billingService) VerifyMPPayment(ctx context.Context, paymentID string) (*domain.BillingStatus, error) {
+	if s.mpProvider == nil {
+		return nil, fmt.Errorf("mercadopago not configured")
+	}
+
 	s.logger.Info("Verifying MercadoPago payment", map[string]any{
 		"payment_id": paymentID,
 	})
@@ -136,7 +176,11 @@ func (s *billingService) VerifyMPPayment(ctx context.Context, paymentID string) 
 		return nil, fmt.Errorf("failed to map customer ID to organization: %w", err)
 	}
 
-	subscription, err := s.billingProvider.GetSubscription(ctx, externalCustomerID)
+	// Fetch the subscription from the MercadoPago adapter directly: the
+	// router resolves the org's billing_provider (still unset until the
+	// SetBillingProvider call below) to Polar, which cannot serve MP
+	// preapprovals at verify time.
+	subscription, err := s.mpProvider.GetSubscription(ctx, externalCustomerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription from MercadoPago: %w", err)
 	}

@@ -25,15 +25,13 @@ func NewProvider(container *dig.Container) *Provider {
 	}
 }
 
-// RegisterDependencies registers all RBAC dependencies in the container
+// RegisterDependencies registers all RBAC dependencies in the container.
+//
+// Note: the `RBACService` implementation is provided by `auth/cmd.Init`
+// (Stytch policy-backed with a static fallback for development/placeholder
+// credentials) so the served implementation cannot diverge from the runtime
+// SSOT. This provider only wires the handler and routes on top of it.
 func (p *Provider) RegisterDependencies() error {
-	// Provide RBAC Service
-	if err := p.container.Provide(func() RBACService {
-		return NewRBACService()
-	}); err != nil {
-		return fmt.Errorf("failed to provide rbac service: %w", err)
-	}
-
 	// Provide RBAC Handler
 	if err := p.container.Provide(func(service RBACService) *Handler {
 		return NewHandler(service)
@@ -76,6 +74,15 @@ func SetupMiddleware(container *dig.Container) error {
 		config := DefaultMiddlewareConfig()
 		if os.Getenv("AUTH_MOCK_ENABLED") == "true" {
 			config.EnableMockAuth = true
+		}
+		// AUTH_TRUST_FORWARDED_AUTH (default false) enables the fast path that
+		// trusts X-Forwarded-Auth + X-Stytch-* headers set by the Next.js edge
+		// proxy after it statelessly validated the session JWT. Only enable in
+		// deployments where the proxy is the sole ingress and strips/overrides
+		// client-supplied forwarded-auth headers; when unset (or not "true"),
+		// the middleware independently verifies every token (existing behavior).
+		if os.Getenv("AUTH_TRUST_FORWARDED_AUTH") == "true" {
+			config.TrustForwardedAuth = true
 		}
 		return NewMiddleware(provider, orgResolver, accResolver, config)
 	}); err != nil {

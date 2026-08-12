@@ -16,11 +16,13 @@ import (
 
 type mockLLM struct {
 	llmdomain.LLMClient
-	text string
-	err  error
+	text  string
+	err   error
+	calls int
 }
 
 func (m *mockLLM) Complete(ctx context.Context, req llmdomain.CompletionRequest) (*llmdomain.CompletionResponse, error) {
+	m.calls++
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -52,8 +54,9 @@ func (m *mockTagRepo) List(ctx context.Context, orgID int32) ([]*crmDomain.Tag, 
 // ---------- tests ----------
 
 func TestAiBuildHappyPath(t *testing.T) {
+	llm := &mockLLM{text: `{"filter_spec":[{"field":"lead_status","op":"eq","value":"cliente"},{"field":"recency_days","op":"lte","value":30}],"message_draft":"¡Hola! Tenemos ofertas especiales para clientes mayoristas este mes. Escríbenos y te contamos más."}`}
 	builder := NewAudienceBuilder(
-		&mockLLM{text: `[{"field":"lead_status","op":"eq","value":"cliente"},{"field":"recency_days","op":"lte","value":30}]`},
+		llm,
 		&mockBilling{status: &billingDomain.AiUsageStatus{CreditsMax: 100, CreditsRemaining: 50}},
 		&mockTagRepo{},
 		&mockEvaluator{count: &domain.EvalResult{Total: 25, ExcludedByGates: 5}},
@@ -68,6 +71,73 @@ func TestAiBuildHappyPath(t *testing.T) {
 	}
 	if result.Preview == nil || result.Preview.Total != 25 {
 		t.Fatalf("unexpected preview: %+v", result.Preview)
+	}
+	if result.MessageDraft == "" {
+		t.Fatalf("expected a message draft, got empty")
+	}
+	// Metered: the build goes through exactly one metered LLM call.
+	if llm.calls != 1 {
+		t.Fatalf("expected exactly 1 metered LLM call, got %d", llm.calls)
+	}
+}
+
+func TestAiBuildMessageDraftFencedJSON(t *testing.T) {
+	builder := NewAudienceBuilder(
+		&mockLLM{text: "```json\n{\"filter_spec\":[{\"field\":\"source\",\"op\":\"eq\",\"value\":\"whatsapp\"}],\"message_draft\":\"Hola, ¿te gustaría recibir nuestras novedades? Responde SÍ para continuar.\"}\n```"},
+		&mockBilling{status: &billingDomain.AiUsageStatus{CreditsMax: 100, CreditsRemaining: 50}},
+		&mockTagRepo{},
+		&mockEvaluator{},
+	)
+
+	result, err := builder.Build(context.Background(), 42, "contactos de whatsapp")
+	if err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+	if result.FilterSpec[0].Field != "source" {
+		t.Fatalf("unexpected spec: %+v", result.FilterSpec)
+	}
+	if result.MessageDraft != "Hola, ¿te gustaría recibir nuestras novedades? Responde SÍ para continuar." {
+		t.Fatalf("unexpected message draft: %q", result.MessageDraft)
+	}
+}
+
+func TestAiBuildUnparsableMessageDropped(t *testing.T) {
+	// Valid filter spec but a non-string message_draft: the spec is still
+	// returned and the draft is omitted (never fails the call).
+	builder := NewAudienceBuilder(
+		&mockLLM{text: `{"filter_spec":[{"field":"lead_status","op":"eq","value":"cliente"}],"message_draft":123}`},
+		&mockBilling{status: &billingDomain.AiUsageStatus{CreditsMax: 100, CreditsRemaining: 50}},
+		&mockTagRepo{},
+		&mockEvaluator{count: &domain.EvalResult{Total: 7, ExcludedByGates: 0}},
+	)
+
+	result, err := builder.Build(context.Background(), 42, "clientes")
+	if err != nil {
+		t.Fatalf("unparsable message must not fail the build: %v", err)
+	}
+	if len(result.FilterSpec) != 1 || result.FilterSpec[0].Field != "lead_status" {
+		t.Fatalf("expected spec preserved, got %+v", result.FilterSpec)
+	}
+	if result.MessageDraft != "" {
+		t.Fatalf("expected omitted message draft, got %q", result.MessageDraft)
+	}
+}
+
+func TestAiBuildEmptyMessageDropped(t *testing.T) {
+	// Empty message_draft is treated as omitted.
+	builder := NewAudienceBuilder(
+		&mockLLM{text: `{"filter_spec":[{"field":"lead_status","op":"eq","value":"cliente"}],"message_draft":""}`},
+		&mockBilling{status: &billingDomain.AiUsageStatus{CreditsMax: 100, CreditsRemaining: 50}},
+		&mockTagRepo{},
+		&mockEvaluator{},
+	)
+
+	result, err := builder.Build(context.Background(), 42, "clientes")
+	if err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+	if result.MessageDraft != "" {
+		t.Fatalf("expected empty message draft, got %q", result.MessageDraft)
 	}
 }
 
@@ -117,8 +187,9 @@ func TestAiBuildNonJSONOutputRejected(t *testing.T) {
 }
 
 func TestAiBuildCreditsExhaustedFailClosed(t *testing.T) {
+	llm := &mockLLM{text: `{"filter_spec":[{"field":"source","op":"eq","value":"whatsapp"}],"message_draft":"Hola"}`}
 	builder := NewAudienceBuilder(
-		&mockLLM{text: `[{"field":"source","op":"eq","value":"whatsapp"}]`},
+		llm,
 		&mockBilling{status: &billingDomain.AiUsageStatus{CreditsMax: 100, CreditsRemaining: 0}},
 		&mockTagRepo{},
 		&mockEvaluator{},
@@ -127,6 +198,9 @@ func TestAiBuildCreditsExhaustedFailClosed(t *testing.T) {
 	_, err := builder.Build(context.Background(), 42, "clientes")
 	if !errors.Is(err, domain.ErrAiCreditsExhausted) {
 		t.Fatalf("expected ErrAiCreditsExhausted, got %v", err)
+	}
+	if llm.calls != 0 {
+		t.Fatalf("exhausted credits must not call the LLM, got %d calls", llm.calls)
 	}
 }
 

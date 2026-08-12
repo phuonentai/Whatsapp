@@ -9,6 +9,7 @@ type ConfigRepository interface {
 	GetByPhoneNumberID(ctx context.Context, phoneNumberID string) (*WhatsAppConfig, error)
 	GetByOrganizationID(ctx context.Context, orgID int32) (*WhatsAppConfig, error)
 	GetByVerifyToken(ctx context.Context, verifyToken string) (*WhatsAppConfig, error)
+	GetByWABAID(ctx context.Context, wabaID string) (*WhatsAppConfig, error)
 	Create(ctx context.Context, config *WhatsAppConfig) (*WhatsAppConfig, error)
 	Update(ctx context.Context, config *WhatsAppConfig) (*WhatsAppConfig, error)
 }

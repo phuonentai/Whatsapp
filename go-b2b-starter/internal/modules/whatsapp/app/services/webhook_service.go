@@ -24,27 +24,39 @@ type WebhookService interface {
 }
 
 type webhookService struct {
-	configRepo whatsappDomain.ConfigRepository
-	logRepo    whatsappDomain.WebhookLogRepository
-	outboxRepo outbox.Repository
-	logger     logger.Logger
+	configRepo   whatsappDomain.ConfigRepository
+	logRepo      whatsappDomain.WebhookLogRepository
+	templateRepo whatsappDomain.TemplateRepository
+	outboxRepo   outbox.Repository
+	logger       logger.Logger
 }
 
 func NewWebhookService(
 	configRepo whatsappDomain.ConfigRepository,
 	logRepo whatsappDomain.WebhookLogRepository,
+	templateRepo whatsappDomain.TemplateRepository,
 	outboxRepo outbox.Repository,
 	logger logger.Logger,
 ) WebhookService {
 	return &webhookService{
-		configRepo: configRepo,
-		logRepo:    logRepo,
-		outboxRepo: outboxRepo,
-		logger:     logger,
+		configRepo:   configRepo,
+		logRepo:      logRepo,
+		templateRepo: templateRepo,
+		outboxRepo:   outboxRepo,
+		logger:       logger,
 	}
 }
 
 func (s *webhookService) ProcessWebhook(ctx context.Context, rawBody []byte, parsedPayload map[string]any, signatureHeader string) error {
+	// Template status updates are delivered by Meta as a WABA-scoped webhook
+	// with entry[].changes[].field == "message_template_status_update" and the
+	// WABA id in entry[].id (no phone_number_id metadata). Route them to the
+	// dedicated sync path BEFORE the message path so no whatsapp.message.received
+	// event is ever created for a template status update.
+	if isTemplateStatusUpdate(parsedPayload) {
+		return s.handleTemplateStatusUpdate(ctx, rawBody, parsedPayload, signatureHeader)
+	}
+
 	phoneNumberID := extractMetadataPhoneNumberID(parsedPayload)
 	if phoneNumberID == "" {
 		s.logFailed(ctx, rawBody, nil, phoneNumberID, "phone_number_id not found in payload")
@@ -444,4 +456,164 @@ func stringField(m map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// templateStatusUpdateField is Meta's webhook change field for template
+// approval-status notifications.
+const templateStatusUpdateField = "message_template_status_update"
+
+// isTemplateStatusUpdate reports whether the payload is a template
+// approval-status update (field match on the first change).
+func isTemplateStatusUpdate(payload map[string]any) bool {
+	entry := firstEntry(payload)
+	change := firstChange(entry)
+	if change == nil {
+		return false
+	}
+	field, _ := change["field"].(string)
+	return field == templateStatusUpdateField
+}
+
+// templateStatusUpdate is the parsed value of a message_template_status_update
+// webhook.
+type templateStatusUpdate struct {
+	Event            string
+	MetaTemplateID   string
+	TemplateName     string
+	TemplateLanguage string
+	Reason           string
+}
+
+func parseTemplateStatusUpdate(change map[string]any) templateStatusUpdate {
+	value := changeValue(change)
+	if value == nil {
+		return templateStatusUpdate{}
+	}
+	str := func(key string) string {
+		if v, ok := value[key].(string); ok {
+			return v
+		}
+		return ""
+	}
+	return templateStatusUpdate{
+		Event:            str("event"),
+		MetaTemplateID:   str("message_template_id"),
+		TemplateName:     str("message_template_name"),
+		TemplateLanguage: str("message_template_language"),
+		Reason:           str("reason"),
+	}
+}
+
+// handleTemplateStatusUpdate applies a Meta template approval-status change.
+// Idempotent: re-applying an identical status is a no-op (transaction-isolated
+// state check in UpdateWhatsAppTemplateStatus). Unknown meta_template_id is
+// logged and ignored (HTTP 200). Never creates whatsapp.message.received.
+func (s *webhookService) handleTemplateStatusUpdate(ctx context.Context, rawBody []byte, parsedPayload map[string]any, signatureHeader string) error {
+	entry := firstEntry(parsedPayload)
+	change := firstChange(entry)
+	update := parseTemplateStatusUpdate(change)
+	if update.MetaTemplateID == "" {
+		s.logger.Warn("template status update missing message_template_id", loggerdomain.Fields{})
+		return fmt.Errorf("message_template_id not found in template status update")
+	}
+
+	// Resolve the org by WABA id (entry.id) since template status updates do
+	// not carry phone_number_id metadata.
+	wabaID, _ := entry["id"].(string)
+	if wabaID == "" {
+		s.logger.Warn("template status update missing entry id (waba)", loggerdomain.Fields{})
+		return fmt.Errorf("entry id not found in template status update")
+	}
+
+	config, err := s.configRepo.GetByWABAID(ctx, wabaID)
+	if err != nil {
+		s.logFailed(ctx, rawBody, nil, wabaID, "config not found for waba_id "+wabaID)
+		return fmt.Errorf("%w: config not found for waba_id %s", whatsappDomain.ErrUnknownPhoneNumber, wabaID)
+	}
+
+	if err := whatsapp.VerifySignature(config.WebhookSecret, rawBody, signatureHeader); err != nil {
+		s.logFailed(ctx, rawBody, &config.OrganizationID, wabaID, "invalid signature")
+		return fmt.Errorf("%w: %v", whatsappDomain.ErrInvalidSignature, err)
+	}
+
+	target, ok := mapMetaStatusEvent(update.Event)
+	if !ok {
+		s.logger.Info("template status update with unrecognized event ignored", loggerdomain.Fields{
+			"event":         update.Event,
+			"meta_template": update.MetaTemplateID,
+		})
+		return nil
+	}
+
+	template, err := s.templateRepo.GetByMetaTemplateID(ctx, config.OrganizationID, update.MetaTemplateID)
+	if err != nil {
+		if errors.Is(err, whatsappDomain.ErrTemplateNotFound) {
+			// Unknown meta_template_id: log-and-ignore per spec, HTTP 200.
+			s.logger.Info("template status update for unknown meta_template_id ignored", loggerdomain.Fields{
+				"organization_id": config.OrganizationID,
+				"meta_template":   update.MetaTemplateID,
+			})
+			return nil
+		}
+		s.logFailed(ctx, rawBody, &config.OrganizationID, wabaID, "failed to look up template: "+err.Error())
+		return fmt.Errorf("failed to look up template: %w", err)
+	}
+
+	reason := update.Reason
+	var rejectionReason *string
+	if target == whatsappDomain.TemplateStatusRejected && reason != "" {
+		rejectionReason = &reason
+	}
+
+	updated, err := s.templateRepo.UpdateStatus(ctx, config.OrganizationID, template.ID, target, nil, rejectionReason)
+	if err != nil {
+		return fmt.Errorf("failed to apply template status update: %w", err)
+	}
+	if updated == nil {
+		// Idempotent no-op: status already equals target. Log and ack.
+		s.logger.Info("template status update was a no-op (status unchanged)", loggerdomain.Fields{
+			"organization_id": config.OrganizationID,
+			"template_id":     template.ID,
+			"status":          target,
+		})
+		return nil
+	}
+
+	s.logger.Info("template status updated via webhook", loggerdomain.Fields{
+		"organization_id": config.OrganizationID,
+		"template_id":     template.ID,
+		"status":          target,
+		"meta_template":   update.MetaTemplateID,
+	})
+
+	// Audit: record the status change as a webhook log row (the ingress's
+	// existing audit surface) without enqueueing any message event.
+	if _, err := s.logRepo.Insert(ctx, &whatsappDomain.WebhookLog{
+		OrganizationID: &config.OrganizationID,
+		Status:         "processed",
+		EventType:      "template_status_changed",
+		PhoneNumberID:  wabaID,
+		RawBody:        rawBody,
+	}); err != nil {
+		s.logger.Error("failed to record template status change audit", loggerdomain.Fields{"error": err.Error()})
+	}
+	return nil
+}
+
+// mapMetaStatusEvent converts Meta's template event vocabulary to the local
+// status. Unknown events map to (\"\", false) → caller ignores with HTTP 200.
+func mapMetaStatusEvent(event string) (whatsappDomain.TemplateStatus, bool) {
+	switch event {
+	case "APPROVED":
+		return whatsappDomain.TemplateStatusApproved, true
+	case "REJECTED":
+		return whatsappDomain.TemplateStatusRejected, true
+	case "PAUSED", "DISABLED":
+		return whatsappDomain.TemplateStatusPaused, true
+	case "PENDING", "IN_APPEAL", "IN_FLIGHT", "DELETED":
+		// In-flight states stay "submitted" locally; no transition needed.
+		return whatsappDomain.TemplateStatusSubmitted, false
+	default:
+		return "", false
+	}
 }

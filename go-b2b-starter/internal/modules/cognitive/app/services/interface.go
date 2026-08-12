@@ -14,8 +14,10 @@ type EmbeddingService interface {
 	// GetDocumentEmbeddings retrieves embeddings for a document
 	GetDocumentEmbeddings(ctx context.Context, orgID, documentID int32) ([]*domain.DocumentEmbedding, error)
 
-	// SearchSimilarDocuments finds documents similar to the given text
-	SearchSimilarDocuments(ctx context.Context, orgID int32, text string, limit int32) ([]*domain.SimilarDocument, error)
+	// SearchSimilarDocuments finds documents similar to the given text.
+	// includeAdminOnly=false restricts retrieval to workspace documents; true
+	// also includes admin_only documents (member holds org:manage).
+	SearchSimilarDocuments(ctx context.Context, orgID int32, text string, limit int32, includeAdminOnly bool) ([]*domain.SimilarDocument, error)
 
 	// DeleteDocumentEmbeddings removes embeddings for a document
 	DeleteDocumentEmbeddings(ctx context.Context, orgID, documentID int32) error
@@ -26,15 +28,17 @@ type EmbeddingService interface {
 
 // RAGService defines the interface for RAG (Retrieval-Augmented Generation) operations
 type RAGService interface {
-	// Chat sends a message and gets a response, optionally using RAG
-	Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest) (*domain.ChatResponse, error)
+	// Chat sends a message and gets a response, optionally using RAG.
+	// includeAdminOnly=false restricts RAG retrieval to workspace documents;
+	// true also retrieves admin_only documents (member holds org:manage).
+	Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, includeAdminOnly bool) (*domain.ChatResponse, error)
 
 	// ChatStream sends a message and streams the response tokens via emit,
 	// optionally using RAG. The final ChatResponse carries the full content
 	// and total tokens used; emit receives incremental StreamEvents (the last
 	// one always has Done=true). Persists the user message and the assistant
-	// message exactly like Chat.
-	ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error) (*domain.ChatResponse, error)
+	// message exactly like Chat. includeAdminOnly applies to RAG retrieval.
+	ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error, includeAdminOnly bool) (*domain.ChatResponse, error)
 
 	// GetSession retrieves a chat session
 	GetSession(ctx context.Context, orgID, sessionID int32) (*domain.ChatSession, error)

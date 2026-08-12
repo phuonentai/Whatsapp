@@ -46,6 +46,18 @@ var (
 	PermContactExport   = NewPermission("contact", "export")
 	PermDealExport      = NewPermission("deal", "export")
 	PermActivityExport  = NewPermission("activity", "export")
+
+	// Inbox tier permissions (inbox-member-tier)
+	PermInboxView  = NewPermission("inbox", "view")
+	PermInboxReply = NewPermission("inbox", "reply")
+
+	// Inbox scope permissions (conversation-row-scoping): composables con las
+	// acciones de bandeja, sin conceder destructivas (inbox:delete/org:manage).
+	// Espejo del fallback dev/mock; la fuente runtime es la política Stytch
+	// cacheada (ver conversationscope).
+	PermInboxViewAll       = NewPermission("inbox", "view_all")
+	PermInboxViewUnassigned = NewPermission("inbox", "view_unassigned")
+	PermInboxReassign      = NewPermission("inbox", "reassign")
 )
 
 // AllPermissions is the complete list of all permissions in the system.
@@ -63,6 +75,11 @@ var AllPermissions = []Permission{
 	PermContactExport,
 	PermDealExport,
 	PermActivityExport,
+	PermInboxView,
+	PermInboxReply,
+	PermInboxViewAll,
+	PermInboxViewUnassigned,
+	PermInboxReassign,
 }
 
 // =============================================================================
@@ -105,6 +122,8 @@ var (
 			PermResourceView,
 			PermResourceCreate,
 			PermTicketView,
+			PermInboxView,
+			PermInboxReply,
 		},
 	}
 
@@ -126,6 +145,10 @@ var (
 			PermContactExport,
 			PermDealExport,
 			PermActivityExport,
+			PermInboxView,
+			PermInboxReply,
+			PermInboxViewAll,
+			PermInboxReassign,
 		},
 	}
 
@@ -148,6 +171,11 @@ var (
 			PermContactExport,
 			PermDealExport,
 			PermActivityExport,
+			PermInboxView,
+			PermInboxReply,
+			PermInboxViewAll,
+			PermInboxViewUnassigned,
+			PermInboxReassign,
 		},
 	}
 )

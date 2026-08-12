@@ -20,10 +20,13 @@ import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import type { ServerPermissions } from "@/lib/auth/server-permissions";
 import { useAuthContext } from "@/lib/contexts/auth-context";
+import { useSlidingSession } from "@/lib/hooks/use-sliding-session";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { useSubscriptionQuery } from "@/lib/hooks/queries/use-subscription-query";
 import { queryKeys } from "@/lib/hooks/queries/query-keys";
 import type { SubscriptionGateState } from "@/lib/polar/current-subscription";
+import { isMercadoPagoEnabled } from "@/lib/mercadopago/config";
+import { ui, tpl } from "@/lib/copy/ui";
 import { useIsPlansModalOpen, useUIStore } from "@/stores/ui-store";
 
 interface DashboardLayoutProps {
@@ -46,6 +49,11 @@ export function DashboardLayout({
     (open: boolean) => setPlansModalOpen(open),
     [setPlansModalOpen]
   );
+
+  // Sliding session renewal: while a session exists, refresh with the
+  // configured session_duration_minutes every 10 minutes (visible tabs only)
+  // so active users do not hit a hard logout at the fixed lifetime.
+  useSlidingSession({ enabled: Boolean(auth?.isAuthenticated) });
 
   useEffect(() => {
     queryClient.setQueryData(
@@ -196,6 +204,7 @@ export function DashboardLayout({
           open={isPlansModalOpen}
           onOpenChange={handlePlansModalOpenChange}
           subscriptionState={subscriptionState}
+          mercadopagoEnabled={isMercadoPagoEnabled()}
         />
       </div>
   );
@@ -216,6 +225,7 @@ function deriveSubscriptionUiState(
   const alerts: SubscriptionAlertDescriptor[] = [];
   const settingsHref = "/dashboard/settings?view=subscription";
   const reason = state.reason ?? null;
+  const status = state.status ?? null;
 
   const pushAlert = (alert: SubscriptionAlertDescriptor) => {
     alerts.push(alert);
@@ -226,25 +236,29 @@ function deriveSubscriptionUiState(
       alerts.push({
         id: "subscription-permissions",
         variant: "info",
-        title: "Limited billing visibility",
-        description:
-          "You don't have permission to view subscription details.",
+        title: ui.billing.alertPermissionsTitle,
+        description: ui.billing.alertPermissionsBody,
       });
       return {
         alerts,
       };
     }
 
-    if (reason === "POLAR_UNCONFIGURED") {
+    if (reason === "POLAR_UNCONFIGURED" || reason === "MP_UNCONFIGURED") {
       alerts.push({
         id: "subscription-unconfigured",
         variant: "info",
-        title: "Billing configuration required",
+        title:
+          reason === "MP_UNCONFIGURED"
+            ? ui.billing.alertConfigRequiredMpTitle
+            : ui.billing.alertConfigRequiredTitle,
         description:
-          "We couldn't verify your subscription because Polar credentials are missing. Add them in settings to enable monitoring.",
+          reason === "MP_UNCONFIGURED"
+            ? ui.billing.alertConfigRequiredMpBody
+            : ui.billing.alertConfigRequiredBody,
         actions: [
           {
-            label: "Open billing settings",
+            label: ui.billing.actionOpenBillingSettings,
             href: settingsHref,
             priority: "secondary",
           },
@@ -255,19 +269,62 @@ function deriveSubscriptionUiState(
       };
     }
 
+    // past_due / unpaid: payment-method-update path distinct from resubscribing.
+    // Polar orgs get the plans modal (customer portal URL not yet in the
+    // subscription snapshot); MercadoPago orgs get honest copy — in-place
+    // payment-method update is explicitly out of scope for MP.
+    const isPastDueOrUnpaid = status === "past_due" || status === "unpaid";
+    if (isPastDueOrUnpaid) {
+      const mpEnabled = isMercadoPagoEnabled();
+      pushAlert({
+        id: "subscription-payment-failed",
+        variant: "critical",
+        title: ui.billing.alertPaymentFailedTitle,
+        description: mpEnabled
+          ? ui.billing.alertPaymentFailedMpBody
+          : ui.billing.alertPaymentFailedPolarBody,
+        actions: mpEnabled
+          ? [
+              {
+                label: ui.billing.actionResubscribeMp,
+                onClick: openPlansModal,
+                priority: "primary",
+              },
+              {
+                label: ui.billing.actionManageSubscription,
+                href: settingsHref,
+                priority: "secondary",
+              },
+            ]
+          : [
+              {
+                label: ui.billing.actionUpdatePaymentMethod,
+                onClick: openPlansModal,
+                priority: "primary",
+              },
+              {
+                label: ui.billing.actionManageSubscription,
+                href: settingsHref,
+                priority: "secondary",
+              },
+            ],
+      });
+      return { alerts };
+    }
+
     pushAlert({
       id: "subscription-inactive",
       variant: "critical",
-      title: "Subscription inactive",
+      title: ui.billing.alertInactiveTitle,
       description: getInactiveDescription(state),
       actions: [
         {
-          label: "Subscribe now",
+          label: ui.billing.actionSubscribeNow,
           onClick: openPlansModal,
           priority: "primary",
         },
         {
-          label: "Manage subscription",
+          label: ui.billing.actionManageSubscription,
           href: settingsHref,
           priority: "secondary",
         },
@@ -284,20 +341,19 @@ function deriveSubscriptionUiState(
       pushAlert({
         id: "subscription-usage-max",
         variant: "critical",
-        title: "Usage limit reached",
-        description: `You've used ${formatNumber(
-          used
-        )} of ${formatNumber(
-          included
-        )} units this billing period. Upgrade or extend your plan to continue.`,
+        title: ui.billing.alertUsageMaxTitle,
+        description: tpl(ui.billing.alertUsageMaxBody, {
+          used: formatNumber(used),
+          included: formatNumber(included),
+        }),
         actions: [
           {
-            label: "Upgrade plan",
+            label: ui.billing.actionUpgradePlan,
             onClick: openPlansModal,
             priority: "primary",
           },
           {
-            label: "Manage billing",
+            label: ui.billing.actionManageBilling,
             href: settingsHref,
             priority: "secondary",
           },
@@ -313,18 +369,18 @@ function deriveSubscriptionUiState(
         alerts.push({
           id: "subscription-usage-warning",
           variant: "warning",
-          title: "You're nearing your usage limit",
-          description: `Only ${formatNumber(
-            remaining
-          )} unit${remaining === 1 ? "" : "s"} remain in this billing period.`,
+          title: ui.billing.alertUsageWarningTitle,
+          description: tpl(ui.billing.alertUsageWarningBody, {
+            remaining: formatNumber(remaining),
+          }),
           actions: [
             {
-              label: "Review plans",
+              label: ui.billing.actionReviewPlans,
               onClick: openPlansModal,
               priority: "primary",
             },
             {
-              label: "Track usage",
+              label: ui.billing.actionTrackUsage,
               href: settingsHref,
               priority: "secondary",
             },
@@ -338,15 +394,15 @@ function deriveSubscriptionUiState(
   if (subscription?.cancelAtPeriodEnd) {
     const cancelDate = subscription.currentPeriodEnd
       ? formatDateString(subscription.currentPeriodEnd)
-      : "the end of this billing period";
+      : ui.billing.endOfPeriod;
     alerts.push({
       id: "subscription-cancelled",
       variant: "warning",
-      title: "Subscription scheduled to cancel",
-      description: `Your current plan will end on ${cancelDate}. Resume the subscription to maintain uninterrupted access.`,
+      title: ui.billing.alertScheduledCancelTitle,
+      description: tpl(ui.billing.alertScheduledCancelBody, { date: cancelDate }),
       actions: [
         {
-          label: "Resume subscription",
+          label: ui.billing.resumeSubscription,
           href: settingsHref,
           priority: "primary",
         },
@@ -361,18 +417,18 @@ function deriveSubscriptionUiState(
       alerts.push({
         id: "subscription-trial-ending",
         variant: daysLeft <= 2 ? "critical" : "warning",
-        title: "Trial ending soon",
-        description: `Your trial ends on ${formatDateString(
-          trialEnd
-        )}. Add a payment method to stay active.`,
+        title: ui.billing.alertTrialEndingTitle,
+        description: tpl(ui.billing.alertTrialEndingBody, {
+          date: formatDateString(trialEnd),
+        }),
         actions: [
           {
-            label: "Secure your plan",
+            label: ui.billing.actionSecurePlan,
             onClick: openPlansModal,
             priority: "primary",
           },
           {
-            label: "Update billing details",
+            label: ui.billing.actionUpdateBillingDetails,
             href: settingsHref,
             priority: "secondary",
           },
@@ -385,9 +441,8 @@ function deriveSubscriptionUiState(
     alerts.push({
       id: "subscription-unknown-error",
       variant: "info",
-      title: "Subscription status unavailable",
-      description:
-        "We couldn't refresh your subscription details. We'll retry automatically, or you can refresh the page.",
+      title: ui.billing.alertStatusUnavailableTitle,
+      description: ui.billing.alertStatusUnavailableBody,
     });
   }
 
@@ -402,18 +457,18 @@ function getInactiveDescription(state: SubscriptionGateState): string {
 
   switch (reason) {
     case "CUSTOMER_NOT_FOUND":
-      return "We couldn't match your workspace to an active billing account. Start a subscription to unlock premium features.";
+      return ui.billing.inactiveCustomerNotFound;
     case "NO_ACTIVE_SUBSCRIPTION":
       if (status === "past_due") {
-        return "We couldn't process your latest payment. Update billing details to resume service.";
+        return ui.billing.inactivePastDue;
       }
-      return "Your subscription has ended. Restart your plan to continue using the service.";
+      return ui.billing.inactiveEnded;
     case "PROFILE_UNAVAILABLE":
-      return "We couldn't load your profile to verify billing status. Please refresh the page or contact support.";
+      return ui.billing.inactiveProfileUnavailable;
     case "UNKNOWN_ERROR":
-      return "We couldn't verify your subscription. Try again shortly or contact support if this persists.";
+      return ui.billing.inactiveUnknown;
     default:
-      return "We could not confirm an active subscription for this workspace. Update your plan to continue.";
+      return ui.billing.inactiveDefault;
   }
 }
 

@@ -54,6 +54,23 @@ func moduleKeysFromMetadata(metadata map[string]any) []string {
 	return keys
 }
 
+// subscriptionMetadataFromProductMetadata builds the metadata map persisted on
+// the upserted subscription row: the event's parsed product metadata nested
+// under "product_metadata", mirroring the Polar adapter's canonical shape so
+// the entitlement and module-sync readers (which check both the top level and
+// the nested map) resolve the same keys the quota path consumed. Absent
+// metadata yields nil — nothing to persist.
+func subscriptionMetadataFromProductMetadata(productMetadata map[string]string) map[string]any {
+	if len(productMetadata) == 0 {
+		return nil
+	}
+	nested := make(map[string]any, len(productMetadata))
+	for k, v := range productMetadata {
+		nested[k] = v
+	}
+	return map[string]any{"product_metadata": nested}
+}
+
 func (s *billingService) ProcessWebhookEvent(ctx context.Context, eventType string, payload map[string]any) error {
 	s.logger.Info("Processing webhook event", map[string]any{
 		"event_type":   eventType,
@@ -260,8 +277,11 @@ func (s *billingService) handleSubscriptionUpsert(ctx context.Context, eventData
 		"organization_id":      organizationID,
 	})
 
-	// Step 2: Parse quota limits from product metadata (remaining invoices)
-	var invoiceCount int32 = 0
+	// Step 2: Parse quota limits from product metadata (remaining invoices).
+	// Absent -> -1 ("no new value"): metadata/status-only updates must not
+	// clobber the stored count — UpsertQuota preserves it atomically, and a
+	// fresh subscription (no quota row yet) seeds 0 via the SQL default.
+	var invoiceCount int32 = -1
 	if val, ok := eventData.ProductMetadata["invoice_count"]; ok {
 		if count, err := strconv.ParseInt(val, 10, 32); err == nil {
 			invoiceCount = int32(count)
@@ -272,12 +292,12 @@ func (s *billingService) handleSubscriptionUpsert(ctx context.Context, eventData
 			})
 		}
 	} else {
-		s.logger.Warn("invoice_count not found in product metadata", map[string]any{
+		s.logger.Info("invoice_count not found in product metadata; preserving stored quota count", map[string]any{
 			"product_metadata": eventData.ProductMetadata,
 		})
 	}
 
-	var maxSeats int32 = 0
+	var maxSeats int32 = -1
 	if val, ok := eventData.ProductMetadata["max_seats"]; ok {
 		if count, err := strconv.ParseInt(val, 10, 32); err == nil {
 			maxSeats = int32(count)
@@ -301,6 +321,7 @@ func (s *billingService) handleSubscriptionUpsert(ctx context.Context, eventData
 		CurrentPeriodEnd:   eventData.CurrentPeriodEnd,
 		CancelAtPeriodEnd:  eventData.CancelAtPeriodEnd,
 		CanceledAt:         eventData.CanceledAt,
+		Metadata:           subscriptionMetadataFromProductMetadata(eventData.ProductMetadata),
 	}
 
 	// Step 5: Upsert subscription to database
@@ -315,7 +336,9 @@ func (s *billingService) handleSubscriptionUpsert(ctx context.Context, eventData
 		"status":          eventData.Status,
 	})
 
-	// Step 5b: Reconcile per-org module state from subscription metadata.
+	// Step 5b: Reconcile per-org module state from the metadata just persisted
+	// on the subscription row. An empty key set (the event carried no product
+	// metadata) makes the sync a no-op instead of disabling every module.
 	if s.moduleService != nil {
 		moduleKeys := moduleKeysFromMetadata(subscription.Metadata)
 		if err := s.moduleService.SyncModulesFromMetadata(ctx, organizationID, moduleKeys); err != nil {
@@ -384,6 +407,26 @@ func (s *billingService) handleSubscriptionCanceled(ctx context.Context, eventDa
 		subscription.CanceledAt = eventData.CanceledAt
 	}
 
+	// The schema requires non-null period bounds, but cancellation events (MP
+	// subscription_cancelled in particular) may arrive without dates. Keep the
+	// prior row's bounds so the upsert succeeds and the status sticks.
+	if subscription.CurrentPeriodStart.IsZero() || subscription.CurrentPeriodEnd.IsZero() {
+		if existing, err := s.repo.GetSubscriptionByOrgID(ctx, organizationID); err == nil {
+			if subscription.CurrentPeriodStart.IsZero() {
+				subscription.CurrentPeriodStart = existing.CurrentPeriodStart
+			}
+			if subscription.CurrentPeriodEnd.IsZero() {
+				subscription.CurrentPeriodEnd = existing.CurrentPeriodEnd
+			}
+		}
+	}
+	if subscription.CurrentPeriodStart.IsZero() {
+		subscription.CurrentPeriodStart = now
+	}
+	if subscription.CurrentPeriodEnd.IsZero() {
+		subscription.CurrentPeriodEnd = now
+	}
+
 	// Step 3: Upsert subscription with canceled status
 	_, err = s.repo.UpsertSubscription(ctx, subscription)
 	if err != nil {
@@ -411,8 +454,10 @@ func (s *billingService) handleCustomerUpdated(ctx context.Context, eventData *d
 		"metadata_keys":   len(eventData.CustomerMetadata),
 	})
 
-	// Step 2: Parse invoice count from customer metadata (remaining count)
-	var invoiceCount int32 = 0
+	// Step 2: Parse invoice count from customer metadata (remaining count).
+	// Absent -> -1 ("no new value"): a metadata-only customer update must not
+	// clobber the stored count; UpsertQuota preserves it atomically.
+	var invoiceCount int32 = -1
 	if val, ok := eventData.CustomerMetadata["invoice_count"]; ok {
 		if count, err := strconv.ParseInt(val, 10, 32); err == nil {
 			invoiceCount = int32(count)

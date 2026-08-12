@@ -69,8 +69,11 @@ func newMockCampaignRepo() *mockCampaignRepo {
 	return &mockCampaignRepo{campaigns: map[int32]*domain.Campaign{}, recipients: map[int32][]*domain.CampaignRecipient{}, nextID: 1}
 }
 
-func (m *mockCampaignRepo) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, createdBy string) (*domain.Campaign, error) {
+func (m *mockCampaignRepo) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, mensaje string, createdBy string) (*domain.Campaign, error) {
 	c := &domain.Campaign{ID: m.nextID, OrganizationID: orgID, Nombre: nombre, SegmentID: segmentID, Status: domain.CampaignDraft, CreatedBy: createdBy}
+	if mensaje != "" {
+		c.Mensaje = &mensaje
+	}
 	m.nextID++
 	m.campaigns[c.ID] = c
 	return c, nil
@@ -157,7 +160,7 @@ func TestLaunchCampaignSnapshotsAudienceAndTransitions(t *testing.T) {
 	activityRepo := &mockActivityRepo{}
 
 	segment, _ := segmentRepo.Create(context.Background(), 42, "Clientes", []domain.Filter{{Field: domain.FieldLeadStatus, Op: domain.OpEq, Value: "cliente"}}, "m1")
-	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "m1")
+	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "", "m1")
 
 	svc := NewCampaignService(campaignRepo, segmentRepo, evaluator, activityRepo)
 	launched, err := svc.Launch(context.Background(), 42, campaign.ID, "m1")
@@ -183,7 +186,7 @@ func TestLaunchCampaignEmptyAudience(t *testing.T) {
 
 	segment, _ := segmentRepo.Create(context.Background(), 42, "Vacíos", nil, "m1")
 	// Overwrite spec to valid one; Create validates only via service, repo mock accepts.
-	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "m1")
+	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "", "m1")
 
 	svc := NewCampaignService(campaignRepo, segmentRepo, evaluator, activityRepo)
 	launched, err := svc.Launch(context.Background(), 42, campaign.ID, "m1")
@@ -202,7 +205,7 @@ func TestRelaunchReturnsErrCampaignNotDraft(t *testing.T) {
 	evaluator := &mockEvaluator{contactIDs: []int32{1}}
 
 	segment, _ := segmentRepo.Create(context.Background(), 42, "S", []domain.Filter{{Field: domain.FieldLeadStatus, Op: domain.OpEq, Value: "cliente"}}, "m1")
-	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "m1")
+	campaign, _ := campaignRepo.Create(context.Background(), 42, "Promo", segment.ID, "", "m1")
 
 	svc := NewCampaignService(campaignRepo, segmentRepo, evaluator, activityRepo)
 	if _, err := svc.Launch(context.Background(), 42, campaign.ID, "m1"); err != nil {
@@ -224,9 +227,42 @@ func TestLaunchUnknownCampaign(t *testing.T) {
 
 func TestCreateCampaignRejectsUnknownSegment(t *testing.T) {
 	svc := NewCampaignService(newMockCampaignRepo(), newMockSegmentRepo(), &mockEvaluator{}, &mockActivityRepo{})
-	_, err := svc.Create(context.Background(), 42, "Promo", 999, "m1")
+	_, err := svc.Create(context.Background(), 42, "Promo", 999, "", "m1")
 	if err == nil {
 		t.Fatalf("expected error for unknown segment")
+	}
+}
+
+func TestCreateCampaignPersistsMensaje(t *testing.T) {
+	campaignRepo := newMockCampaignRepo()
+	segmentRepo := newMockSegmentRepo()
+	segment, _ := segmentRepo.Create(context.Background(), 42, "Clientes", []domain.Filter{{Field: domain.FieldLeadStatus, Op: domain.OpEq, Value: "cliente"}}, "m1")
+
+	svc := NewCampaignService(campaignRepo, segmentRepo, &mockEvaluator{}, &mockActivityRepo{})
+	campaign, err := svc.Create(context.Background(), 42, "Promo", segment.ID, "¡Hola! Oferta especial esta semana. Responde SÍ para más info.", "m1")
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+	if campaign.Mensaje == nil || *campaign.Mensaje != "¡Hola! Oferta especial esta semana. Responde SÍ para más info." {
+		t.Fatalf("expected mensaje persisted, got %v", campaign.Mensaje)
+	}
+}
+
+func TestCreateCampaignWithoutMensaje(t *testing.T) {
+	campaignRepo := newMockCampaignRepo()
+	segmentRepo := newMockSegmentRepo()
+	segment, _ := segmentRepo.Create(context.Background(), 42, "Clientes", []domain.Filter{{Field: domain.FieldLeadStatus, Op: domain.OpEq, Value: "cliente"}}, "m1")
+
+	svc := NewCampaignService(campaignRepo, segmentRepo, &mockEvaluator{}, &mockActivityRepo{})
+	campaign, err := svc.Create(context.Background(), 42, "Promo", segment.ID, "", "m1")
+	if err != nil {
+		t.Fatalf("create without mensaje failed: %v", err)
+	}
+	if campaign.Mensaje != nil {
+		t.Fatalf("expected nil mensaje for old clients, got %q", *campaign.Mensaje)
+	}
+	if campaign.Nombre != "Promo" || campaign.SegmentID != segment.ID {
+		t.Fatalf("unexpected campaign: %+v", campaign)
 	}
 }
 

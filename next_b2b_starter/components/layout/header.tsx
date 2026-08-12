@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import {
+  Bell,
   ChevronRight,
   LifeBuoy,
   PanelLeftClose,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { useCommandPaletteStore } from "@/lib/stores/command-palette-store";
 import { UserMenu } from "./user-menu";
+import { ui } from "@/lib/copy/ui";
 
 export function Header() {
   const isSidebarCollapsed = useSidebarStore((state) => state.isCollapsed);
@@ -34,7 +36,7 @@ export function Header() {
 
     if (segments.length > 0 && segments[0] !== 'dashboard') {
       items.push({
-        label: 'Dashboard',
+        label: ui.layout.navDashboard,
         href: '/dashboard',
         isLast: false,
       });
@@ -60,11 +62,11 @@ export function Header() {
   const pageTitle = breadcrumbItems[breadcrumbItems.length - 1]?.label ?? "Overview";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/80">
       <div className="flex">
         <div
           className={cn(
-            "hidden border-r border-border transition-[width] duration-200 lg:block",
+            "hidden border-r border-slate-800 transition-[width] duration-200 lg:block",
             isSidebarCollapsed ? "w-20" : "w-64"
           )}
         />
@@ -77,8 +79,12 @@ export function Header() {
                   variant="outline"
                   size="icon"
                   onClick={toggleSidebar}
-                  className="hidden h-9 w-9 lg:inline-flex"
-                  aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  className="hidden h-9 w-9 border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white lg:inline-flex"
+                  aria-label={
+                    isSidebarCollapsed
+                      ? ui.layout.expandSidebar
+                      : ui.layout.collapseSidebar
+                  }
                   disabled={isAutoCollapsed}
                 >
                   {isSidebarCollapsed ? (
@@ -88,25 +94,25 @@ export function Header() {
                   )}
                 </Button>
 
-                <span className="hidden h-8 w-px bg-border lg:block" aria-hidden="true" />
+                <span className="hidden h-8 w-px bg-slate-800 lg:block" aria-hidden="true" />
 
                 <div>
-                  <h1 className="text-lg font-semibold text-foreground">{pageTitle}</h1>
-                  <nav className="mt-1 flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+                  <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
+                  <nav className="mt-1 flex flex-wrap items-center gap-1 text-sm text-slate-400">
                     {breadcrumbItems.map((item, index) => (
                       <span key={item.href} className="flex items-center gap-1">
                         {item.isLast ? (
-                          <span className="font-medium text-foreground">{item.label}</span>
+                          <span className="font-medium text-white">{item.label}</span>
                         ) : (
                           <Link
                             href={item.href}
-                            className="transition-colors hover:text-foreground"
+                            className="transition-colors hover:text-white"
                           >
                             {item.label}
                           </Link>
                         )}
                         {index < breadcrumbItems.length - 1 && (
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
                         )}
                       </span>
                     ))}
@@ -117,28 +123,48 @@ export function Header() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  className="hidden h-9 w-64 justify-start gap-2 text-sm font-normal text-muted-foreground sm:flex"
+                  className="hidden h-9 w-64 justify-start gap-2 border-slate-700 bg-slate-800 text-sm font-normal text-slate-400 hover:bg-slate-700 hover:text-white sm:flex"
                   onClick={() => openPalette("search")}
                 >
                   <Search className="h-4 w-4" aria-hidden />
-                  <span className="flex-1 text-left">Search…</span>
-                  <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium">
+                  <span className="flex-1 text-left">{ui.layout.searchPlaceholder}</span>
+                  <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-700 bg-slate-700 px-1.5 font-mono text-[10px] font-medium text-slate-400">
                     ⌘K
                   </kbd>
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 sm:hidden"
+                  className="h-9 w-9 text-slate-400 hover:bg-slate-800 hover:text-white sm:hidden"
                   onClick={() => openPalette("search")}
-                  aria-label="Search"
+                  aria-label={ui.layout.searchAria}
                 >
                   <Search className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-9 w-9 text-slate-400 hover:bg-slate-800 hover:text-white"
+                  asChild
+                >
+                  <Link
+                    href="/dashboard/settings?view=audit"
+                    aria-label={ui.layout.notificationsAria}
+                    title={ui.layout.notificationsAria}
+                  >
+                    <span className="relative inline-flex">
+                      <Bell className="h-4 w-4" />
+                      <span
+                        className="absolute right-0 top-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-slate-400 hover:bg-slate-800 hover:text-white"
                   asChild
                 >
                   <a
@@ -146,7 +172,8 @@ export function Header() {
                       process.env.NEXT_PUBLIC_CONTACT_EMAIL ||
                       "mailto:info@yourdomain.com"
                     }
-                    aria-label="Support"
+                    aria-label={ui.layout.supportAria}
+                    title={ui.layout.supportAria}
                   >
                     <LifeBuoy className="h-4 w-4" />
                   </a>
@@ -154,10 +181,14 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-9 w-9 text-slate-400 hover:bg-slate-800 hover:text-white"
                   asChild
                 >
-                  <Link href="/dashboard/settings" aria-label="Preferences">
+                  <Link
+                    href="/dashboard/settings"
+                    aria-label={ui.layout.preferencesAria}
+                    title={ui.layout.preferencesAria}
+                  >
                     <Settings className="h-4 w-4" />
                   </Link>
                 </Button>

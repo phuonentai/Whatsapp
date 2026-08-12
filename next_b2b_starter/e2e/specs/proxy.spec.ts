@@ -46,6 +46,10 @@ test.describe("Proxy Middleware - JWT Validation", () => {
     await page.goto("/dashboard");
     await page.waitForURL(/\/auth/);
     expect(page.url()).toContain("/auth");
+    // Stateless validation rejects the expired JWT and clears the session cookies.
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "stytch_session_jwt")).toBeUndefined();
+    expect(cookies.find((c) => c.name === "stytch_session")).toBeUndefined();
   });
 
   test("redirects to /auth with malformed JWT cookie on protected route", async ({ page }) => {
@@ -61,6 +65,10 @@ test.describe("Proxy Middleware - JWT Validation", () => {
     await page.goto("/dashboard");
     await page.waitForURL(/\/auth/);
     expect(page.url()).toContain("/auth");
+    // Stateless validation rejects the malformed JWT and clears the session cookies.
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "stytch_session_jwt")).toBeUndefined();
+    expect(cookies.find((c) => c.name === "stytch_session")).toBeUndefined();
   });
 
   test("redirects preserves returnTo query param", async ({ page }) => {

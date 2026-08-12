@@ -12,7 +12,7 @@ import {
 } from "@/lib/auth/server-constants";
 import { isTokenExpired } from "@/lib/auth/token-utils";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
 
@@ -38,6 +38,20 @@ export async function POST() {
       }
     }
 
+    // Sliding-session duration: prefer the client-supplied value so the hook's
+    // explicit request is honored; fall back to the env-configured default
+    // (NEXT_PUBLIC_STYTCH_SESSION_DURATION_MINUTES, default 480).
+    let durationMinutes = getSessionDurationMinutes();
+    try {
+      const body = await request.json();
+      const requested = Number(body?.session_duration_minutes);
+      if (Number.isFinite(requested) && requested > 0) {
+        durationMinutes = requested;
+      }
+    } catch {
+      // No or non-JSON body: keep the env default.
+    }
+
     // First, check if we already have a valid JWT
     const existingJwt = cookieStore.get(SESSION_JWT_COOKIE_NAME)?.value ?? null;
     if (existingJwt && !isTokenExpired(existingJwt)) {
@@ -59,7 +73,7 @@ export async function POST() {
     try {
       const response = await client.sessions.authenticate({
         session_token: sessionToken,
-        session_duration_minutes: getSessionDurationMinutes(),
+        session_duration_minutes: durationMinutes,
       });
 
       const sessionJwt = (response as any)?.session_jwt ?? null;
@@ -80,7 +94,7 @@ export async function POST() {
       }
 
       const res = NextResponse.json({ sessionJwt });
-      const maxAgeSeconds = getSessionDurationMinutes() * 60;
+      const maxAgeSeconds = durationMinutes * 60;
 
       res.cookies.set(SESSION_JWT_COOKIE_NAME, sessionJwt, {
         ...getCookieConfig(),

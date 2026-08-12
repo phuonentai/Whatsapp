@@ -30,6 +30,10 @@ export function PlansModal({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [blockingDialogOpen, setBlockingDialogOpen] = useState(false);
+  // Detected when the Polar checkout action reports "Polar billing is not
+  // configured." — the signal that a deployment is MP-only. Combined with the
+  // resolved state (reason POLAR_UNCONFIGURED) so the MP CTA becomes primary.
+  const [polarUnconfiguredDetected, setPolarUnconfiguredDetected] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedInterval, setSelectedInterval] = useState<"month" | "year">("month");
   const { data: products, isLoading, error } = useProductsQuery();
@@ -42,11 +46,14 @@ export function PlansModal({
     return (["month", "year"] as const).filter((interval) => intervals.has(interval));
   }, [products]);
 
-  useEffect(() => {
-    if (intervalOptions.length > 0 && !intervalOptions.includes(selectedInterval)) {
-      setSelectedInterval(intervalOptions[0]);
-    }
-  }, [intervalOptions, selectedInterval]);
+  // Derive the effective interval: until the product catalog loads, the
+  // user's choice may reference an interval the plan does not offer. Deriving
+  // (instead of syncing state in an effect) keeps the value consistent with
+  // intervalOptions on every render.
+  const effectiveInterval =
+    intervalOptions.length > 0 && !intervalOptions.includes(selectedInterval)
+      ? intervalOptions[0]
+      : selectedInterval;
 
   const handleClose = () => {
     setSelectedPlanId(null);
@@ -78,14 +85,14 @@ export function PlansModal({
   const plans = useMemo(() => {
     if (!products) return [];
     return products
-      .filter((plan) => plan.interval === selectedInterval)
+      .filter((plan) => plan.interval === effectiveInterval)
       .map((plan) => {
         const isCurrent =
           Boolean(subscriptionState?.isActive) &&
           currentProductId === plan.productId;
         return { ...plan, isCurrent };
       });
-  }, [currentProductId, selectedInterval, subscriptionState?.isActive, products]);
+  }, [currentProductId, effectiveInterval, subscriptionState?.isActive, products]);
 
   if (!open) return null;
 
@@ -102,6 +109,14 @@ export function PlansModal({
       try {
         const result = await createCheckout({ planId: plan.id });
         if (!result.success) {
+          if (result.error === "Polar billing is not configured.") {
+            // MP-only deployment: promote the MP CTA instead of surfacing a
+            // failing Polar button as the primary action.
+            setPolarUnconfiguredDetected(true);
+            setSelectedPlanId(null);
+            onPlanChangePending?.(false);
+            return;
+          }
           setCheckoutError(result.error);
           setSelectedPlanId(null);
           onPlanChangePending?.(false);
@@ -216,7 +231,7 @@ export function PlansModal({
                 type="button"
                 onClick={() => setSelectedInterval(interval)}
                 className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                  selectedInterval === interval
+                  effectiveInterval === interval
                     ? "bg-gray-900 text-white shadow"
                     : "text-gray-600 hover:text-gray-900"
                 }`}
@@ -252,6 +267,11 @@ export function PlansModal({
                   isCurrent={plan.isCurrent}
                   onPolarCheckout={() => handlePolarCheckout(plan)}
                   onMPCheckout={mercadopagoEnabled ? () => handleMPCheckout(plan) : undefined}
+                  mpPrimary={
+                    mercadopagoEnabled &&
+                    (polarUnconfiguredDetected ||
+                      subscriptionState?.reason === "POLAR_UNCONFIGURED")
+                  }
                 />
               ))}
             </div>

@@ -30,7 +30,7 @@ function StatusBadge({ status }: { status: SiigoConnectionStatus }) {
     status === "live"
       ? "bg-emerald-100 text-emerald-700"
       : status === "paused"
-        ? "bg-gray-100 text-gray-600"
+        ? "bg-slate-100 text-slate-600"
         : status === "awaiting_setup"
           ? "bg-amber-100 text-amber-700"
           : "bg-blue-100 text-blue-700";
@@ -82,7 +82,7 @@ export function SiigoAdminView() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
-          <ServerCog className="h-6 w-6 text-gray-600" />
+          <ServerCog className="h-6 w-6 text-slate-600" />
           <div>
             <CardTitle>Onboarding de facturación Siigo</CardTitle>
             <CardDescription>Estado de conexión, numeración e importación por organización.</CardDescription>
@@ -103,7 +103,7 @@ export function SiigoAdminView() {
         )}
 
         {rows && rows.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-500">
+          <p className="py-8 text-center text-sm text-slate-500">
             Ninguna organización ha conectado Siigo todavía.
           </p>
         )}
@@ -147,7 +147,7 @@ export function SiigoAdminView() {
 
         {rows && rows.some((row) => row.status === "awaiting_setup") && (
           <div className="mt-5 space-y-3">
-            <h4 className="text-sm font-semibold text-gray-900">Configuración asistida</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Configuración asistida</h4>
             {rows
               .filter((row) => row.status === "awaiting_setup")
               .map((row) => (

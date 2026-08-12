@@ -7,6 +7,11 @@ export interface ProfileOrganizationDto {
   slug: string;
   name: string;
   status: string;
+  // Display-only mirror of the Stytch org MFA policy (never used for
+  // authorization decisions — Stytch is the sole enforcement point).
+  mfa_policy?: string;
+  mfa_methods?: string;
+  allowed_mfa_methods?: string[];
 }
 
 export interface ProfileResponseDto {

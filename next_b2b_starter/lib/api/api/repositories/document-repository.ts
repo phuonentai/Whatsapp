@@ -3,7 +3,9 @@
 import { apiClient } from "../client/api-client";
 import {
   DocumentDto,
+  DocumentVisibility,
   ListDocumentsResponseDto,
+  UpdateDocumentRequestDto,
   UploadDocumentResponseDto,
 } from "../dto/document.dto";
 import {
@@ -15,7 +17,8 @@ import {
 
 class DocumentRepository {
   /**
-   * Upload a document (PDF)
+   * Upload a document (PDF). Admin-only in v1; new documents default to
+   * visibility = workspace on the server.
    */
   async uploadDocument(file: File, title: string): Promise<Document> {
     const formData = new FormData();
@@ -87,6 +90,41 @@ class DocumentRepository {
   }
 
   /**
+   * Get a single document by id. Restricted documents (admin_only) return 404
+   * for members without org:manage — no title leak.
+   */
+  async getDocument(id: number): Promise<Document> {
+    const response = await apiClient.get<DocumentDto>(`/example_documents/${id}`);
+    return this.toDocument(response);
+  }
+
+  /**
+   * Update document metadata (title/visibility). Admin-only in v1.
+   */
+  async updateDocument(
+    id: number,
+    fields: UpdateDocumentRequestDto
+  ): Promise<Document> {
+    const response = await apiClient.patch<DocumentDto>(
+      `/example_documents/${id}`,
+      fields
+    );
+    return this.toDocument(response);
+  }
+
+  /**
+   * Reprocess a document (Retry): re-runs extraction + re-embeds chunks.
+   * Never re-uploads the file. Admin-only in v1.
+   */
+  async reprocessDocument(id: number): Promise<Document> {
+    const response = await apiClient.post<DocumentDto>(
+      `/example_documents/${id}/reprocess`,
+      {}
+    );
+    return this.toDocument(response);
+  }
+
+  /**
    * Delete a document
    */
   async deleteDocument(id: number): Promise<boolean> {
@@ -105,6 +143,7 @@ class DocumentRepository {
       contentType: dto.content_type,
       fileSize: dto.file_size,
       status: dto.status as DocumentStatus,
+      visibility: (dto.visibility ?? "workspace") as DocumentVisibility,
       extractedText: "extracted_text" in dto ? dto.extracted_text : undefined,
       metadata: "metadata" in dto ? dto.metadata : undefined,
       createdAt: new Date(dto.created_at),

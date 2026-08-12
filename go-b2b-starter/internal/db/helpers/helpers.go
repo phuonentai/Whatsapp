@@ -28,6 +28,23 @@ func FromPgText(t pgtype.Text) string {
 	return t.String
 }
 
+// ToPgTextPtr converts a *string to pgtype.Text (nil → invalid)
+func ToPgTextPtr(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: *s, Valid: true}
+}
+
+// FromPgTextPtr converts pgtype.Text to *string (invalid → nil)
+func FromPgTextPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	v := t.String
+	return &v
+}
+
 // ToPgInt4 converts an int32 to pgtype.Int4
 func ToPgInt4(i int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: i, Valid: true}

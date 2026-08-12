@@ -38,6 +38,7 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 	ticketsGroup.PUT("/:id/prioridad", auth.RequirePermissionFunc("ticket", "manage"), r.handler.SetPriority)
 	ticketsGroup.PUT("/:id/etiquetas", auth.RequirePermissionFunc("ticket", "manage"), r.handler.SetTags)
 	ticketsGroup.POST("/:id/notas", auth.RequirePermissionFunc("ticket", "manage"), r.handler.AddInternalNote)
+	ticketsGroup.POST("/:id/ai-triage", auth.RequirePermissionFunc("ticket", "view"), r.handler.AiTriage)
 }
 
 func (r *Routes) Routes(router *gin.RouterGroup, resolver serverDomain.MiddlewareResolver) {

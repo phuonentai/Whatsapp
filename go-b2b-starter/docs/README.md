@@ -90,7 +90,7 @@ STYTCH_SECRET=your-secret
 
 # Billing
 POLAR_ACCESS_TOKEN=your-token
-POLAR_WEBHOOK_SECRET=your-secret
+WEBHOOK_SECRET=your-secret
 
 # File Storage
 R2_ACCOUNT_ID=your-account

@@ -5,11 +5,17 @@ import {
   AgentSettingsDto,
   AgentSuggestionDto,
   ComplianceExportDto,
+  ConversationContextDto,
+  RephraseRequestDto,
+  RephraseResponseDto,
 } from "../dto/agent.dto";
 import type {
   AgentSettings,
   AgentSuggestion,
   ComplianceExport,
+  ConversationContext,
+  RephraseMode,
+  RephraseResponse,
 } from "@/lib/models/agent.model";
 
 interface Wrapped<T> {
@@ -72,6 +78,24 @@ class AgentRepository {
     );
   }
 
+  async getConversationContext(conversationId: number): Promise<ConversationContext> {
+    const response = await apiClient.get<
+      ConversationContextDto | Wrapped<ConversationContextDto>
+    >(`/agent/conversations/${conversationId}/context`);
+    const dto =
+      (response as Wrapped<ConversationContextDto>).data ?? (response as ConversationContextDto);
+    return this.toContextModel(dto);
+  }
+
+  async rephrase(text: string, mode: RephraseMode): Promise<RephraseResponse> {
+    const body: RephraseRequestDto = { text, mode };
+    const response = await apiClient.post<Wrapped<RephraseResponseDto>>(
+      "/agent/rephrase",
+      body
+    );
+    return { text: response.data.text };
+  }
+
   private toSettingsModel(dto: AgentSettingsDto): AgentSettings {
     return {
       id: dto.id,
@@ -110,6 +134,23 @@ class AgentRepository {
 
   private toExportModel(dto: ComplianceExportDto): ComplianceExport {
     return dto as ComplianceExport;
+  }
+
+  private toContextModel(dto: ConversationContextDto): ConversationContext {
+    return {
+      conversationId: dto.conversation_id,
+      summary: dto.summary ?? undefined,
+      detectedIntent: dto.detected_intent ?? undefined,
+      keyFacts: dto.key_facts ?? [],
+      sourceCursor: dto.source_cursor,
+      generatedAt: dto.generated_at ?? undefined,
+      consentGated: dto.consent_gated,
+      status: dto.status,
+      channel: dto.channel ?? undefined,
+      messageCount: dto.message_count ?? undefined,
+      firstMessageAt: dto.first_message_at ?? undefined,
+      lastMessageAt: dto.last_message_at ?? undefined,
+    };
   }
 }
 

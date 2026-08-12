@@ -1,6 +1,7 @@
 package paywall
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -27,7 +28,7 @@ type MiddlewareConfig struct {
 func DefaultMiddlewareConfig() *MiddlewareConfig {
 	return &MiddlewareConfig{
 		ErrorHandler:  defaultErrorHandler,
-		UpgradeURL:    "/billing",
+		UpgradeURL:    "/dashboard/settings?view=subscription",
 		AllowTrialing: true,
 	}
 }
@@ -98,19 +99,30 @@ func (m *Middleware) RequireActiveSubscription() gin.HandlerFunc {
 		// Check subscription status from database (fast read)
 		status, err := m.provider.GetSubscriptionStatus(c.Request.Context(), orgID)
 		if err != nil {
-			// No subscription found
-			m.config.ErrorHandler(c, http.StatusPaymentRequired, &ErrorResponse{
-				Error:      "subscription_required",
-				Message:    "An active subscription is required to access this feature",
-				UpgradeURL: m.config.UpgradeURL,
-				Status:     StatusNone,
-			})
+			// Error classification (design D1): sentinel → 402 subscription_required;
+			// any other error (DB failure, provider unreachable) → 500 never a 402.
+			if errors.Is(err, ErrNoSubscription) {
+				m.config.ErrorHandler(c, http.StatusPaymentRequired, &ErrorResponse{
+					Error:      "subscription_required",
+					Message:    "An active subscription is required to access this feature",
+					UpgradeURL: m.config.UpgradeURL,
+					Status:     StatusNone,
+				})
+			} else {
+				m.config.ErrorHandler(c, http.StatusInternalServerError, &ErrorResponse{
+					Error:   "subscription_check_failed",
+					Message: "Unable to verify subscription status. Please try again.",
+				})
+			}
 			c.Abort()
 			return
 		}
 
 		// Lazy Guarding: If DB says inactive BUT subscription exists (not "none"),
-		// double-check with payment provider in case we missed a webhook
+		// double-check with payment provider in case we missed a webhook.
+		// Unknown statuses (StatusUnknown) are deliberately included: they
+		// represent a real subscription whose state we don't recognize locally,
+		// so a provider refresh may heal it before we deny with a 402.
 		if !status.IsActive && status.Status != StatusNone {
 			// Attempt to refresh subscription status from provider
 			freshStatus, refreshErr := m.provider.RefreshSubscriptionStatus(c.Request.Context(), orgID)

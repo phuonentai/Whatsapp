@@ -226,7 +226,19 @@ func (h *Handler) CreateMPCheckout(c *gin.Context) {
 		return
 	}
 
-	billingStatus, err := h.billingService.CreateMPCheckout(c.Request.Context(), req.PlanID)
+	// RequireOrganization populates the Gin context key; the request context
+	// never carries it, so reading ctx.Value here would always miss.
+	stytchOrgID := c.GetString("stytch_org_id")
+	if stytchOrgID == "" {
+		c.JSON(http.StatusUnauthorized, httperr.NewHTTPError(
+			http.StatusUnauthorized,
+			"missing_org_context",
+			"Organization context is required",
+		))
+		return
+	}
+
+	billingStatus, err := h.billingService.CreateMPCheckout(c.Request.Context(), stytchOrgID, req.PlanID)
 	if err != nil {
 		h.logger.Error("[CreateMPCheckout] Failed to create checkout", map[string]any{
 			"error": err.Error(),
@@ -348,7 +360,19 @@ func (h *Handler) CancelMPSubscription(c *gin.Context) {
 		return
 	}
 
-	billingStatus, err := h.billingService.CancelMPSubscription(c.Request.Context(), req.SubscriptionID)
+	// RequireOrganization populates the Gin context key; pass it explicitly
+	// into the service (the request context never carries it).
+	stytchOrgID := c.GetString("stytch_org_id")
+	if stytchOrgID == "" {
+		c.JSON(http.StatusUnauthorized, httperr.NewHTTPError(
+			http.StatusUnauthorized,
+			"missing_org_context",
+			"Organization context is required",
+		))
+		return
+	}
+
+	billingStatus, err := h.billingService.CancelMPSubscription(c.Request.Context(), stytchOrgID, req.SubscriptionID)
 	if err != nil {
 		h.logger.Error("[CancelMPSubscription] Failed to cancel subscription", map[string]any{
 			"subscription_id": req.SubscriptionID,

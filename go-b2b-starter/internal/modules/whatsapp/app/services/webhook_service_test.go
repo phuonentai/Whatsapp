@@ -13,6 +13,8 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	"github.com/moasq/go-b2b-starter/internal/platform/outbox"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeOutboxRepo struct {
@@ -61,6 +63,12 @@ func (f *fakeWebhookConfigRepo) GetByOrganizationID(_ context.Context, _ int32) 
 }
 func (f *fakeWebhookConfigRepo) GetByVerifyToken(context.Context, string) (*domain.WhatsAppConfig, error) {
 	return nil, errors.New("not found")
+}
+func (f *fakeWebhookConfigRepo) GetByWABAID(context.Context, string) (*domain.WhatsAppConfig, error) {
+	if f.cfg == nil || f.cfg.WABAID == "" {
+		return nil, errors.New("not found")
+	}
+	return f.cfg, nil
 }
 func (f *fakeWebhookConfigRepo) Create(context.Context, *domain.WhatsAppConfig) (*domain.WhatsAppConfig, error) {
 	return nil, errors.New("not implemented")
@@ -194,10 +202,11 @@ func newWebhookServiceForTest(cfg *domain.WhatsAppConfig) (*webhookService, *fak
 	outboxRepo := &fakeOutboxRepo{}
 	logs := &fakeLogRepo{store: make(map[int32]*domain.WebhookLog)}
 	return &webhookService{
-		configRepo: &fakeWebhookConfigRepo{cfg: cfg},
-		logRepo:    logs,
-		outboxRepo: outboxRepo,
-		logger:     noopLogger{},
+		configRepo:   &fakeWebhookConfigRepo{cfg: cfg},
+		logRepo:      logs,
+		templateRepo: &fakeWebhookTemplateRepo{},
+		outboxRepo:   outboxRepo,
+		logger:       noopLogger{},
 	}, outboxRepo, logs
 }
 
@@ -466,4 +475,138 @@ func parsePayload(t *testing.T, raw string) map[string]any {
 		t.Fatalf("invalid fixture: %v", err)
 	}
 	return m
+}
+
+// fakeWebhookTemplateRepo is an in-memory template repo for webhook tests.
+type fakeWebhookTemplateRepo struct {
+	domain.TemplateRepository
+	templates []*domain.Template
+}
+
+func (f *fakeWebhookTemplateRepo) GetByMetaTemplateID(_ context.Context, orgID int32, metaID string) (*domain.Template, error) {
+	for _, t := range f.templates {
+		if t.OrganizationID == orgID && t.MetaTemplateID != nil && *t.MetaTemplateID == metaID {
+			return t, nil
+		}
+	}
+	return nil, domain.ErrTemplateNotFound
+}
+
+func (f *fakeWebhookTemplateRepo) UpdateStatus(_ context.Context, orgID int32, id int64, status domain.TemplateStatus, metaID, reason *string) (*domain.Template, error) {
+	for _, t := range f.templates {
+		if t.ID == id && t.OrganizationID == orgID {
+			if t.Status == status {
+				return nil, nil // idempotent no-op
+			}
+			t.Status = status
+			t.RejectionReason = reason
+			if status == domain.TemplateStatusApproved {
+				t.IsActive = true
+			}
+			if status == domain.TemplateStatusRejected {
+				t.IsActive = false
+			}
+			return t, nil
+		}
+	}
+	return nil, domain.ErrTemplateNotFound
+}
+
+// templateStatusUpdatePayload builds a Meta message_template_status_update webhook body.
+func templateStatusUpdatePayload(wabaID, event, metaTemplateID, reason string) string {
+	if reason == "" {
+		reason = "None"
+	}
+	return `{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "` + wabaID + `",
+    "changes": [{
+      "field": "message_template_status_update",
+      "value": {
+        "event": "` + event + `",
+        "message_template_id": "` + metaTemplateID + `",
+        "message_template_name": "confirmacion_pedido",
+        "message_template_language": "es",
+        "reason": "` + reason + `"
+      }
+    }]
+  }]
+}`
+}
+
+func TestWebhook_TemplateStatusApproved(t *testing.T) {
+	cfg := &domain.WhatsAppConfig{OrganizationID: 7, PhoneNumberID: "phone-1", WABAID: "waba-1", WebhookSecret: "whsec_test"}
+	svc, _, logs := newWebhookServiceForTest(cfg)
+	metaID := "meta-1045559864261146"
+	svc.templateRepo = &fakeWebhookTemplateRepo{templates: []*domain.Template{{
+		ID: 1, OrganizationID: 7, Name: "confirmacion_pedido", Status: domain.TemplateStatusSubmitted,
+		MetaTemplateID: &metaID, IsActive: true,
+	}}}
+
+	body := templateStatusUpdatePayload("waba-1", "APPROVED", metaID, "")
+	err := svc.ProcessWebhook(context.Background(), []byte(body), parsePayload(t, body), hmacHeader(cfg.WebhookSecret, []byte(body)))
+	require.NoError(t, err)
+
+	tpl := svc.templateRepo.(*fakeWebhookTemplateRepo).templates[0]
+	assert.Equal(t, domain.TemplateStatusApproved, tpl.Status)
+	assert.True(t, tpl.IsActive)
+	// No message events are enqueued for template status updates.
+	assert.Equal(t, 0, len(logs.outboxEvents))
+}
+
+func TestWebhook_TemplateStatusRejectedWithReason(t *testing.T) {
+	cfg := &domain.WhatsAppConfig{OrganizationID: 7, PhoneNumberID: "phone-1", WABAID: "waba-1", WebhookSecret: "whsec_test"}
+	svc, _, _ := newWebhookServiceForTest(cfg)
+	metaID := "meta-1045559864261146"
+	svc.templateRepo = &fakeWebhookTemplateRepo{templates: []*domain.Template{{
+		ID: 1, OrganizationID: 7, Name: "confirmacion_pedido", Status: domain.TemplateStatusSubmitted,
+		MetaTemplateID: &metaID, IsActive: true,
+	}}}
+
+	body := templateStatusUpdatePayload("waba-1", "REJECTED", metaID, "Sample may contain policy violations")
+	err := svc.ProcessWebhook(context.Background(), []byte(body), parsePayload(t, body), hmacHeader(cfg.WebhookSecret, []byte(body)))
+	require.NoError(t, err)
+
+	tpl := svc.templateRepo.(*fakeWebhookTemplateRepo).templates[0]
+	assert.Equal(t, domain.TemplateStatusRejected, tpl.Status)
+	assert.False(t, tpl.IsActive)
+	require.NotNil(t, tpl.RejectionReason)
+	assert.Equal(t, "Sample may contain policy violations", *tpl.RejectionReason)
+}
+
+func TestWebhook_TemplateStatusUpdateIdempotentNoOp(t *testing.T) {
+	cfg := &domain.WhatsAppConfig{OrganizationID: 7, PhoneNumberID: "phone-1", WABAID: "waba-1", WebhookSecret: "whsec_test"}
+	svc, _, _ := newWebhookServiceForTest(cfg)
+	metaID := "meta-1"
+	svc.templateRepo = &fakeWebhookTemplateRepo{templates: []*domain.Template{{
+		ID: 1, OrganizationID: 7, Status: domain.TemplateStatusApproved, MetaTemplateID: &metaID, IsActive: true,
+	}}}
+
+	body := templateStatusUpdatePayload("waba-1", "APPROVED", metaID, "")
+	// Duplicate delivery: same status, must be a no-op, no error, no double audit.
+	for i := 0; i < 2; i++ {
+		err := svc.ProcessWebhook(context.Background(), []byte(body), parsePayload(t, body), hmacHeader(cfg.WebhookSecret, []byte(body)))
+		require.NoError(t, err)
+	}
+}
+
+func TestWebhook_TemplateStatusUpdateUnknownTemplateIgnored(t *testing.T) {
+	cfg := &domain.WhatsAppConfig{OrganizationID: 7, PhoneNumberID: "phone-1", WABAID: "waba-1", WebhookSecret: "whsec_test"}
+	svc, _, _ := newWebhookServiceForTest(cfg)
+	// No templates stored at all.
+
+	body := templateStatusUpdatePayload("waba-1", "APPROVED", "meta-unknown", "")
+	err := svc.ProcessWebhook(context.Background(), []byte(body), parsePayload(t, body), hmacHeader(cfg.WebhookSecret, []byte(body)))
+	require.NoError(t, err)
+}
+
+func TestWebhook_TemplateStatusUpdateBadSignature(t *testing.T) {
+	cfg := &domain.WhatsAppConfig{OrganizationID: 7, PhoneNumberID: "phone-1", WABAID: "waba-1", WebhookSecret: "whsec_test"}
+	svc, _, _ := newWebhookServiceForTest(cfg)
+
+	body := templateStatusUpdatePayload("waba-1", "APPROVED", "meta-1", "")
+	err := svc.ProcessWebhook(context.Background(), []byte(body), parsePayload(t, body), "sha256=deadbeef")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrInvalidSignature)
 }

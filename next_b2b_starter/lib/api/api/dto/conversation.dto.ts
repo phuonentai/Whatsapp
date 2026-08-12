@@ -12,6 +12,7 @@ export interface ConversationDto {
   contact_display_name: string;
   contact_instagram_username?: string;
   contact_avatar_url?: string;
+  assignee_stytch_member_id?: string | null;
 }
 
 export interface MessageDto {

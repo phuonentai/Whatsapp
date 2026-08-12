@@ -47,8 +47,10 @@ func (h *Handler) Routes(router *gin.RouterGroup, resolver serverDomain.Middlewa
 	}
 
 	// Webhook ingress (signature-only, no session required)
-	// Follows the per-provider pattern established by whatsapp (/api/v1/webhooks/whatsapp)
-	webhooks := router.Group("/api/v1/webhooks")
+	// Mounted as /v1/webhooks under the already-prefixed /api mount (the
+	// whatsapp pattern), so the effective paths are /api/v1/webhooks/polar and
+	// /api/v1/webhooks/mercadopago — not /api/api/v1/webhooks/*.
+	webhooks := router.Group("/v1/webhooks")
 	{
 		webhooks.POST("/polar", h.ProcessPolarWebhook)
 		webhooks.POST("/mercadopago", h.ProcessMPWebhook)

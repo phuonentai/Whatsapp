@@ -36,6 +36,14 @@ export const queryKeys = {
   },
 
   /**
+   * RBAC roles query keys (Stytch policy-backed /rbac/roles)
+   */
+  rbac: {
+    all: ["rbac"] as const,
+    roles: () => [...queryKeys.rbac.all, "roles"] as const,
+  },
+
+  /**
    * Members query keys
    */
   members: {
@@ -178,7 +186,7 @@ export const queryKeys = {
       [...queryKeys.crm.all, "companies", params] as const,
     company: (id: number) => [...queryKeys.crm.all, "company", id] as const,
     deals: (params?: { pipeline_id?: number; stage_id?: number; estado?: string; contact_id?: number }) =>
-      [...queryKeys.crm.all, "deals", params] as const,
+      params ? [...queryKeys.crm.all, "deals", params] : [...queryKeys.crm.all, "deals"],
     deal: (id: number) => [...queryKeys.crm.all, "deal", id] as const,
     pipelines: () => [...queryKeys.crm.all, "pipelines"] as const,
     activities: (params?: { tipo?: string; limit?: number; offset?: number }) =>
@@ -195,8 +203,9 @@ export const queryKeys = {
     campaigns: () => [...queryKeys.crm.all, "campaigns"] as const,
     campaignRecipients: (id: number) => [...queryKeys.crm.all, "campaigns", id, "recipients"] as const,
     entitlement: () => [...queryKeys.crm.all, "entitlement"] as const,
-    conversations: (params?: { status?: string; channel?: string; limit?: number; offset?: number }) =>
+    conversations: (params?: { status?: string; channel?: string; scope?: string; limit?: number; offset?: number }) =>
       [...queryKeys.crm.all, "conversations", params] as const,
+    memberDirectory: () => [...queryKeys.crm.all, "conversations", "directorio"] as const,
     messages: (conversationId: number) =>
       [...queryKeys.crm.all, "messages", conversationId] as const,
     tickets: (params?: { status?: string; assignee?: string }) =>
@@ -236,6 +245,17 @@ export const queryKeys = {
   },
 
   /**
+   * WhatsApp message template registry
+   */
+  whatsappTemplates: {
+    all: ["whatsappTemplates"] as const,
+    lists: () => [...queryKeys.whatsappTemplates.all, "list"] as const,
+    list: () => [...queryKeys.whatsappTemplates.lists()] as const,
+    detail: (id: number) =>
+      [...queryKeys.whatsappTemplates.all, "detail", id] as const,
+  },
+
+  /**
    * WhatsApp embedded signup query keys
    */
   whatsappSignup: {
@@ -265,6 +285,19 @@ export const queryKeys = {
       all: ["agent", "suggestions"] as const,
       pending: () => [...queryKeys.agent.suggestions.all, "pending"] as const,
     },
+    context: (conversationId: number) => [...queryKeys.agent.all, "context", conversationId] as const,
+  },
+  procurement: {
+    all: ["procurement"] as const,
+    suppliers: () => [...queryKeys.procurement.all, "suppliers"] as const,
+    products: () => [...queryKeys.procurement.all, "products"] as const,
+    runs: () => [...queryKeys.procurement.all, "runs"] as const,
+    board: (runId: number) => [...queryKeys.procurement.all, "board", runId] as const,
+    orders: (runId: number) => [...queryKeys.procurement.all, "orders", runId] as const,
+    schedules: () => [...queryKeys.procurement.all, "schedules"] as const,
+    scheduleDetail: (scheduleId: number) =>
+      [...queryKeys.procurement.all, "schedules", scheduleId] as const,
+    followUpSettings: () => [...queryKeys.procurement.all, "followup-settings"] as const,
   },
 } as const;
 

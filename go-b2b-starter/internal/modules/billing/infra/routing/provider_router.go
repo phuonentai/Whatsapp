@@ -43,6 +43,11 @@ func (r *ProviderRouter) resolveProvider(ctx context.Context, orgID int32) (doma
 	case "", "polar":
 		return r.polarAdapter, nil
 	case "mercadopago":
+		// When MercadoPago is unconfigured (optional DI binding, nil adapter)
+		// the router degrades to Polar-only routing.
+		if r.mpAdapter == nil {
+			return r.polarAdapter, nil
+		}
 		return r.mpAdapter, nil
 	default:
 		return nil, fmt.Errorf("unsupported billing provider: %s", provider)

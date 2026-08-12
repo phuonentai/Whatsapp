@@ -18,12 +18,13 @@ func NewCampaignRepository(store sqlc.Store) domain.CampaignRepository {
 	return &campaignRepository{store: store}
 }
 
-func (r *campaignRepository) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, createdBy string) (*domain.Campaign, error) {
+func (r *campaignRepository) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, mensaje string, createdBy string) (*domain.Campaign, error) {
 	result, err := r.store.CreateCampaign(ctx, sqlc.CreateCampaignParams{
 		OrganizationID: orgID,
 		Nombre:         nombre,
 		SegmentID:      segmentID,
 		CreatedBy:      pgText(createdBy),
+		Mensaje:        pgText(mensaje),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create campaign: %w", err)
@@ -125,6 +126,9 @@ func mapCampaign(c *sqlc.CrmCampaign) *domain.Campaign {
 	}
 	if c.LaunchedAt.Valid {
 		campaign.LaunchedAt = &c.LaunchedAt.Time
+	}
+	if c.Mensaje.Valid {
+		campaign.Mensaje = &c.Mensaje.String
 	}
 	return campaign
 }

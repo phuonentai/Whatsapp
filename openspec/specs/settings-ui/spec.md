@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the settings UI: member invitation with roles, module toggling, and playbook guion management.
-
 ## Requirements
-
 ### Requirement: Admin invites a member with a role
 The system SHALL render an invite-member form in the settings dashboard, SHALL accept a member email and role selection, and SHALL submit the invite through the member API for workspace admins.
 
@@ -211,3 +209,39 @@ The system SHALL render a pause/resume toggle in the Siigo section when the orga
 - **WHEN** a member toggles resume while the connection is `paused`
 - **THEN** the system SHALL call the resume endpoint
 - **AND** SHALL show the live banner
+
+### Requirement: Settings views are reachable from the command palette
+
+Every settings detail view (`?view=...`) SHALL be registered as a command-palette destination with a display name and target URL.
+
+#### Scenario: Palette lists settings views
+
+- **WHEN** the command palette opens and the user types "settings"
+- **THEN** the palette SHALL list settings destinations including Account, Team, Subscription, Modules, AI Copilot, Compliance, Messaging, and Audit log
+
+#### Scenario: Palette entry opens a settings view
+
+- **WHEN** user selects a settings destination in the palette and presses Enter
+- **THEN** the app SHALL navigate to `/dashboard/settings?view=<selected>`
+
+
+### Requirement: Navegación de settings incorpora la vista de derechos
+
+La navegación de settings (`settings-content.tsx`) SHALL incorporar la vista `?view=access` ("Equipo y permisos") con gate `org:manage`, registrándola en el allowlist de gates existente (mismo mecanismo que `?view=members`/`?view=subscription`), y SHALL enlazarla desde el overview. Las vistas `?view=members` y `?view=modules` SHALL permanecer disponibles (la consolidación no elimina rutas existentes ni duplica su estado).
+
+#### Scenario: Vista access en el overview
+
+- **WHEN** un admin abre el overview de settings
+- **THEN** SHALL ver la sección "Equipo y permisos" con su resumen (nº de miembros, rol propio)
+- **AND** el clic SHALL navegar a `?view=access`
+
+#### Scenario: Gates de acceso por vista
+
+- **WHEN** un usuario sin `org:manage` intenta abrir `?view=access`
+- **THEN** SHALL recibir la vista 403 (sin datos) o el gate existente del stack
+
+#### Scenario: Registro en el allowlist de gates
+
+- **WHEN** el parámetro `?view=access` llega con permisos listos
+- **THEN** la vista SHALL resolverse únicamente si `org:manage` está en el allowlist del stack de settings
+- **AND** una vista no registrada SHALL caer al overview sin renderizar datos

@@ -14,6 +14,14 @@ function getGoBackendUrl(): string {
   return process.env.NEXT_PUBLIC_GO_BACKEND_URL ?? process.env.GO_BACKEND_URL ?? "http://localhost:8080";
 }
 
+function getAppBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_BASE_URL ??
+    process.env.APP_BASE_URL ??
+    "http://localhost:3000"
+  );
+}
+
 interface CreateMPCheckoutParams {
   planId?: string;
 }
@@ -48,7 +56,17 @@ export async function createMercadoPagoCheckout(
   }
 
   try {
-    const planId = params?.planId ?? process.env.NEXT_PUBLIC_MERCADOPAGO_CHECKOUT_PLAN_ID ?? "default";
+    // MP plans are mapped by env plan ids: the configured public checkout plan
+    // id wins, then the plan id passed from the plans modal, then "default".
+    const planId =
+      process.env.NEXT_PUBLIC_MERCADOPAGO_CHECKOUT_PLAN_ID ??
+      params?.planId ??
+      "default";
+
+    // Explicit app-origin return URL (subscription view) so the backend
+    // back_url is never the localhost default in production. The backend
+    // falls back to its MERCADOPAGO_BACK_URL config when not supplied.
+    const returnUrl = `${getAppBaseUrl()}/dashboard/settings?view=subscription`;
 
     const response = await fetch(`${getGoBackendUrl()}/api/subscriptions/create-mp-checkout`, {
       method: "POST",
@@ -56,7 +74,7 @@ export async function createMercadoPagoCheckout(
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.session_jwt}`,
       },
-      body: JSON.stringify({ plan_id: planId }),
+      body: JSON.stringify({ plan_id: planId, back_url: returnUrl }),
     });
 
     if (!response.ok) {

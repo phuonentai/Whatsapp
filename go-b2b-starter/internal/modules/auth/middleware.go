@@ -164,8 +164,10 @@ func (m *Middleware) RequireAuth() gin.HandlerFunc {
 					var perms []Permission
 					if role == RoleAdmin {
 						// Admins keep the wildcard grant (equivalent to every
-						// known permission after frontend expansion).
-						perms = []Permission{NewPermission("*", "*")}
+						// known permission after frontend expansion), plus the
+						// explicit row-scoping grant so the conversation scope
+						// resolver (exact-match) sees admin as view-all.
+						perms = []Permission{NewPermission("*", "*"), PermInboxViewAll}
 					} else {
 						// Non-admin identities get explicit permissions scoped
 						// to their role so org:manage-gated surfaces (invite,
@@ -274,6 +276,8 @@ func mockPermissionsForRole(role Role) []Permission {
 		NewPermission("payment", "export"),
 		NewPermission("payment", "execute"),
 		NewPermission("audit", "view"),
+		PermInboxView,
+		PermInboxReply,
 	}
 	if role != RoleAdmin {
 		filtered := perms[:0]
@@ -281,6 +285,12 @@ func mockPermissionsForRole(role Role) []Permission {
 			if p != PermOrgManage {
 				filtered = append(filtered, p)
 			}
+		}
+		// Conversation row-scoping parity (conversation-row-scoping): manager
+		// ve todo y reasigna; member no tiene permisos de scope por defecto
+		// (decisión de producto para view_unassigned en roles de ventas).
+		if role == RoleManager {
+			filtered = append(filtered, PermInboxViewAll, PermInboxReassign)
 		}
 		return filtered
 	}

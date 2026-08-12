@@ -28,11 +28,11 @@ type mockRAGService struct {
 	streamErr    error
 }
 
-func (m *mockRAGService) Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest) (*domain.ChatResponse, error) {
+func (m *mockRAGService) Chat(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, includeAdminOnly bool) (*domain.ChatResponse, error) {
 	return m.chatResponse, m.chatErr
 }
 
-func (m *mockRAGService) ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error) (*domain.ChatResponse, error) {
+func (m *mockRAGService) ChatStream(ctx context.Context, orgID, accountID int32, req *domain.ChatRequest, emit func(domain.StreamEvent) error, includeAdminOnly bool) (*domain.ChatResponse, error) {
 	for _, ev := range m.streamEvents {
 		if err := emit(ev); err != nil {
 			return nil, err

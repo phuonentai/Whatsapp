@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,44 +33,52 @@ func (v *Verifier) VerifyMercadoPago(payload []byte, signature, secret string) e
 // ensure interface compliance
 var _ domain.WebhookVerifier = (*Verifier)(nil)
 
+// signatureMaxAge is the freshness window accepted for the x-signature
+// timestamp, guarding against replay of old signed payloads.
+const signatureMaxAge = 5 * time.Minute
+
 // VerifyWebhookSignature verifies a MercadoPago IPN webhook signature.
-// It supports both the current MercadoPago format
-// ("ts=<timestamp>,v1=<hex hmac>" over "id:<id>;request-id:<request_id>;ts:<ts>;<body>")
-// and a plain raw-hex HMAC-SHA256 of the body (legacy/test clients).
+// The header MUST be in the MercadoPago format
+// ("ts=<unix>,v1=<hex hmac>" over "id:<id>;request-id:<request_id>;ts:<ts>;<body>"),
+// the timestamp MUST fall inside the freshness window, and the HMAC is
+// compared in constant time. Headers not in that format are rejected; there
+// is no raw-header fallback.
 func VerifyWebhookSignature(payload []byte, signatureHeader string, secret string) error {
 	if secret == "" {
 		return fmt.Errorf("webhook secret is not configured")
 	}
 
 	params := parseSignatureParams(signatureHeader)
-	if ts, ok := params["ts"]; ok {
-		if v1, ok := params["v1"]; ok {
-			expected, err := hex.DecodeString(v1)
-			if err != nil {
-				return fmt.Errorf("invalid signature v1 format: %w", err)
-			}
-			signingInput := signatureSigningInput(payload, ts)
-			if hmacMatches(expected, []byte(secret), []byte(signingInput)) {
-				return nil
-			}
-			return fmt.Errorf("webhook signature mismatch")
-		}
+	tsStr, ok := params["ts"]
+	if !ok {
+		return fmt.Errorf("invalid signature header: missing ts parameter")
+	}
+	v1, ok := params["v1"]
+	if !ok {
+		return fmt.Errorf("invalid signature header: missing v1 parameter")
 	}
 
-	expectedMAC, err := hex.DecodeString(signatureHeader)
+	ts, err := strconv.ParseInt(tsStr, 10, 64)
 	if err != nil {
-		return fmt.Errorf("invalid signature header format: %w", err)
+		return fmt.Errorf("invalid signature timestamp: %w", err)
+	}
+	age := time.Since(time.Unix(ts, 0))
+	if age < 0 {
+		age = -age
+	}
+	if age > signatureMaxAge {
+		return fmt.Errorf("webhook signature timestamp %d is outside the freshness window", ts)
 	}
 
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payload)
-	expected := mac.Sum(nil)
-
-	if !hmac.Equal(expectedMAC, expected) {
-		return fmt.Errorf("webhook signature mismatch")
+	expected, err := hex.DecodeString(v1)
+	if err != nil {
+		return fmt.Errorf("invalid signature v1 format: %w", err)
 	}
-
-	return nil
+	signingInput := signatureSigningInput(payload, tsStr)
+	if hmacMatches(expected, []byte(secret), []byte(signingInput)) {
+		return nil
+	}
+	return fmt.Errorf("webhook signature mismatch")
 }
 
 func parseSignatureParams(header string) map[string]string {
@@ -113,15 +122,16 @@ type MPWebhookPayload struct {
 }
 
 type MPSubscriptionEventData struct {
-	ID              string `json:"id"`
-	ExternalRef     string `json:"external_reference"`
-	Status          string `json:"status"`
-	Reason          string `json:"reason"`
-	PayerEmail      string `json:"payer_email"`
-	PaymentMethodID string `json:"payment_method_id"`
-	NextPaymentDate string `json:"next_payment_date"`
-	DateCreated     string `json:"date_created"`
-	LastModified    string `json:"last_modified"`
+	ID              string         `json:"id"`
+	ExternalRef     string         `json:"external_reference"`
+	Status          string         `json:"status"`
+	Reason          string         `json:"reason"`
+	PayerEmail      string         `json:"payer_email"`
+	PaymentMethodID string         `json:"payment_method_id"`
+	NextPaymentDate string         `json:"next_payment_date"`
+	DateCreated     string         `json:"date_created"`
+	LastModified    string         `json:"last_modified"`
+	Metadata        map[string]any `json:"metadata"`
 	AutoRecurring   *struct {
 		Frequency      int    `json:"frequency"`
 		FrequencyType  string `json:"frequency_type"`
@@ -133,14 +143,14 @@ type MPSubscriptionEventData struct {
 }
 
 type MPPaymentEventData struct {
-	ID          int64  `json:"id"`
-	ExternalRef string `json:"external_reference"`
-	Status      string `json:"status"`
-	StatusDetail string `json:"status_detail"`
-	PayerEmail  string `json:"payer"`
-	Amount      float64 `json:"transaction_amount"`
-	Description string `json:"description"`
-	DateCreated string `json:"date_created"`
+	ID           json.RawMessage `json:"id"`
+	ExternalRef  string          `json:"external_reference"`
+	Status       string          `json:"status"`
+	StatusDetail string          `json:"status_detail"`
+	PayerEmail   string          `json:"payer"`
+	Amount       float64         `json:"transaction_amount"`
+	Description  string          `json:"description"`
+	DateCreated  string          `json:"date_created"`
 }
 
 func ParseWebhookPayload(payload json.RawMessage) (*MPWebhookPayload, error) {
@@ -187,6 +197,18 @@ func ParseSubscriptionEventData(raw json.RawMessage) (*domain.SubscriptionEventD
 		}
 	}
 
+	// Carry the quota attached at checkout time (metadata.invoice_count_max)
+	// into product metadata so the shared handleSubscriptionUpsert seeds a
+	// nonzero local quota. Tolerates numeric and string metadata values.
+	if raw, ok := event.Metadata["invoice_count_max"]; ok {
+		if count, ok := parseInvoiceCountMax(raw); ok {
+			if data.ProductMetadata == nil {
+				data.ProductMetadata = make(map[string]string)
+			}
+			data.ProductMetadata["invoice_count"] = strconv.FormatInt(int64(count), 10)
+		}
+	}
+
 	return data, nil
 }
 
@@ -209,12 +231,27 @@ func ParsePaymentEventData(raw json.RawMessage) (*domain.CheckoutSessionResponse
 	createdAt, _ := time.Parse(time.RFC3339, event.DateCreated)
 
 	return &domain.CheckoutSessionResponse{
-		ID:         fmt.Sprintf("%d", event.ID),
+		ID:         parsePaymentID(event.ID),
 		Status:     checkoutStatus,
 		CustomerID: event.ExternalRef,
 		Amount:     int64(event.Amount),
 		CreatedAt:  createdAt,
 	}, nil
+}
+
+// parsePaymentID extracts the payment id from the IPN data.id field, which
+// MercadoPago may deliver as a JSON number or as a string. Falls back to a
+// string parse when the numeric unmarshal yields 0.
+func parsePaymentID(raw json.RawMessage) string {
+	var numeric int64
+	if err := json.Unmarshal(raw, &numeric); err == nil && numeric != 0 {
+		return strconv.FormatInt(numeric, 10)
+	}
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return str
+	}
+	return ""
 }
 
 func MapMPStatus(status string) string {

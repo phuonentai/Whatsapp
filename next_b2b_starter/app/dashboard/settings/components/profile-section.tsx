@@ -64,36 +64,36 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <header className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Account owner
           </p>
-          <h3 className="text-2xl font-semibold text-gray-900">{displayName}</h3>
-          <p className="text-sm text-gray-600">
+          <h3 className="text-2xl font-semibold text-slate-900">{displayName}</h3>
+          <p className="text-sm text-slate-600">
             These details identify you across automations and approvals.
           </p>
         </header>
 
         <dl className="mt-8 space-y-5 text-sm">
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Email
             </dt>
-            <dd className="text-base font-medium text-gray-900">{profile.email}</dd>
+            <dd className="text-base font-medium text-slate-900">{profile.email}</dd>
           </div>
 
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Display name
             </dt>
-            <dd className="text-base font-medium text-gray-900">
+            <dd className="text-base font-medium text-slate-900">
               {displayName}
             </dd>
           </div>
 
           <div className="flex flex-col gap-2">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Access level
             </dt>
             <dd>
@@ -102,19 +102,19 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
               >
                 {roleConfig.label}
               </span>
-              <p className="mt-2 text-xs text-gray-500">{roleConfig.description}</p>
+              <p className="mt-2 text-xs text-slate-500">{roleConfig.description}</p>
             </dd>
           </div>
         </dl>
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <header className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Workspace
           </p>
           <div className="flex items-center justify-between gap-4">
-            <h3 className="text-xl font-semibold text-gray-900">
+            <h3 className="text-xl font-semibold text-slate-900">
               {profile.organizationName || "No workspace connected"}
             </h3>
             {canManage && profile.organizationName && !isEditing && (
@@ -130,7 +130,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
               </Button>
             )}
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             Configure branding, invite collaborators, and manage approvals within this workspace.
           </p>
         </header>
@@ -155,7 +155,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
                 size="sm"
                 onClick={handleSaveWorkspace}
                 disabled={isSaving}
-                className="bg-gray-900 text-white hover:bg-gray-800"
+                className="bg-emerald-500 text-white hover:bg-emerald-600"
               >
                 {isSaving ? "Guardando…" : "Guardar"}
               </Button>
@@ -176,18 +176,18 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         )}
 
         <div className="mt-8 space-y-4 text-sm">
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Workspace ID
             </p>
-            <p className="mt-1 font-medium text-gray-900">
+            <p className="mt-1 font-medium text-slate-900">
               {profile.organizationId || "Not assigned"}
             </p>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-slate-500">
               You&apos;ll need this ID when connecting {PRODUCT_NAME} to external approval tools.
             </p>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             Need to switch workspaces or update billing ownership? Reach out to support so we can
             take care of it for you.
           </p>

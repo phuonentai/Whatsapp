@@ -120,7 +120,7 @@ export function ReportesPage() {
               key={p}
               onClick={() => setPeriod(p)}
               className={`px-4 py-2 rounded-md text-sm font-medium ${
-                period === p ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
+                period === p ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-700"
               }`}
             >
               {p === "week" ? "Semana" : "Mes"}
@@ -218,7 +218,7 @@ export function ReportesPage() {
                     <XAxis dataKey="name" />
                     <YAxis tickFormatter={(v: number) => `${Math.round(v / 1000000)}M`} />
                     <Tooltip formatter={(v) => formatCOP(Number(v))} />
-                    <Bar dataKey="monto" fill="#2563eb" name="Facturado (COP)" />
+                    <Bar dataKey="monto" fill="#10b981" name="Facturado (COP)" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

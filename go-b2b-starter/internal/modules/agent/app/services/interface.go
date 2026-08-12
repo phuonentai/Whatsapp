@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	crmdomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	igEvents "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain/events"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 )
@@ -26,6 +27,12 @@ type AgentService interface {
 	// RejectSuggestion marks a pending suggestion rejected (no send).
 	RejectSuggestion(ctx context.Context, orgID, suggestionID int32) (*domain.Suggestion, error)
 
+	// GovernManualSend evaluates the send_message guardrails for a manual inbox
+	// send (member with inbox:reply or admin) and delivers it when allowed;
+	// denials are audited. Implements the CRM module's ManualSendGovernance
+	// seam.
+	GovernManualSend(ctx context.Context, orgID, convID int32, content, actorID string) (deniedReasons []string, msg *crmdomain.Message, err error)
+
 	// ListPendingSuggestions returns the org's pending queue.
 	ListPendingSuggestions(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.Suggestion, error)
 
@@ -41,6 +48,12 @@ type AgentService interface {
 
 	// UpdateSettings validates and persists the org's agent settings.
 	UpdateSettings(ctx context.Context, orgID int32, s *domain.AgentSettings) (*domain.AgentSettings, error)
+
+	// RephraseText transforms a user-authored draft through the metered,
+	// credit-gated LLM pipeline. mode must be one of the rephrase modes
+	// (rephrase, formal, casual, summarize). Returns the trimmed rewritten
+	// text; never sends or persists anything.
+	RephraseText(ctx context.Context, orgID int32, text, mode string) (string, error)
 }
 
 // FlowDebug is the debug projection of a conversation flow.

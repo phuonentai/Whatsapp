@@ -16,7 +16,7 @@ We've implemented a custom solution to address two critical security requirement
 Instead of using Stytch's UI component directly (which always sends emails), we've created a custom flow:
 
 1. **Frontend**: Custom email form in `app/auth/page.tsx`
-2. **Backend API**: `/api/auth/magic-link` validates membership before sending
+2. **Backend server action**: `sendMagicLink` validates membership before sending
 3. **Stytch API**: Only called if user is an existing member
 
 ### Security Features
@@ -106,11 +106,11 @@ Ensure your Stytch API credentials have permission to:
 2. **Expected**: Authentication fails with error
 3. **Verify**: No session is created, user cannot access dashboard
 
-## API Endpoint Documentation
+## Server Action Documentation
 
-### POST `/api/auth/magic-link`
+### `sendMagicLink` server action
 
-Validates email and sends magic link to existing members only.
+Validates email and sends magic link to existing members only. Called from the custom email form in `app/auth/page.tsx`.
 
 **Request:**
 ```json
@@ -185,7 +185,7 @@ await client.organizations.members.create({
 ### Issue: Unknown users still getting emails
 
 **Check:**
-1. Using `/api/auth/magic-link` endpoint (not direct Stytch SDK call)
+1. Using the `sendMagicLink` server action (not direct Stytch SDK call)
 2. Backend search is working correctly
 3. No caching issues in API route
 
@@ -208,7 +208,11 @@ STYTCH_SECRET=secret-test-...
 NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN=public-token-test-...
 
 # Session configuration
-NEXT_PUBLIC_STYTCH_SESSION_DURATION_MINUTES=43200  # 30 days
+# Default 480 minutes (8 hours). Override per environment as needed (Stytch
+# bounds: 5 min – 366 days). Sessions slide: the client re-authenticates with
+# this duration every 10 minutes while the app is open, so active users do not
+# hit a hard logout at the fixed lifetime.
+NEXT_PUBLIC_STYTCH_SESSION_DURATION_MINUTES=480  # 8 hours (default; env-overridable)
 
 # App URLs
 NEXT_PUBLIC_APP_BASE_URL=http://localhost:3000
@@ -219,7 +223,7 @@ NEXT_PUBLIC_STYTCH_REDIRECT_PATH=/authenticate
 
 1. **Enable MFA**: Require multi-factor authentication for sensitive organizations
 2. **Monitor failed attempts**: Track authentication failures in your logs
-3. **Rate limiting**: Add rate limiting to `/api/auth/magic-link` endpoint
+3. **Rate limiting**: Add rate limiting to the `sendMagicLink` server action
 4. **Email verification**: Ensure all members have verified emails
 5. **Session duration**: Keep session duration appropriate for your security requirements
 
@@ -239,5 +243,5 @@ For Stytch-specific configuration questions:
 - [Stytch Support](https://stytch.com/contact)
 
 For implementation questions related to this codebase:
-- Review `app/api/auth/magic-link/route.ts` for backend logic
+- Review the `sendMagicLink` server action (`lib/actions/auth/send-magic-link.ts`) for backend logic
 - Review `app/auth/page.tsx` for frontend implementation

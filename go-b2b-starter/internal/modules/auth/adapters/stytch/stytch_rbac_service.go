@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
+	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/rbac"
 )
 
@@ -32,9 +33,19 @@ func (s *StytchRBACService) getPolicy() (*rbac.Policy, error) {
 }
 
 // GetAllRoles returns all roles from the Stytch RBAC policy.
+//
+// When the policy is unavailable (breaker open / Stytch API failure and empty
+// cache) the failure is logged and an empty list is returned — callers MUST
+// distinguish this from "no permissions" (the UI renders a policy-unavailable
+// state, never a false empty matrix).
 func (s *StytchRBACService) GetAllRoles() []auth.RoleInfo {
 	policy, err := s.getPolicy()
-	if err != nil || policy == nil {
+	if err != nil {
+		s.logPolicyFailure("GetAllRoles: RBAC policy unavailable, returning empty role list", err)
+		return nil
+	}
+	if policy == nil {
+		s.policyService.logger.Warn("GetAllRoles: RBAC policy is nil, returning empty role list", logger.Fields{})
 		return nil
 	}
 
@@ -42,8 +53,9 @@ func (s *StytchRBACService) GetAllRoles() []auth.RoleInfo {
 	for _, role := range policy.Roles {
 		permissions := s.policyService.convertPermissions(role.Permissions, policy)
 		roles = append(roles, auth.RoleInfo{
-			ID:   normalizeRoleID(role.RoleID),
-			Name: roleName(role.RoleID),
+			ID:          normalizeRoleID(role.RoleID),
+			Name:        roleName(role.RoleID),
+			Description: role.Description,
 			Permissions: permissions,
 		})
 	}
@@ -63,8 +75,9 @@ func (s *StytchRBACService) GetRoleInfo(roleID string) *auth.RoleInfo {
 		if strings.EqualFold(normalizeRoleID(role.RoleID), normalized) {
 			permissions := s.policyService.convertPermissions(role.Permissions, policy)
 			return &auth.RoleInfo{
-				ID:   normalized,
-				Name: roleName(role.RoleID),
+				ID:          normalized,
+				Name:        roleName(role.RoleID),
+				Description: role.Description,
 				Permissions: permissions,
 			}
 		}
@@ -200,6 +213,15 @@ func (s *StytchRBACService) GetRBACMetadata() auth.RBACMetadata {
 		PermissionsByRole: permsByRole,
 		Description:       fmt.Sprintf("RBAC policy with %d roles defined in Stytch", len(policy.Roles)),
 	}
+}
+
+// logPolicyFailure logs a policy fetch failure (breaker-open or API error)
+// so operators can distinguish "policy unavailable" from a legitimate empty
+// policy. The caller still returns an empty result per the contract.
+func (s *StytchRBACService) logPolicyFailure(msg string, err error) {
+	s.policyService.logger.Error(msg, logger.Fields{
+		"error": err.Error(),
+	})
 }
 
 // roleName generates a display name from a role ID.

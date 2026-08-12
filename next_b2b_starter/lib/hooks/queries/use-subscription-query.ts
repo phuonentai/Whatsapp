@@ -39,8 +39,9 @@ export function useSubscriptionQuery(
     // Retry once on failure
     retry: 1,
 
-    // Don't refetch on window focus
-    refetchOnWindowFocus: false,
+    // Refetch on window focus so a payment made in another tab (or a
+    // webhook/verify-driven change) shows up without a manual refresh.
+    refetchOnWindowFocus: true,
 
     ...options,
   });

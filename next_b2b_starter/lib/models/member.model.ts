@@ -34,6 +34,16 @@ export interface UserProfile {
   organizationId: string;
   organizationName: string;
   organizationStatus?: string;
+  /**
+   * Display-only mirror of the Stytch org MFA policy (`OPTIONAL` |
+   * `REQUIRED_FOR_ALL`). MUST NOT be used for authorization decisions —
+   * Stytch enforces MFA at session mint.
+   */
+  organizationMfaPolicy?: string;
+  /** Display-only mirror of `mfa_methods` (`ALL_ALLOWED` | `RESTRICTED`). */
+  organizationMfaMethods?: string;
+  /** Display-only mirror of `allowed_mfa_methods` (e.g. `["totp"]`). */
+  organizationAllowedMfaMethods?: string[];
 }
 
 /**

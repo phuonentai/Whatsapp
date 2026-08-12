@@ -100,9 +100,35 @@ func (s *crmService) persistWhatsAppMessage(ctx context.Context, orgID int32, fr
 	}
 
 	conv := s.conversation(ctx, orgID, createdContact.ID, domain.ChannelWhatsapp, &ts)
+	// Auto-match determinístico org-scoped (conversation-row-scoping, task 4.3):
+	// 1) assigned_to del contacto → 2) fallback owner de la empresa del contacto
+	// → 3) fallback empresa del mismo org por teléfono → NULL (cola). El match
+	// NUNCA cruza tenants: todas las consultas se acotan al org resuelto del
+	// phone_number_id. Para conversaciones existentes, EnsureActive es
+	// idempotente y conserva el assignee (no-sobreescritura en inbounds
+	// posteriores, task 4.3).
+	if assignee := s.resolveInboundAssignee(ctx, orgID, createdContact.ID, phone); assignee != nil {
+		conv.AssigneeStytchMemberID = assignee
+	}
 	if err := s.persist(ctx, orgID, conv, createdContact.ID, domain.ChannelWhatsapp, ts, messageType, content, messageSID, direction, messageData, phone, domain.ActivityTypeWhatsAppMessage); err != nil {
 		return err
 	}
+	return nil
+}
+
+// resolveInboundAssignee resuelve el assignee de un inbound net-nuevo dentro
+// del org (nunca cross-tenant). Devuelve nil → cola de no-asignados.
+func (s *crmService) resolveInboundAssignee(ctx context.Context, orgID int32, contactID int32, phone string) *string {
+	// 1) assigned_to del contacto (con fallback owner de empresa vía
+	// COALESCE en ResolveContactAssignee).
+	if id, err := s.conversationRepo.ResolveContactAssignee(ctx, orgID, contactID); err == nil && id != nil && *id != "" {
+		return id
+	}
+	// 2) Empresa del mismo org por teléfono → owner_account_id.
+	if id, err := s.conversationRepo.ResolveCompanyOwnerMemberByPhone(ctx, orgID, phone); err == nil && id != nil && *id != "" {
+		return id
+	}
+	// Sin match → cola (assignee NULL, visible solo para inbox:view_unassigned).
 	return nil
 }
 

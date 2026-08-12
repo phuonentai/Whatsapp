@@ -1,0 +1,6 @@
+{
+  "requires_council": true,
+  "requires_playwright": false,
+  "requires_iso": false,
+  "complexity": "medium"
+}

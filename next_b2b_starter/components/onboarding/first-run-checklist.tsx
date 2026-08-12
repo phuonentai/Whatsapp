@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Check, MessageCircle, Sparkles, CreditCard, Inbox } from "lucide-react";
+import { Check, MessageCircle, Sparkles, CreditCard, Inbox, FileText } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -15,10 +15,11 @@ import { useConversationsQuery } from "@/lib/hooks/queries/use-conversations-que
 import {
   isAssistantIntroDismissed,
   isInboxVisited,
+  isKnowledgeVisited,
   loadBusinessContext,
 } from "@/lib/onboarding/storage";
 
-type StepKey = "connectWhatsApp" | "choosePlan" | "meetAssistant" | "openInbox";
+type StepKey = "connectWhatsApp" | "choosePlan" | "meetAssistant" | "openInbox" | "addDocument";
 
 interface ChecklistStep {
   key: StepKey;
@@ -43,23 +44,42 @@ export function FirstRunChecklist() {
     const assistantIntroduced = isAssistantIntroDismissed();
     const inboxExplored = isInboxVisited() || (conversations?.length ?? 0) > 0;
 
-    const base: ChecklistStep[] = [
-      {
-        key: "connectWhatsApp",
-        title: ui.onboarding.stepConnectWhatsApp,
-        description: ui.onboarding.stepConnectWhatsAppDesc,
-        done: whatsappConnected,
-        icon: MessageCircle,
-        href: "/dashboard/settings?view=whatsapp",
-      },
-      {
+    const base: ChecklistStep[] = [];
+
+    // When subscription is inactive, surface the plan choice before the
+    // paywalled WhatsApp step so new orgs are not stranded on a raw 402.
+    if (!planActive) {
+      base.push({
         key: "choosePlan",
         title: ui.onboarding.stepChoosePlan,
         description: ui.onboarding.stepChoosePlanDesc,
-        done: planActive,
+        done: false,
         icon: CreditCard,
         action: () => setPlansModalOpen(true),
-      },
+      });
+    }
+
+    base.push({
+      key: "connectWhatsApp",
+      title: ui.onboarding.stepConnectWhatsApp,
+      description: ui.onboarding.stepConnectWhatsAppDesc,
+      done: whatsappConnected,
+      icon: MessageCircle,
+      href: "/dashboard/settings?view=whatsapp",
+    });
+
+    if (planActive) {
+      base.push({
+        key: "choosePlan",
+        title: ui.onboarding.stepChoosePlan,
+        description: ui.onboarding.stepChoosePlanDesc,
+        done: true,
+        icon: CreditCard,
+        action: () => setPlansModalOpen(true),
+      });
+    }
+
+    base.push(
       {
         key: "meetAssistant",
         title: ui.onboarding.stepMeetAssistant,
@@ -76,7 +96,15 @@ export function FirstRunChecklist() {
         icon: Inbox,
         href: "/dashboard/inbox",
       },
-    ];
+      {
+        key: "addDocument",
+        title: ui.onboarding.stepAddDocument,
+        description: ui.onboarding.stepAddDocumentDesc,
+        done: isKnowledgeVisited(),
+        icon: FileText,
+        href: "/dashboard/knowledge",
+      },
+    );
 
     // Client-side business context shapes priority: when the user said they do
     // not have WhatsApp yet, surface the inbox as the first actionable step.

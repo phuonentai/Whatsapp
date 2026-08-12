@@ -18,16 +18,16 @@ import (
 var _ domain.BillingProvider = (*mpAdapter)(nil)
 
 type mpAdapter struct {
-	client  *mp.Client
-	logger  logger.Logger
-	backURL string
+	client *mp.Client
+	logger logger.Logger
+	cfg    *mp.Config
 }
 
-func NewMPAdapter(client *mp.Client, log logger.Logger, backURL string) domain.BillingProvider {
+func NewMPAdapter(client *mp.Client, log logger.Logger, cfg *mp.Config) domain.BillingProvider {
 	return &mpAdapter{
-		client:  client,
-		logger:  log,
-		backURL: backURL,
+		client: client,
+		logger: log,
+		cfg:    cfg,
 	}
 }
 
@@ -38,8 +38,15 @@ func (a *mpAdapter) CreateCheckoutSession(ctx context.Context, planID, externalR
 		"preapproval_plan_id": planID,
 		"external_reference":  externalReference,
 		"reason":              "Subscription checkout",
-		"back_url":            a.backURL,
+		"back_url":            a.cfg.BackURL,
 		"auto_recurring":      true,
+	}
+
+	// Attach the plan's configured invoice quota as preapproval metadata so
+	// verify/sync/webhook paths can seed local quota tracking (MP plans carry
+	// no product metadata of their own).
+	if invoiceCount, ok := a.invoiceCountForPlan(planID); ok {
+		body["metadata"] = map[string]any{"invoice_count_max": invoiceCount}
 	}
 
 	resp, err := a.client.Post(ctx, "/preapproval", body)
@@ -108,8 +115,9 @@ func (a *mpAdapter) GetSubscription(ctx context.Context, externalCustomerID stri
 				TransactionAmt  string `json:"transaction_amount"`
 				CurrencyID      string `json:"currency_id"`
 			} `json:"auto_recurring"`
-			PayerID    int    `json:"payer_id"`
-			PaymentID  string `json:"payment_method_id"`
+			PayerID    int            `json:"payer_id"`
+			PaymentID  string         `json:"payment_method_id"`
+			Metadata   map[string]any `json:"metadata"`
 		} `json:"results"`
 		Paging struct {
 			Total int `json:"total"`
@@ -148,7 +156,9 @@ func (a *mpAdapter) GetSubscription(ctx context.Context, externalCustomerID stri
 	subscription := &domain.Subscription{
 		ExternalCustomerID: externalCustomerID,
 		SubscriptionID:     mpSub.ID,
-		SubscriptionStatus: mpSub.Status,
+		// Map the raw MP status (authorized/paused/cancelled) to the canonical
+		// domain status so the SQL gate and GetBillingStatus recognize it.
+		SubscriptionStatus: MapMPStatus(mpSub.Status),
 		ProductID:          "",
 		ProductName:        mpSub.Reason,
 		CurrentPeriodStart: periodStart,
@@ -160,7 +170,60 @@ func (a *mpAdapter) GetSubscription(ctx context.Context, externalCustomerID stri
 		},
 	}
 
+	// Read back the quota attached at checkout time so verify/sync paths seed
+	// a nonzero local quota. Tolerates numeric and string metadata values.
+	if raw, ok := mpSub.Metadata["invoice_count_max"]; ok {
+		if count, ok := parseInvoiceCountMax(raw); ok {
+			subscription.Metadata["invoice_count_max"] = count
+		}
+	}
+
 	return subscription, nil
+}
+
+// invoiceCountForPlan resolves the configured invoice quota for a preapproval
+// plan id. It reports ok=false for unmapped plans so no quota metadata is
+// attached to preapprovals for unknown plans.
+func (a *mpAdapter) invoiceCountForPlan(planID string) (int32, bool) {
+	if planID == "" {
+		return 0, false
+	}
+	if a.cfg.CheckoutPlanID != "" && planID == a.cfg.CheckoutPlanID {
+		return a.cfg.CheckoutInvoiceCount, true
+	}
+	if a.cfg.BusinessPlanID != "" && planID == a.cfg.BusinessPlanID {
+		return a.cfg.BusinessInvoiceCount, true
+	}
+	return 0, false
+}
+
+// parseInvoiceCountMax normalizes a preapproval metadata value into an int32
+// invoice quota, tolerating JSON numbers and string representations.
+func parseInvoiceCountMax(raw any) (int32, bool) {
+	switch v := raw.(type) {
+	case float64:
+		return int32(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int32(n), true
+	case string:
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return 0, false
+		}
+		return int32(n), true
+	case int:
+		return int32(v), true
+	case int32:
+		return v, true
+	case int64:
+		return int32(v), true
+	default:
+		return 0, false
+	}
 }
 
 func (a *mpAdapter) GetCheckoutSession(ctx context.Context, sessionID string) (*domain.CheckoutSessionResponse, error) {

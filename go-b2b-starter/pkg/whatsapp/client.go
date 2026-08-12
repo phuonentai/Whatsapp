@@ -219,3 +219,116 @@ func (c *ClientWithBreaker) SendTextMessage(ctx context.Context, accessToken, gr
 	c.breaker.Success()
 	return msgID, nil
 }
+
+// TemplateMessageRequest is the WhatsApp Cloud API template message payload.
+// Template sends are business-initiated and bypass the 24-hour messaging
+// window (the API itself enforces that Meta-approved templates may be sent
+// outside the window).
+type TemplateMessageRequest struct {
+	MessagingProduct string `json:"messaging_product"`
+	RecipientType    string `json:"recipient_type"`
+	To               string `json:"to"`
+	Type             string `json:"type"`
+	Template         struct {
+		Name     string `json:"name"`
+		Language struct {
+			Policy string `json:"policy"`
+			Code   string `json:"code"`
+		} `json:"language"`
+		Components []TemplateComponent `json:"components"`
+	} `json:"template"`
+}
+
+// TemplateComponent is a body component parameter list for a template send.
+type TemplateComponent struct {
+	Type       string                `json:"type"`
+	Parameters []TemplateParameter `json:"parameters"`
+}
+
+type TemplateParameter struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// SendTemplateMessage sends a Meta-approved message template through the
+// WhatsApp Cloud API. Unlike SendTextMessage, template sends are permitted
+// outside the 24-hour customer-service window. Shares the same circuit
+// breaker as SendTextMessage so a Meta outage blocks both paths consistently.
+func (c *ClientWithBreaker) SendTemplateMessage(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, to, templateName, language string, params []string) (string, error) {
+	if !c.breaker.Allow() {
+		return "", fmt.Errorf("circuit breaker open: request blocked")
+	}
+
+	msgID, err := c.client.sendTemplateMessage(ctx, accessToken, graphAPIURL, apiVersion, phoneNumberID, to, templateName, language, params)
+	if err != nil {
+		c.breaker.Failure()
+		return "", err
+	}
+
+	c.breaker.Success()
+	return msgID, nil
+}
+
+func (c *Client) sendTemplateMessage(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, to, templateName, language string, params []string) (string, error) {
+	url := fmt.Sprintf("%s/%s/%s/messages", graphAPIURL, apiVersion, phoneNumberID)
+
+	payload := TemplateMessageRequest{
+		MessagingProduct: "whatsapp",
+		RecipientType:    "individual",
+		To:               to,
+		Type:             "template",
+	}
+	payload.Template.Name = templateName
+	payload.Template.Language.Policy = "deterministic"
+	payload.Template.Language.Code = language
+	paramsOut := make([]TemplateParameter, 0, len(params))
+	for _, p := range params {
+		paramsOut = append(paramsOut, TemplateParameter{Type: "text", Text: p})
+	}
+	payload.Template.Components = []TemplateComponent{{
+		Type:       "body",
+		Parameters: paramsOut,
+	}}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var apiErr APIErrorResponse
+		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error.Message != "" {
+			return "", fmt.Errorf("whatsapp api error (code %d): %s", apiErr.Error.Code, apiErr.Error.Message)
+		}
+		return "", fmt.Errorf("whatsapp api error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var result TextMessageResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if len(result.Messages) == 0 {
+		return "", fmt.Errorf("whatsapp api returned no message ID")
+	}
+
+	return result.Messages[0].ID, nil
+}

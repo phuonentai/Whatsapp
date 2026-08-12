@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ui } from "@/lib/copy/ui";
 import {
   useAiBuild,
   useCreateCampaign,
@@ -15,7 +16,14 @@ import {
   useSegmentsQuery,
 } from "@/lib/hooks/queries/use-campaign-queries";
 import { campaignRepository } from "@/lib/api/api/repositories/campaign-repository";
-import type { CampaignDto, EvalResultDto, SegmentDto, SegmentFilter } from "@/lib/api/api/dto/campaign.dto";
+import { AudienceResultCard } from "./audience-result-card";
+import type {
+  AudienceBuildResultDto,
+  CampaignDto,
+  EvalResultDto,
+  SegmentDto,
+  SegmentFilter,
+} from "@/lib/api/api/dto/campaign.dto";
 
 // Preset templates the SMB actually uses; each maps to a whitelisted filter spec.
 const PRESETS: { label: string; spec: SegmentFilter[] }[] = [
@@ -42,9 +50,26 @@ export function CampaignManager() {
 
   const [aiText, setAiText] = useState("");
   const [aiSpec, setAiSpec] = useState<SegmentFilter[] | null>(null);
+  const [aiPreview, setAiPreview] = useState<EvalResultDto | null>(null);
+  const aiInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAiBuildSuccess = (result: AudienceBuildResultDto) => {
+    setAiSpec(result.filter_spec);
+    setAiPreview(result.preview);
+    // Pre-fill the campaign message draft (editable; nothing auto-saved or
+    // sent). When the model produced no usable draft, surface the copy error.
+    if (result.message_draft) {
+      setCampaignMensaje(result.message_draft);
+      setAiDraftNote("draft");
+    } else {
+      setAiDraftNote("failed");
+    }
+  };
 
   const [campaignNombre, setCampaignNombre] = useState("");
   const [campaignSegmentId, setCampaignSegmentId] = useState<number>(0);
+  const [campaignMensaje, setCampaignMensaje] = useState("");
+  const [aiDraftNote, setAiDraftNote] = useState<"draft" | "failed" | null>(null);
   const [expandedRecipients, setExpandedRecipients] = useState<number | null>(null);
 
   if (isLoading) return <div className="text-gray-500">Cargando campañas...</div>;
@@ -99,6 +124,7 @@ export function CampaignManager() {
         </p>
         <div className="flex gap-2">
           <input
+            ref={aiInputRef}
             name="ai_descripcion"
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
@@ -106,7 +132,7 @@ export function CampaignManager() {
             className="border rounded px-3 py-2 flex-1"
           />
           <button
-            onClick={() => aiBuild.mutate(aiText, { onSuccess: (r) => setAiSpec(r.filter_spec) })}
+            onClick={() => aiBuild.mutate(aiText, { onSuccess: handleAiBuildSuccess })}
             disabled={aiBuild.isPending || !aiText.trim()}
             className="bg-gray-900 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
           >
@@ -117,25 +143,16 @@ export function CampaignManager() {
           <p className="text-red-600 text-sm mt-2">{String(aiBuild.error ?? "Error generando la audiencia.")}</p>
         )}
         {aiSpec && (
-          <div className="mt-3 border-t pt-3">
-            <pre className="bg-gray-50 rounded p-3 text-xs overflow-x-auto">{JSON.stringify(aiSpec, null, 2)}</pre>
-            <div className="flex items-center gap-2 mt-3">
-              <button
-                onClick={handleSaveAiSegment}
-                className="bg-gray-900 text-white px-4 py-2 rounded text-sm"
-              >
-                Guardar como segmento
-              </button>
-              <button
-                onClick={() => runPreview(aiSpec)}
-                disabled={previewing}
-                className="border px-4 py-2 rounded text-sm text-gray-600"
-              >
-                {previewing ? "Calculando..." : "Ver vista previa"}
-              </button>
-              {preview && <PreviewBadge preview={preview} />}
-            </div>
-          </div>
+          <AudienceResultCard
+            spec={aiSpec}
+            preview={preview ?? aiPreview}
+            isPreviewing={previewing}
+            isRegenerating={aiBuild.isPending}
+            onAccept={handleSaveAiSegment}
+            onEdit={() => aiInputRef.current?.focus()}
+            onRegenerate={() => aiBuild.mutate(aiText, { onSuccess: handleAiBuildSuccess })}
+            onPreview={() => runPreview(aiSpec)}
+          />
         )}
       </section>
 
@@ -242,11 +259,17 @@ export function CampaignManager() {
           <button
             onClick={() =>
               createCampaign.mutate(
-                { nombre: campaignNombre.trim(), segment_id: campaignSegmentId },
+                {
+                  nombre: campaignNombre.trim(),
+                  segment_id: campaignSegmentId,
+                  ...(campaignMensaje.trim() ? { mensaje: campaignMensaje.trim() } : {}),
+                },
                 {
                   onSuccess: () => {
                     setCampaignNombre("");
                     setCampaignSegmentId(0);
+                    setCampaignMensaje("");
+                    setAiDraftNote(null);
                     toast.success("Campaña creada");
                   },
                 }
@@ -257,6 +280,24 @@ export function CampaignManager() {
           >
             Crear campaña
           </button>
+        </div>
+
+        <div className="mb-4">
+          <textarea
+            name="campana_mensaje"
+            value={campaignMensaje}
+            onChange={(e) => setCampaignMensaje(e.target.value)}
+            placeholder={ui.campaigns.messagePlaceholder}
+            aria-label={ui.campaigns.messageLabel}
+            rows={3}
+            className="border rounded px-3 py-2 w-full text-sm resize-y"
+          />
+          {aiDraftNote === "draft" && (
+            <p className="text-xs text-gray-500 mt-1">{ui.campaigns.aiDraftHint}</p>
+          )}
+          {aiDraftNote === "failed" && (
+            <p className="text-xs text-red-600 mt-1">{ui.campaigns.messageError}</p>
+          )}
         </div>
 
         <ul className="space-y-2">

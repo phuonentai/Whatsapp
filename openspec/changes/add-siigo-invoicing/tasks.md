@@ -54,3 +54,8 @@
 
 - [ ] 11.1 Siigo sandbox OAuth + customer upsert + invoice creation + status webhook delivery against live sandbox credentials — **Deferred (external)**: requires live Siigo sandbox access; executed during deployment like the MercadoPago sandbox deferrals
 - [ ] 11.2 WhatsApp `factura_lista` template approval + send test against a real WhatsApp number — **Deferred (external)**: requires Meta template approval + live WhatsApp config
+
+## Central re-verification (2026-08-11, Phase 1 of repo-wide active-changes run)
+
+- [x] Re-ran gates on current tree: `go build ./...` + `go vet ./...` PASS (baseline sweep), `go test ./internal/modules/invoicing/...` PASS (exit 0, cached), `npx tsc --noEmit` PASS (exit 0 — the 10.2 `server.ts:178` exception is RESOLVED, that working-tree edit landed), `pnpm lint` PASS (0 errors / 4 pre-existing warnings), `pnpm build` PASS (baseline sweep).
+- [ ] Remaining open items 1.1/1.2 (Siigo API model spikes) and 11.1/11.2 (sandbox + Meta template) remain deferred-external per recorded reasons. Archive stays deferred per governance.

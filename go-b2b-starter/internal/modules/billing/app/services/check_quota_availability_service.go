@@ -51,7 +51,7 @@ func (s *billingService) CheckQuotaAvailability(ctx context.Context, organizatio
 	if !quotaStatus.CanProcessInvoice {
 		return &domain.BillingStatus{
 			OrganizationID:        organizationID,
-			HasActiveSubscription: quotaStatus.SubscriptionStatus == "active",
+			HasActiveSubscription: isActiveSubscriptionStatus(quotaStatus.SubscriptionStatus),
 			CanProcessInvoices:    false,
 			InvoiceCount:          quotaStatus.InvoiceCount,
 			Reason:                "quota exceeded or subscription inactive",

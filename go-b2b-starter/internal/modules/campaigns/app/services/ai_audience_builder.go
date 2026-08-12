@@ -13,12 +13,15 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/campaigns/domain"
 )
 
-const audienceSystemPrompt = `Eres un asistente de segmentación de contactos para campañas de WhatsApp de una PYME colombiana.
+const audienceSystemPrompt = `Eres un asistente de segmentación y redacción para campañas de WhatsApp de una PYME colombiana.
 
-Convierte la descripción del usuario en una especificación de filtros JSON. Reglas:
-1. Responde SOLO con un array JSON de filtros, sin texto adicional, sin bloques de código.
-2. Cada filtro tiene la forma: {"field": "<campo>", "op": "<operador>", "value": <valor>}.
-3. Todos los filtros se combinan con Y (AND).
+Convierte la descripción del usuario en un objeto JSON con dos campos:
+- "filter_spec": un array de filtros (ver reglas abajo).
+- "message_draft": un borrador de mensaje promocional de WhatsApp en español para esa audiencia.
+
+Reglas del filter_spec:
+1. Cada filtro tiene la forma: {"field": "<campo>", "op": "<operador>", "value": <valor>}.
+2. Todos los filtros se combinan con Y (AND).
 
 Campos y operadores permitidos:
 - {"field": "source", "op": "eq", "value": "whatsapp"} — origen del contacto
@@ -29,10 +32,19 @@ Campos y operadores permitidos:
 - {"field": "recency_days", "op": "lte", "value": <entero>} — contactados en los últimos N días
 - {"field": "search", "op": "contains", "value": "<texto>"} — búsqueda por nombre/correo/teléfono/documento
 
+Reglas del message_draft:
+1. Redacta en español, de 1 a 3 oraciones, con un tono acorde a la descripción (formal, promocional o urgente según lo que pida el usuario).
+2. Incluye una llamada a la acción (CTA) clara.
+3. Cumple la Ley 1581: sin afirmaciones engañosas ni promesas exageradas; si corresponde, recuerda el consentimiento del destinatario.
+4. NO uses marcadores de PII de contactos: nada de nombres, teléfonos ni documentos en el texto.
+5. Si la descripción no da contexto suficiente para redactar el mensaje, deja "message_draft" vacío ("").
+
 Etiquetas de esta organización (nombre -> id):
 %s
 
-Si no puedes expresar el pedido con estos campos, usa los más cercanos. Si el pedido no menciona etiquetas, no incluyas tag_ids. Nunca inventes ids de etiquetas.`
+Si no puedes expresar el pedido con estos campos, usa los más cercanos. Si el pedido no menciona etiquetas, no incluyas tag_ids. Nunca inventes ids de etiquetas.
+
+Responde SOLO con un objeto JSON válido: {"filter_spec": [...], "message_draft": "..."}, sin texto adicional ni bloques de código.`
 
 type aiAudienceBuilder struct {
 	llm           llmdomain.LLMClient
@@ -79,7 +91,7 @@ func (b *aiAudienceBuilder) Build(ctx context.Context, orgID int32, naturalLangu
 		return nil, fmt.Errorf("audience build failed: %w", err)
 	}
 
-	spec, err := parseFilterSpecJSON(resp.Text)
+	spec, messageDraft, err := parseAIBuildResponse(resp.Text)
 	if err != nil {
 		return nil, fmt.Errorf("%w: la IA no pudo construir filtros válidos", domain.ErrInvalidFilterSpec)
 	}
@@ -98,7 +110,7 @@ func (b *aiAudienceBuilder) Build(ctx context.Context, orgID int32, naturalLangu
 		return nil, err
 	}
 
-	return &domain.AudienceBuildResult{FilterSpec: spec, Preview: preview}, nil
+	return &domain.AudienceBuildResult{FilterSpec: spec, Preview: preview, MessageDraft: messageDraft}, nil
 }
 
 // tagDictionary renders "name (id)" lines for the org's tags so the LLM can
@@ -146,21 +158,55 @@ func verifyTagIDs(ctx context.Context, tagRepo crmDomain.TagRepository, orgID in
 	return nil
 }
 
-// parseFilterSpecJSON extracts a JSON array from an LLM response, tolerating
-// markdown code fences.
-func parseFilterSpecJSON(text string) ([]domain.Filter, error) {
+// parseAIBuildResponse extracts the filter spec (mandatory) and the optional
+// message draft from an LLM response, tolerating markdown code fences.
+//   - filter_spec: required; unparsable specs fail the call.
+//   - message_draft: optional; unparsable or empty drafts are dropped and
+//     never fail the call (per-field resilience, mirroring ticket triage).
+//
+// A bare filter-spec array (legacy contract) is still accepted as a spec
+// with no message draft.
+func parseAIBuildResponse(text string) ([]domain.Filter, string, error) {
 	trimmed := strings.TrimSpace(text)
 	trimmed = strings.TrimPrefix(trimmed, "```json")
 	trimmed = strings.TrimPrefix(trimmed, "```")
 	trimmed = strings.TrimSuffix(trimmed, "```")
 	trimmed = strings.TrimSpace(trimmed)
 
+	// Legacy contract: the model answered with a bare filter spec array.
+	var rawSpec []domain.Filter
+	if err := json.Unmarshal([]byte(trimmed), &rawSpec); err == nil {
+		if len(rawSpec) == 0 {
+			return nil, "", fmt.Errorf("empty filter spec")
+		}
+		return rawSpec, "", nil
+	}
+
+	var obj struct {
+		FilterSpec   json.RawMessage `json:"filter_spec"`
+		MessageDraft json.RawMessage `json:"message_draft"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &obj); err != nil {
+		return nil, "", err
+	}
+	if len(obj.FilterSpec) == 0 {
+		return nil, "", fmt.Errorf("missing filter_spec")
+	}
+
 	var spec []domain.Filter
-	if err := json.Unmarshal([]byte(trimmed), &spec); err != nil {
-		return nil, err
+	if err := json.Unmarshal(obj.FilterSpec, &spec); err != nil {
+		return nil, "", err
 	}
 	if len(spec) == 0 {
-		return nil, fmt.Errorf("empty filter spec")
+		return nil, "", fmt.Errorf("empty filter spec")
 	}
-	return spec, nil
+
+	// Optional message draft: drop on parse failure, keep the spec.
+	var draft string
+	if len(obj.MessageDraft) > 0 {
+		if err := json.Unmarshal(obj.MessageDraft, &draft); err != nil {
+			draft = ""
+		}
+	}
+	return spec, strings.TrimSpace(draft), nil
 }

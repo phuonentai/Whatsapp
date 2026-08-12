@@ -8,15 +8,18 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MessageCircle, CheckCircle, XCircle, Loader2, Copy, ExternalLink, ChevronDown, ChevronUp, LifeBuoy } from "lucide-react";
+import { StatusChip } from "@/components/ui/status-chip";
+import { MessageCircle, CheckCircle, XCircle, Loader2, Copy, ExternalLink, ChevronDown, ChevronUp, LifeBuoy, AlertTriangle, PauseCircle } from "lucide-react";
 import { useWhatsAppConfigQuery } from "@/lib/hooks/queries/use-whatsapp-config-query";
 import { useUpsertWhatsAppConfig } from "@/lib/hooks/mutations/use-upsert-whatsapp-config";
 import { useToggleWhatsAppConfig } from "@/lib/hooks/mutations/use-toggle-whatsapp-config";
 import { useWhatsAppSignupMetaConfig, useWhatsAppSignupStatus } from "@/lib/hooks/queries/use-whatsapp-signup-query";
 import { useWhatsAppSignupExchange } from "@/lib/hooks/mutations/use-whatsapp-signup-mutation";
+import { PostConnectSteps, clearPostConnectDismissed } from "@/components/whatsapp/post-connect-steps";
 import type { WhatsAppConfigInput } from "@/lib/models/whatsapp-config.model";
 import { toast } from "sonner";
 import { ui } from "@/lib/copy/ui";
+import { useUIStore } from "@/stores/ui-store";
 
 declare global {
   interface Window {
@@ -92,6 +95,7 @@ export function WhatsAppConfigSection() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [signupErrorCode, setSignupErrorCode] = useState<string | null>(null);
   const [microStepIndex, setMicroStepIndex] = useState(0);
+  const setPlansModalOpen = useUIStore((state) => state.setPlansModalOpen);
 
   const hasExistingConfig = config !== undefined;
   const notConnected = !hasExistingConfig && isConfigNotFound(error);
@@ -139,7 +143,10 @@ export function WhatsAppConfigSection() {
 
   // Sanctioned render-phase state adjustment (React "adjusting state during
   // render" pattern): re-seed the form when the fetched config changes.
-  const [prevConfig, setPrevConfig] = useState(config);
+  // prevConfig starts as undefined so the re-seed also fires when config is
+  // synchronously available on mount (cached query data), not only when it
+  // arrives after a loading state.
+  const [prevConfig, setPrevConfig] = useState<typeof config>(undefined);
   if (config !== prevConfig) {
     setPrevConfig(config);
     if (config) {
@@ -162,6 +169,14 @@ export function WhatsAppConfigSection() {
       refetch();
     }
   }, [signupStatusQuery.data?.status, refetch]);
+
+  // When the config deactivates, drop the post-connect dismissal so the
+  // next-steps card reappears on the next activation.
+  useEffect(() => {
+    if (config && !config.isActive) {
+      clearPostConnectDismissed();
+    }
+  }, [config]);
 
   const handleSubmit = async () => {
     setValidationError(null);
@@ -279,6 +294,35 @@ export function WhatsAppConfigSection() {
   }
 
   if (error && !notConnected) {
+    const errMsg = error instanceof Error ? error.message : String(error ?? "");
+    const is402 = errMsg.includes("402") || errMsg.includes("subscription_required") || errMsg.includes("subscription_inactive") || errMsg.includes("active subscription is required");
+
+    if (is402) {
+      return (
+        <Alert className="border border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>{ui.billing.subscriptionRequiredTitle}</AlertTitle>
+          <AlertDescription>
+            {ui.billing.subscriptionRequiredWhatsAppBody}
+          </AlertDescription>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" onClick={() => setPlansModalOpen(true)}>
+              {ui.billing.viewPlans}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <a href="/dashboard/settings?view=subscription">
+                {ui.billing.actionManageSubscription}
+              </a>
+            </Button>
+          </div>
+        </Alert>
+      );
+    }
+
     return (
       <Alert variant="destructive" className="border border-red-200 bg-red-50">
         <AlertTitle>{ui.whatsapp.loadFailedTitle}</AlertTitle>
@@ -298,7 +342,7 @@ export function WhatsAppConfigSection() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <MessageCircle className="h-6 w-6 text-gray-600" />
+              <MessageCircle className="h-6 w-6 text-slate-600" />
               <div>
                 <CardTitle>{ui.whatsapp.title}</CardTitle>
                 <CardDescription>
@@ -307,7 +351,13 @@ export function WhatsAppConfigSection() {
               </div>
             </div>
             {hasExistingConfig && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <StatusChip
+                  tone={isActive ? "emerald" : "gray"}
+                  icon={isActive ? CheckCircle : PauseCircle}
+                >
+                  {isActive ? ui.settings.statusConnected : ui.settings.statusPaused}
+                </StatusChip>
                 <Label htmlFor="active-toggle" className="text-sm font-medium">
                   {isActive ? ui.whatsapp.active : ui.whatsapp.inactive}
                 </Label>
@@ -324,11 +374,11 @@ export function WhatsAppConfigSection() {
 
         <CardContent className="space-y-5">
           {!hasExistingConfig && !signupInProgress && (
-            <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
-              <MessageCircle className="h-10 w-10 text-gray-400" />
+            <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+              <MessageCircle className="h-10 w-10 text-slate-400" />
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{ui.whatsapp.connectTitle}</h3>
-                <p className="mt-1 max-w-md text-sm text-gray-500">
+                <h3 className="text-lg font-semibold text-slate-900">{ui.whatsapp.connectTitle}</h3>
+                <p className="mt-1 max-w-md text-sm text-slate-500">
                   {ui.whatsapp.connectBody}
                 </p>
               </div>
@@ -349,7 +399,7 @@ export function WhatsAppConfigSection() {
                   <div
                     key={step}
                     className={`h-1.5 flex-1 rounded-full animate-pulse ${
-                      idx <= displayedStepIndex ? "bg-emerald-500" : "bg-blue-200"
+                      idx <= displayedStepIndex ? "bg-primary" : "bg-muted"
                     }`}
                   />
                 ))}
@@ -366,7 +416,7 @@ export function WhatsAppConfigSection() {
               <AlertDescription>
                 {connectError ?? ui.whatsapp.connectFailed}
                 {(signupStatusQuery.data?.error_code || signupErrorCode) && (
-                  <span className="mt-1 block text-xs text-gray-500">
+                  <span className="mt-1 block text-xs text-slate-500">
                     {ui.whatsapp.errorCodePrefix} {signupStatusQuery.data?.error_code ?? signupErrorCode} —{" "}
                     {ui.whatsapp.errorCodeHint}
                   </span>
@@ -384,28 +434,28 @@ export function WhatsAppConfigSection() {
                 <CheckCircle className="h-4 w-4" />
                 {ui.whatsapp.connected}
               </div>
-              <div className="grid gap-2 text-sm text-gray-600 sm:grid-cols-3">
+              <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs text-gray-500">{ui.whatsapp.businessPhone}</p>
-                  <p className="font-medium text-gray-800">{config.businessPhone}</p>
+                  <p className="text-xs text-slate-500">{ui.whatsapp.businessPhone}</p>
+                  <p className="font-medium text-slate-800">{config.businessPhone}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">{ui.whatsapp.phoneNumberId}</p>
-                  <p className="font-medium text-gray-800">{config.phoneNumberId}</p>
+                  <p className="text-xs text-slate-500">{ui.whatsapp.phoneNumberId}</p>
+                  <p className="font-medium text-slate-800">{config.phoneNumberId}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">{ui.whatsapp.wabaId}</p>
-                  <p className="font-medium text-gray-800">{config.wabaId ?? "—"}</p>
+                  <p className="text-xs text-slate-500">{ui.whatsapp.wabaId}</p>
+                  <p className="font-medium text-slate-800">{config.wabaId ?? "—"}</p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="border-t border-gray-200 pt-4">
+          <div className="border-t border-slate-200 pt-4">
             <Button
               variant="ghost"
               size="sm"
-              className="text-gray-500"
+              className="text-slate-500"
               onClick={() => setShowAdvanced((v) => !v)}
             >
               {showAdvanced ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
@@ -414,14 +464,14 @@ export function WhatsAppConfigSection() {
           </div>
 
           {showAdvanced && (
-            <div className="space-y-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="space-y-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div>
                 <Label className="text-sm font-medium">{ui.whatsapp.webhookCallbackUrl}</Label>
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-slate-500 mb-2">
                   {ui.whatsapp.webhookCallbackHint}
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 truncate">
+                  <code className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 truncate">
                     {callbackUrl}
                   </code>
                   <Button variant="outline" size="sm" onClick={copyCallbackUrl} className="shrink-0">
@@ -450,7 +500,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setPhoneNumberId(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">Found in Meta Business Dashboard under WhatsApp &gt; API Setup</p>
+                  <p className="text-xs text-slate-500">Found in Meta Business Dashboard under WhatsApp &gt; API Setup</p>
                 </div>
 
                 <div className="space-y-2">
@@ -465,7 +515,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setBusinessPhone(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">E.164 format with country code (e.g. +57 for Colombia)</p>
+                  <p className="text-xs text-slate-500">E.164 format with country code (e.g. +57 for Colombia)</p>
                 </div>
 
                 <div className="space-y-2">
@@ -480,7 +530,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setWebhookSecret(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {hasExistingConfig
                       ? "Leave blank to keep the existing value unchanged"
                       : "Required for new connections. Found in Meta Business Dashboard."}
@@ -499,7 +549,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setVerifyToken(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {hasExistingConfig
                       ? "Leave blank to keep the existing value unchanged"
                       : "Required for new connections. You define this token."}
@@ -518,7 +568,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setWabaId(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">WhatsApp Business Account ID</p>
+                  <p className="text-xs text-slate-500">WhatsApp Business Account ID</p>
                 </div>
 
                 <div className="space-y-2">
@@ -533,7 +583,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setAccessToken(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {hasExistingConfig
                       ? "Leave blank to keep the existing value unchanged"
                       : "Required for sending messages. Generate in Meta Business Dashboard."}
@@ -552,7 +602,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setApiVersion(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">WhatsApp Cloud API version (default: v21.0)</p>
+                  <p className="text-xs text-slate-500">WhatsApp Cloud API version (default: v21.0)</p>
                 </div>
 
                 <div className="space-y-2">
@@ -567,7 +617,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setGraphApiUrl(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">Base URL for Graph API (default: https://graph.facebook.com)</p>
+                  <p className="text-xs text-slate-500">Base URL for Graph API (default: https://graph.facebook.com)</p>
                 </div>
 
                 <div className="space-y-2">
@@ -582,7 +632,7 @@ export function WhatsAppConfigSection() {
                     onChange={(e) => setAppId(e.target.value)}
                     disabled={upsertMutation.isPending}
                   />
-                  <p className="text-xs text-gray-500">WhatsApp Business App ID (optional)</p>
+                  <p className="text-xs text-slate-500">WhatsApp Business App ID (optional)</p>
                 </div>
               </div>
 
@@ -590,7 +640,7 @@ export function WhatsAppConfigSection() {
                 <Button
                   onClick={handleSubmit}
                   disabled={upsertMutation.isPending}
-                  className="bg-gray-900 text-white hover:bg-gray-800"
+                  className="bg-emerald-500 text-white hover:bg-emerald-600"
                 >
                   {upsertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {hasExistingConfig ? ui.whatsapp.saveChanges : ui.whatsapp.connectButton}
@@ -598,29 +648,28 @@ export function WhatsAppConfigSection() {
 
                 {hasExistingConfig && config && (
                   <div className="flex items-center gap-2 text-sm">
-                    {config.isActive ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        <span className="text-emerald-700">{ui.whatsapp.messagesBeingReceived}</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-500">{ui.whatsapp.messageReceivingPaused}</span>
-                      </>
-                    )}
+                    <StatusChip
+                      tone={config.isActive ? "emerald" : "gray"}
+                      icon={config.isActive ? CheckCircle : XCircle}
+                    >
+                      {config.isActive
+                        ? ui.whatsapp.messagesBeingReceived
+                        : ui.whatsapp.messageReceivingPaused}
+                    </StatusChip>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          <p className="flex items-center gap-1 text-xs text-gray-400">
+          <p className="flex items-center gap-1 text-xs text-slate-400">
             <ExternalLink className="h-3 w-3" />
             {ui.whatsapp.footerNote}
           </p>
         </CardContent>
       </Card>
+
+      {config?.isActive && <PostConnectSteps />}
     </div>
   );
 }

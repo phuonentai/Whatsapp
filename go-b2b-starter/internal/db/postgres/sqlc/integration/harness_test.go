@@ -63,6 +63,10 @@ var migrationsToApply = []string{
 	"000031_create_client_payments.up.sql",
 	"000032_seed_analytics_module.up.sql",
 	"000033_add_instagram_schema.up.sql",
+	"000034_create_conversation_contexts.up.sql",
+	"000035_add_campaign_message.up.sql",
+	"000036_create_whatsapp_templates.up.sql",
+	"000037_create_procurement_schema.up.sql",
 }
 
 func TestMain(m *testing.M) {

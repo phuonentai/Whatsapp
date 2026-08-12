@@ -1,0 +1,10 @@
+{
+  "requires_council": false,
+  "requires_playwright": false,
+  "requires_migration": false,
+  "requires_feature_flag": false,
+  "complexity": "low",
+  "security_impact": false,
+  "data_model_change": false,
+  "payment_impact": false
+}

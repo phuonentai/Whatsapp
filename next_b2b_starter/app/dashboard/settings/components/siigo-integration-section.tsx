@@ -90,7 +90,7 @@ export function SiigoIntegrationSection() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="h-6 w-6 text-gray-600" />
+              <FileText className="h-6 w-6 text-slate-600" />
               <div>
                 <CardTitle>Integración Siigo</CardTitle>
                 <CardDescription>
@@ -111,7 +111,7 @@ export function SiigoIntegrationSection() {
             <SandboxAndActivateStep />
           )}
           {status.status === "paused" && (
-            <Alert className="border border-gray-200 bg-gray-50">
+            <Alert className="border border-slate-200 bg-slate-50">
               <AlertTitle>Facturación pausada</AlertTitle>
               <AlertDescription>
                 No se emitirán facturas automáticas hasta que reanudes la facturación.
@@ -187,10 +187,10 @@ function ConnectStep() {
   const canSubmit = clientId.trim().length > 0 && clientSecret.trim().length > 0 && nit.trim().length > 0;
 
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div>
-        <h3 className="text-base font-semibold text-gray-900">Paso 1 — Conecta tu cuenta Siigo</h3>
-        <p className="mt-1 text-sm text-gray-500">
+        <h3 className="text-base font-semibold text-slate-900">Paso 1 — Conecta tu cuenta Siigo</h3>
+        <p className="mt-1 text-sm text-slate-500">
           Ingresa las credenciales API de tu empresa en Siigo (Portal de desarrolladores) y el NIT de tu empresa.
         </p>
       </div>
@@ -274,10 +274,10 @@ function NumerationStep() {
   const confirm = useConfirmNumeration();
 
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div>
-        <h3 className="text-base font-semibold text-gray-900">Paso 2 — Confirma tu numeración DIAN</h3>
-        <p className="mt-1 text-sm text-gray-500">
+        <h3 className="text-base font-semibold text-slate-900">Paso 2 — Confirma tu numeración DIAN</h3>
+        <p className="mt-1 text-sm text-slate-500">
           La facturación continúa la numeración de tu empresa. Confirma antes de emitir la primera factura.
         </p>
       </div>
@@ -285,18 +285,18 @@ function NumerationStep() {
       {numeration.isLoading && <Skeleton className="h-10 w-64" />}
 
       {numeration.data && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
           {numeration.data.mode === "auto" && (
-            <p className="text-gray-700">
+            <p className="text-slate-700">
               Siigo asignará el consecutivo automáticamente bajo la resolución activa de tu empresa.
-              <span className="mt-1 block text-xs text-gray-500">
+              <span className="mt-1 block text-xs text-slate-500">
                 {numeration.data.prefijo && <>Prefijo: {numeration.data.prefijo} · </>}
                 {numeration.data.next_number && <>Siguiente número: {numeration.data.next_number}</>}
               </span>
             </p>
           )}
           {numeration.data.mode === "manual" && (
-            <p className="text-gray-700">
+            <p className="text-slate-700">
               Siguiente número: <strong>{numeration.data.next_number ?? "—"}</strong>
               {numeration.data.prefijo && <> · Prefijo: {numeration.data.prefijo}</>}
             </p>
@@ -348,10 +348,10 @@ function ImportStep() {
   const counts = previewResult ?? preview.data;
 
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-5">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
       <div>
-        <h3 className="text-base font-semibold text-gray-900">Paso 3 — Importa tus clientes</h3>
-        <p className="mt-1 text-sm text-gray-500">
+        <h3 className="text-base font-semibold text-slate-900">Paso 3 — Importa tus clientes</h3>
+        <p className="mt-1 text-sm text-slate-500">
           Importa los clientes de Siigo como empresas y contactos del CRM (dedupe por NIT).
         </p>
       </div>
@@ -363,15 +363,15 @@ function ImportStep() {
       )}
 
       {preview.isFetching && (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> Consultando clientes en Siigo…
         </div>
       )}
 
       {counts && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-          <p className="font-medium text-gray-900">{counts.total} clientes encontrados</p>
-          <ul className="mt-2 grid gap-1 text-gray-600 sm:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
+          <p className="font-medium text-slate-900">{counts.total} clientes encontrados</p>
+          <ul className="mt-2 grid gap-1 text-slate-600 sm:grid-cols-2">
             <li>Nuevos: {counts.nuevos}</li>
             <li>Existentes: {counts.existentes}</li>
             <li>Duplicados por NIT: {counts.duplicados}</li>
@@ -409,9 +409,9 @@ function SandboxAndActivateStep() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-        <h3 className="text-base font-semibold text-gray-900">Paso 4 — Prueba en sandbox</h3>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <h3 className="text-base font-semibold text-slate-900">Paso 4 — Prueba en sandbox</h3>
+        <p className="mt-1 text-sm text-slate-500">
           Crea una factura de prueba en el ambiente sandbox para validar el flujo completo.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -426,11 +426,11 @@ function SandboxAndActivateStep() {
         )}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-        <h3 className="text-base font-semibold text-gray-900">Paso 5 — Activar facturación</h3>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <h3 className="text-base font-semibold text-slate-900">Paso 5 — Activar facturación</h3>
+        <p className="mt-1 text-sm text-slate-500">
           Al activar, los negocios en etapa facturado emitirán factura electrónica automáticamente.
-          La plantilla de WhatsApp <code className="rounded bg-gray-100 px-1">factura_lista</code> debe estar
+          La plantilla de WhatsApp <code className="rounded bg-slate-100 px-1">factura_lista</code> debe estar
           aprobada en Meta para enviar la notificación.
         </p>
         <Button
@@ -451,7 +451,7 @@ function ActiveNotice() {
   return (
     <Alert className="border border-emerald-200 bg-emerald-50">
       <AlertTitle className="flex items-center gap-2">
-        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <CheckCircle2 className="h-4 w-4 text-primary" />
         Facturación activa
       </AlertTitle>
       <AlertDescription>
@@ -463,7 +463,7 @@ function ActiveNotice() {
 
 function DisabledNotice() {
   return (
-    <Alert className="border border-gray-200 bg-gray-50">
+    <Alert className="border border-slate-200 bg-slate-50">
       <AlertDescription>
         Facturación desactivada — activa con Siigo para emitir facturas electrónicas automáticas.
       </AlertDescription>
@@ -474,7 +474,7 @@ function DisabledNotice() {
 function WizardProgress({ status }: { status: SiigoConnectionStatus }) {
   const current = statusIndex(status);
   return (
-    <div className="border-t border-gray-200 pt-4">
+    <div className="border-t border-slate-200 pt-4">
       <ol className="flex flex-wrap items-center gap-2">
         {STEP_ORDER.map((step, idx) => {
           const done = idx < current;
@@ -488,14 +488,14 @@ function WizardProgress({ status }: { status: SiigoConnectionStatus }) {
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : active
                       ? "border-blue-200 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-gray-50 text-gray-400"
+                      : "border-slate-200 bg-slate-50 text-slate-400"
                 }`}
               >
                 {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : active ? <CircleDashed className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                 <Icon className="h-3.5 w-3.5" />
                 {step.title}
               </div>
-              {idx < STEP_ORDER.length - 1 && <span className="text-gray-300">→</span>}
+              {idx < STEP_ORDER.length - 1 && <span className="text-slate-300">→</span>}
             </li>
           );
         })}

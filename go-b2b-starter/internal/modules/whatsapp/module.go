@@ -23,10 +23,11 @@ func (m *Module) RegisterDependencies() error {
 	if err := m.container.Provide(func(
 		configRepo domain.ConfigRepository,
 		logRepo domain.WebhookLogRepository,
+		templateRepo domain.TemplateRepository,
 		outboxRepo outbox.Repository,
 		log logger.Logger,
 	) services.WebhookService {
-		return services.NewWebhookService(configRepo, logRepo, outboxRepo, log)
+		return services.NewWebhookService(configRepo, logRepo, templateRepo, outboxRepo, log)
 	}); err != nil {
 		return err
 	}
@@ -57,6 +58,17 @@ func (m *Module) RegisterDependencies() error {
 			ticketService,
 			log,
 		)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		templateRepo domain.TemplateRepository,
+		configRepo domain.ConfigRepository,
+		graphClient graphapi.Client,
+		log logger.Logger,
+	) services.TemplateService {
+		return services.NewTemplateService(templateRepo, configRepo, graphClient, log)
 	}); err != nil {
 		return err
 	}

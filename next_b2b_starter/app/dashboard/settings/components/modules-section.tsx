@@ -1,23 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2, PackageOpen } from "lucide-react";
 import { useModulesCatalogQuery, useOrgModulesQuery } from "@/lib/hooks/queries/use-modules-queries";
 import { useSaveModuleConfig } from "@/lib/hooks/mutations/use-tickets-mutations";
-import { useModule } from "@/lib/hooks/use-entitlement";
+import { useModule, useEntitlementQuery } from "@/lib/hooks/use-entitlement";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusChip } from "@/components/ui/status-chip";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ui, tpl } from "@/lib/copy/ui";
 
 export function ModulesSection() {
   const { data: catalog, isLoading, isError, refetch, isRefetching } = useModulesCatalogQuery();
   const { data: orgModules } = useOrgModulesQuery();
+  const { data: entitlement } = useEntitlementQuery();
+  const planName = entitlement?.plan?.trim() || "";
 
   if (isLoading) {
-    return <div className="text-sm text-gray-500">Cargando módulos...</div>;
+    return <div className="text-sm text-slate-500">Cargando módulos...</div>;
   }
 
   if (isError) {
@@ -34,7 +38,7 @@ export function ModulesSection() {
   return (
     <div className="space-y-4">
       {(catalog ?? []).map((module) => (
-        <ModuleCard key={module.key} module={module} orgConfig={orgModules?.find((m) => m.key === module.key)?.config} />
+        <ModuleCard key={module.key} module={module} planName={planName} orgConfig={orgModules?.find((m) => m.key === module.key)?.config} />
       ))}
     </div>
   );
@@ -42,9 +46,11 @@ export function ModulesSection() {
 
 function ModuleCard({
   module,
+  planName,
   orgConfig,
 }: {
   module: { key: string; name: string; description?: string };
+  planName: string;
   orgConfig?: Record<string, unknown>;
 }) {
   const { enabled } = useModule(module.key);
@@ -87,9 +93,23 @@ function ModuleCard({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base">{module.name}</CardTitle>
-          <Badge variant={enabled ? "default" : "outline"}>{enabled ? "Activo" : "No adquirido"}</Badge>
+          {enabled ? (
+            <StatusChip
+              tone="emerald"
+              icon={CheckCircle2}
+              aria-label={ui.settings.planSourceBadgeAria}
+            >
+              {planName
+                ? tpl(ui.settings.includedInPlan, { plan: planName })
+                : ui.settings.statusActive}
+            </StatusChip>
+          ) : (
+            <StatusChip tone="gray" icon={PackageOpen} aria-label={ui.settings.planSourceBadgeAria}>
+              {ui.settings.notAcquired}
+            </StatusChip>
+          )}
         </div>
         <CardDescription>{module.description}</CardDescription>
       </CardHeader>
@@ -121,7 +141,7 @@ function ModuleCard({
               />
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saveConfig.isPending} className="bg-gray-900 text-white hover:bg-gray-800">
+          <Button onClick={handleSave} disabled={saveConfig.isPending} className="bg-emerald-500 text-white hover:bg-emerald-600">
             Guardar configuración
           </Button>
         </CardContent>

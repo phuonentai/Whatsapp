@@ -91,8 +91,8 @@ func DefaultGuardrails() Guardrails {
 
 // NeverRules are deterministic deny rules checked against every draft.
 type NeverRules struct {
-	MaxDiscountPercent *float64  `json:"max_discount_percent,omitempty"`
-	ForbiddenTerms     []string  `json:"forbidden_terms,omitempty"`
+	MaxDiscountPercent *float64 `json:"max_discount_percent,omitempty"`
+	ForbiddenTerms     []string `json:"forbidden_terms,omitempty"`
 }
 
 // EscalateRules define topics that must be escalated to a human.
@@ -151,21 +151,21 @@ type ConversationFlow struct {
 
 // Suggestion is a pending/approved/rejected draft or escalation.
 type Suggestion struct {
-	ID                 int32
-	OrganizationID     int32
-	ConversationID     int32
-	ContactID          int32
-	FlowID             *int32
-	Type               SuggestionType
-	Body               string
-	Metadata           map[string]any
-	Status             SuggestionStatus
-	Source             SuggestionSource
-	ApprovedByMemberID string
-	WhatsAppMessageID  string
-	RequestID          string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                 int32            `json:"id"`
+	OrganizationID     int32            `json:"organization_id"`
+	ConversationID     int32            `json:"conversation_id"`
+	ContactID          int32            `json:"contact_id"`
+	FlowID             *int32           `json:"flow_id,omitempty"`
+	Type               SuggestionType   `json:"type"`
+	Body               string           `json:"body"`
+	Metadata           map[string]any   `json:"metadata,omitempty"`
+	Status             SuggestionStatus `json:"status"`
+	Source             SuggestionSource `json:"source"`
+	ApprovedByMemberID string           `json:"approved_by_member_id,omitempty"`
+	WhatsAppMessageID  string           `json:"whatsapp_message_id,omitempty"`
+	RequestID          string           `json:"request_id,omitempty"`
+	CreatedAt          time.Time        `json:"created_at"`
+	UpdatedAt          time.Time        `json:"updated_at"`
 }
 
 // AgentAction is an append-only governance audit row.

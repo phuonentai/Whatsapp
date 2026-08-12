@@ -3,6 +3,7 @@ package stytch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,15 +11,18 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/auth"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"github.com/moasq/go-b2b-starter/internal/platform/redis"
+	platformstytch "github.com/moasq/go-b2b-starter/internal/platform/stytch"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/b2bstytchapi"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/rbac"
 )
 
 const (
 	// Redis cache key for RBAC policy.
-	// Versioned (v2) when the `export` action was added so the new action
-	// applies without waiting for the previous cache TTL to expire.
-	rbacPolicyCacheKey = "auth:stytch:rbac:policy:v2"
+	// Versioned: v2 when the `export` action was added; v3 when the inbox
+	// scope permissions (`inbox:view_all`, `inbox:view_unassigned`,
+	// `inbox:reassign`) were added (conversation-row-scoping) so they apply
+	// without waiting for the previous cache TTL to expire.
+	rbacPolicyCacheKey = "auth:stytch:rbac:policy:v3"
 	// Cache TTL matches Stytch SDK default (5 minutes)
 	rbacPolicyCacheTTL = 5 * time.Minute
 )
@@ -27,17 +31,38 @@ const (
 //
 // It retrieves the role-permission mappings from Stytch and caches them
 // in Redis to avoid API calls on every request.
+//
+// The policy fetch SHALL pass through the two-tier circuit breaker
+// (`platform/stytch.Client.Run`: threshold 5, timeout 10s, half-open 2) when a
+// breaker client is provided — the consolidated service served via DI always
+// provides one, so a Stytch outage degrades to cached policy (or empty with a
+// log) instead of a hard failure per request.
 type RBACPolicyService struct {
-	client *b2bstytchapi.API
-	redis  redis.Client
-	logger logger.Logger
+	client  *b2bstytchapi.API // raw Stytch B2B API client (policy endpoint)
+	breaker *platformstytch.Client // optional breaker wrapper; when set, fetches run via Client.Run
+	redis   redis.Client
+	logger  logger.Logger
 }
 
+// NewRBACPolicyService creates a policy service whose fetch is NOT guarded by
+// the circuit breaker. Prefer NewRBACPolicyServiceWithBreaker for any
+// production-served instance.
 func NewRBACPolicyService(client *b2bstytchapi.API, redisClient redis.Client, logger logger.Logger) *RBACPolicyService {
 	return &RBACPolicyService{
 		client: client,
 		redis:  redisClient,
 		logger: logger,
+	}
+}
+
+// NewRBACPolicyServiceWithBreaker creates a policy service whose policy fetch
+// is guarded by the shared two-tier circuit breaker (`Client.Run`).
+func NewRBACPolicyServiceWithBreaker(client *b2bstytchapi.API, breaker *platformstytch.Client, redisClient redis.Client, logger logger.Logger) *RBACPolicyService {
+	return &RBACPolicyService{
+		client:  client,
+		breaker: breaker,
+		redis:   redisClient,
+		logger:  logger,
 	}
 }
 
@@ -98,24 +123,61 @@ func (s *RBACPolicyService) getPolicy(ctx context.Context) (*rbac.Policy, error)
 }
 
 // fetchPolicyFromStytch fetches RBAC policy from Stytch API.
+//
+// When a breaker client is wired, the call runs through the two-tier circuit
+// breaker (`Client.Run`); a breaker-open failure returns ErrCircuitOpen and is
+// treated as policy unavailable (logged; cache is preferred, otherwise empty).
 func (s *RBACPolicyService) fetchPolicyFromStytch(ctx context.Context) (*rbac.Policy, error) {
 	s.logger.Info("fetching RBAC policy from Stytch", logger.Fields{})
 
-	resp, err := s.client.RBAC.Policy(ctx, &rbac.PolicyParams{})
-	if err != nil {
-		return nil, fmt.Errorf("stytch RBAC policy API call failed: %w", err)
+	var policy *rbac.Policy
+
+	fetch := func() error {
+		resp, err := s.client.RBAC.Policy(ctx, &rbac.PolicyParams{})
+		if err != nil {
+			return fmt.Errorf("stytch RBAC policy API call failed: %w", err)
+		}
+
+		if resp.Policy == nil {
+			return fmt.Errorf("stytch returned empty policy")
+		}
+
+		policy = resp.Policy
+		return nil
 	}
 
-	if resp.Policy == nil {
-		return nil, fmt.Errorf("stytch returned empty policy")
+	if s.breaker != nil {
+		if err := s.breaker.Run(ctx, fetch); err != nil {
+			s.logPolicyFetchFailure(err)
+			return nil, err
+		}
+	} else {
+		if err := fetch(); err != nil {
+			s.logPolicyFetchFailure(err)
+			return nil, err
+		}
 	}
 
 	s.logger.Info("successfully fetched RBAC policy", logger.Fields{
-		"roles_count":     len(resp.Policy.Roles),
-		"resources_count": len(resp.Policy.Resources),
+		"roles_count":     len(policy.Roles),
+		"resources_count": len(policy.Resources),
 	})
 
-	return resp.Policy, nil
+	return policy, nil
+}
+
+// logPolicyFetchFailure logs a policy fetch failure. Breaker-open failures are
+// logged distinctly so operators can tell "blocked locally" from "API error".
+func (s *RBACPolicyService) logPolicyFetchFailure(err error) {
+	if errors.Is(err, platformstytch.ErrCircuitOpen) {
+		s.logger.Warn("RBAC policy fetch blocked by circuit breaker (policy unavailable)", logger.Fields{
+			"error": err.Error(),
+		})
+		return
+	}
+	s.logger.Error("failed to fetch RBAC policy from Stytch (policy unavailable)", logger.Fields{
+		"error": err.Error(),
+	})
 }
 
 // cachePolicy stores policy in Redis.
@@ -197,7 +259,9 @@ func (s *RBACPolicyService) expandWildcardActions(resourceID string, actions []s
 		}
 	}
 
-	// Resource not found, keep wildcard as-is
+	// Resource not found in policy, keep wildcard as-is
+	// (documented residual: UI shows the literal wildcard with a
+	// "broad permission" note rather than inventing an expansion).
 	return actions
 }
 

@@ -56,6 +56,18 @@ func (r *configRepository) GetByVerifyToken(ctx context.Context, verifyToken str
 	return r.mapToDomain(&result), nil
 }
 
+func (r *configRepository) GetByWABAID(ctx context.Context, wabaID string) (*domain.WhatsAppConfig, error) {
+	result, err := r.store.GetWhatsAppConfigByWABAID(ctx, helpers.ToPgText(wabaID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrConfigNotFound
+		}
+		return nil, fmt.Errorf("failed to get config by waba id: %w", err)
+	}
+
+	return r.mapToDomain(&result), nil
+}
+
 func (r *configRepository) Create(ctx context.Context, config *domain.WhatsAppConfig) (*domain.WhatsAppConfig, error) {
 	params := sqlc.CreateWhatsAppConfigParams{
 		OrganizationID: config.OrganizationID,

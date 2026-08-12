@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the inbox UI: replying in open conversations, filtering the conversation list by status, and quick replies with playbook guion text.
-
 ## Requirements
-
 ### Requirement: User sends a reply in an open conversation
 The system SHALL send a reply typed into the reply input of the selected conversation via `useSendMessage`, append it to the message thread, and clear the input on success. An empty or whitespace-only draft SHALL NOT be sent. On failure, the system SHALL show an error toast, SHALL keep the draft in the input, SHALL NOT append the message to the thread, and SHALL NOT produce an unhandled promise rejection.
 
@@ -44,7 +42,7 @@ The system SHALL render one pill per applied playbook guion for the workspace, a
 - **THEN** the quick-replies row is not visible
 
 ### Requirement: User approves a pending agent suggestion
-The system SHALL render pending agent suggestions for the selected conversation, allow the user to approve a pending suggestion, and SHALL remove it from the pending list on approval via `POST /api/agent/suggestions/:id/approve`.
+The system SHALL render pending agent suggestions for the selected conversation, allow the user to approve a pending suggestion, and SHALL remove it from the pending list on approval via `POST /api/agent/suggestions/:id/approve`. While pending suggestions load, the panel SHALL render a skeleton placeholder instead of disappearing. Pending state SHALL be tracked per suggestion so an in-flight approve/reject disables only that suggestion's actions. The user SHALL be able to expand the conversation context a suggestion was based on before deciding.
 
 #### Scenario: Approving a suggestion removes it from pending
 - **WHEN** a pending suggestion exists for the conversation and user clicks approve
@@ -53,6 +51,18 @@ The system SHALL render pending agent suggestions for the selected conversation,
 #### Scenario: Rejecting a suggestion dismisses it
 - **WHEN** a pending suggestion exists for the conversation and user clicks reject
 - **THEN** the suggestion is dismissed from the pending suggestions panel
+
+#### Scenario: Panel loads with skeleton
+- **WHEN** the pending-suggestions query is loading
+- **THEN** the panel SHALL render a skeleton placeholder and SHALL NOT flash out of existence
+
+#### Scenario: Per-suggestion pending state
+- **WHEN** the user approves one of several pending suggestions
+- **THEN** only that suggestion's actions SHALL show pending state and the others SHALL remain interactive
+
+#### Scenario: Context expansion shows conversation excerpt
+- **WHEN** the user expands the context control on a suggestion
+- **THEN** the panel SHALL show a read-only excerpt of the conversation the suggestion was based on
 
 ### Requirement: Non-admin members see no privileged inbox controls
 The system SHALL hide quick-replies and the agent-suggestion panel from members without ORG_MANAGE/ORG_AGENT permission, and SHALL reject privileged inbox API calls from non-admin identities with 403.
@@ -207,3 +217,26 @@ The conversation list SHALL render an unread indicator for conversations with ne
 
 - **WHEN** the user sends a reply in a conversation with an unread indicator
 - **THEN** the indicator SHALL clear after the reply succeeds
+
+### Requirement: Conversaciones recientes reutilizan la bandeja
+
+La home del dashboard SHALL mostrar un panel de conversaciones recientes alimentado por `useConversationsQuery` (misma fuente que la bandeja), ordenado por `last_message_at` descendente y limitado a un subconjunto (p. ej. 4-5), con nombre/avatar del contacto, último mensaje, hora relativa y badge de no leídos cuando el modelo lo exponga. Cada ítem SHALL enlazar a la bandeja (`/dashboard/inbox`) o a la conversación si la ruta de la bandeja lo soporta. El panel NO SHALL duplicar la lógica de filtrado/estado de la bandeja.
+
+#### Scenario: La home muestra conversaciones recientes
+
+- **WHEN** el org tiene conversaciones activas
+- **THEN** la home SHALL listar las más recientes con su snippet y hora
+- **AND** el clic en una conversación SHALL navegar a la bandeja
+
+#### Scenario: Sin conversaciones
+
+- **WHEN** el org no tiene conversaciones
+- **THEN** el panel SHALL mostrar un estado vacío con CTA a la bandeja
+
+#### Scenario: El panel solo expone datos a nivel de snippet
+
+- **WHEN** el panel de la home renderiza una conversación
+- **THEN** SHALL mostrar únicamente los mismos campos de lista que expone la bandeja (nombre/avatar del contacto, último mensaje truncado, hora relativa, badge de no leídos si el modelo lo expone)
+- **AND** SHALL NOT renderizar el cuerpo completo del hilo, ni ofrecer exportación o transferencia de mensajes desde la home
+- **AND** el clic SHALL navegar a la bandeja, donde se conserva la superficie existente de lectura de hilo
+

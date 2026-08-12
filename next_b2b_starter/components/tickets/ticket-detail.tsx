@@ -6,7 +6,9 @@ import {
   useTransitionTicket,
   useSetTicketPriority,
   useAddInternalNote,
+  useAiTriageMutation,
 } from "@/lib/hooks/mutations/use-tickets-mutations";
+import { ui, tpl } from "@/lib/copy/ui";
 import { ErrorState } from "@/components/common/error-state";
 import type { TicketDto } from "@/lib/api/api/repositories/ticket-repository";
 
@@ -18,12 +20,20 @@ const STATUS_OPTIONS: { value: TicketDto["status"]; label: string }[] = [
   { value: "cancelled", label: "Cancelado" },
 ];
 
+const PRIORITY_LABELS: Record<TicketDto["priority"], string> = {
+  low: "baja",
+  normal: "media",
+  high: "alta",
+};
+
 export function TicketDetail({ id }: { id: number }) {
   const { data, isLoading, isError, refetch, isRefetching } = useTicketQuery(id);
   const transition = useTransitionTicket();
   const setPriority = useSetTicketPriority();
   const addNote = useAddInternalNote();
+  const triage = useAiTriageMutation();
   const [note, setNote] = useState("");
+  const [prioritySuggestion, setPrioritySuggestion] = useState<TicketDto["priority"] | null>(null);
 
   if (isLoading) return <div className="text-gray-500 text-sm">Cargando...</div>;
 
@@ -94,6 +104,30 @@ export function TicketDetail({ id }: { id: number }) {
         </div>
       </div>
 
+      {prioritySuggestion && (
+        <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          <span className="text-amber-800">
+            {tpl(ui.tickets.triagePrioritySuggestion, { priority: PRIORITY_LABELS[prioritySuggestion] })}
+          </span>
+          <button
+            onClick={() => {
+              setPriority.mutate({ id: ticket.id, priority: prioritySuggestion });
+              setPrioritySuggestion(null);
+            }}
+            className="px-2 py-0.5 bg-amber-600 text-white rounded text-xs"
+          >
+            {ui.tickets.triageApply}
+          </button>
+          <button
+            onClick={() => setPrioritySuggestion(null)}
+            aria-label="Descartar sugerencia de prioridad"
+            className="ml-auto text-amber-700 hover:text-amber-900"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <input
           value={note}
@@ -110,6 +144,23 @@ export function TicketDetail({ id }: { id: number }) {
           className="px-3 py-1 bg-gray-800 text-white rounded text-sm"
         >
           Agregar
+        </button>
+        <button
+          onClick={() =>
+            triage.mutate(
+              { id: ticket.id },
+              {
+                onSuccess: (result) => {
+                  setNote(result.note);
+                  setPrioritySuggestion(result.priority);
+                },
+              }
+            )
+          }
+          disabled={triage.isPending}
+          className="px-3 py-1 bg-emerald-500 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {triage.isPending ? "Generando…" : ui.tickets.triageDraft}
         </button>
       </div>
     </div>

@@ -4,13 +4,19 @@ import { verifyMercadoPagoPayment } from "@/lib/actions/billing/verify-mp-paymen
 import { DashboardHome } from "./components/dashboard-home";
 
 interface DashboardPageProps {
-  searchParams: Promise<{ checkout_id?: string; payment_id?: string; preference_id?: string }>;
+  searchParams: Promise<{
+    checkout_id?: string;
+    payment_id?: string;
+    preference_id?: string;
+    preapproval_id?: string;
+  }>;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const checkoutId = params.checkout_id;
   const paymentId = params.payment_id ?? params.preference_id;
+  const preapprovalId = params.preapproval_id;
 
   if (checkoutId) {
     const result = await verifyPayment(checkoutId);
@@ -28,6 +34,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       });
       redirect(`/dashboard/settings?view=subscription&payment_error=true`);
     }
+  }
+
+  // MercadoPago preapproval-only return (no payment id yet): the subscription
+  // settles via the subscription_authorized webhook or a later payment, so
+  // land on the subscription view without a false error banner.
+  if (preapprovalId && !paymentId) {
+    console.info("[Dashboard] MercadoPago preapproval return without payment", {
+      preapprovalId,
+    });
+    redirect("/dashboard/settings?view=subscription");
   }
 
   if (paymentId) {

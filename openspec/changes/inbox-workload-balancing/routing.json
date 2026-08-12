@@ -1,0 +1,7 @@
+{
+  "requires_council": true,
+  "requires_playwright": true,
+  "requires_market_read": true,
+  "complexity": "high",
+  "gated": "blocks until conversation-row-scoping, inbox-scope-views, inbox-assignment-actions archived"
+}

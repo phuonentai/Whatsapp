@@ -34,19 +34,6 @@ When ready to implement, run /opsx-apply
    ```
    This creates a scaffolded change in the planning home resolved by the CLI with `.openspec.yaml`.
 
-2b. **Premise validation (mandatory before writing specs)**
-
-   Before writing any delta specs, verify the factual premises the proposal asserts against the actual codebase:
-   - Routes/endpoints: confirm the claimed path or handler exists (grep/glob)
-   - Components/pages: confirm the claimed file or component exists
-   - Build status: if the proposal claims something compiles or a feature "exists", verify it (e.g., `tsc`, `go build`, or file inspection)
-   - Do NOT copy claims from other specs or proposals without checking the code
-
-   **Outcome:**
-   - Verified premises proceed as facts
-   - Premises that cannot be verified MUST be demoted to an `## Assumptions` section in the proposal, stating the claim and the evidence gap
-   - Never write delta specs on the basis of unverified claims
-
 3. **Get the artifact build order**
    ```bash
    openspec status --change "<name>" --json
@@ -117,4 +104,3 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
-- NEVER state factual premises (existing components, routes, endpoints, build status) without verifying them against the codebase (step 2b); unverifiable claims go in Assumptions

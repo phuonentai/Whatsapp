@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
 	crmServices "github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 	invdomain "github.com/moasq/go-b2b-starter/internal/modules/invoicing/domain"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
 )
@@ -190,7 +192,7 @@ type mockConvRepo struct {
 	byContact map[int32]*domain.Conversation
 }
 
-func (m *mockConvRepo) GetByID(ctx context.Context, orgID, convID int32) (*domain.Conversation, error) {
+func (m *mockConvRepo) GetByID(ctx context.Context, orgID, convID int32, scope conversationscope.Scope) (*domain.Conversation, error) {
 	return nil, nil
 }
 func (m *mockConvRepo) GetActiveByContact(ctx context.Context, orgID, contactID int32) (*domain.Conversation, error) {
@@ -208,10 +210,22 @@ func (m *mockConvRepo) EnsureActive(ctx context.Context, conv *domain.Conversati
 func (m *mockConvRepo) UpdateLastMessageAt(ctx context.Context, orgID, convID int32, lastMessageAt *time.Time) (*domain.Conversation, error) {
 	return nil, nil
 }
-func (m *mockConvRepo) UpdateStatus(ctx context.Context, orgID, convID int32, status domain.ConversationStatus) (*domain.Conversation, error) {
+func (m *mockConvRepo) UpdateStatus(ctx context.Context, orgID, convID int32, status domain.ConversationStatus, scope conversationscope.Scope) (*domain.Conversation, error) {
 	return nil, nil
 }
-func (m *mockConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*domain.ConversationWithContact, error) {
+func (m *mockConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string, view conversationscope.ViewScope, scope conversationscope.Scope) ([]*domain.ConversationWithContact, error) {
+	return nil, nil
+}
+func (m *mockConvRepo) UpdateAssignee(ctx context.Context, orgID, convID int32, assignee *string) (*domain.Conversation, error) {
+	return nil, nil
+}
+func (m *mockConvRepo) InsertEvent(ctx context.Context, event *domain.ConversationEvent) error {
+	return nil
+}
+func (m *mockConvRepo) ResolveContactAssignee(ctx context.Context, orgID, contactID int32) (*string, error) {
+	return nil, nil
+}
+func (m *mockConvRepo) ResolveCompanyOwnerMemberByPhone(ctx context.Context, orgID int32, phone string) (*string, error) {
 	return nil, nil
 }
 
@@ -239,6 +253,11 @@ type mockOutbound struct {
 
 func (m *mockOutbound) SendMessage(ctx context.Context, orgID, convID int32, content string) (*domain.Message, error) {
 	m.sent = append(m.sent, content)
+	return &domain.Message{}, nil
+}
+
+func (m *mockOutbound) SendTemplateMessage(ctx context.Context, orgID, convID int32, templateID int64, params []string) (*domain.Message, error) {
+	m.sent = append(m.sent, fmt.Sprintf("template:%d", templateID))
 	return &domain.Message{}, nil
 }
 

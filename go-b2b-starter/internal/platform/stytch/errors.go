@@ -34,7 +34,9 @@ func IsDuplicateSlugError(err error) bool {
 		return false
 	}
 
-	var stErr *stytcherror.Error
+	// The Stytch Go SDK surfaces API errors as value-typed stytcherror.Error,
+	// so the As target must be a value, not a pointer.
+	var stErr stytcherror.Error
 	if errors.As(err, &stErr) {
 		return string(stErr.ErrorType) == "organization_slug_already_used"
 	}
@@ -48,7 +50,9 @@ func MapError(err error) error {
 		return nil
 	}
 
-	var stErr *stytcherror.Error
+	// The Stytch Go SDK surfaces API errors as value-typed stytcherror.Error,
+	// so the As target must be a value, not a pointer.
+	var stErr stytcherror.Error
 	if errors.As(err, &stErr) {
 		// Check specific error types first
 		if string(stErr.ErrorType) == "organization_slug_already_used" {

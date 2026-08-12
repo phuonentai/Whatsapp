@@ -1,0 +1,48 @@
+{
+  "authState": {
+    "inputs": [
+      {
+        "type": "email",
+        "name": "",
+        "placeholder": "tu@empresa.com"
+      }
+    ],
+    "buttons": [
+      "Enviarme un enlace"
+    ],
+    "headings": [
+      "Bienvenido de nuevo a NexoChat",
+      "Inicia sesión en NexoChat",
+      "¿Necesitas ayuda?"
+    ],
+    "links": [
+      "NexoChat",
+      "NexoChat",
+      "Inicio",
+      "Regístrate"
+    ],
+    "bodyText": "NexoChat\nAcceso Seguro Empresarial\nBienvenido de nuevo a NexoChat\n\nUsa tu correo de trabajo para recibir un enlace de acceso único, consciente de tu organización.\n\nDatos Protegidos\n\nCumplimos con la Ley 1581 de Habeas Data en Colombia.\n\nSin contraseñas\n\nAcceso seguro por enlace de un solo uso.\n\nSesión por organización\n\nRoles y permisos según tu espacio de trabajo.\n\nInicia sesión en NexoChat\n\nIngresa tu correo de trabajo para recibir un enlace seguro.\n\nCorreo de trabajo\nEnviarme un enlace\n\nAl continuar aceptas los términos de servicio y la política de privacidad.\n\n¿No tienes cuenta? Regístrate\n\nImpulsado por\nStytch\n¿Necesitas ayuda?\n\nEscríbenos a soporte@nexochat.com para soporte o revisa la documentación de tu espacio de trabajo."
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-te",
+    "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "[Stytch] StytchAPIError: [404] public_token_not_found\npublic_token could not be found.\nSee https://stytch.com/docs/api/errors/404#public_token_not_found for more information.\nrequest_id: request-id-te",
+    "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+  ],
+  "dashboardState": {
+    "greeting": "Dashboard",
+    "kpis": [
+      "Inteligencia Artificial",
+      "Suscripción inactiva",
+      "Estado de la suscripción no disponible",
+      "Miércoles, 12 de agosto",
+      "Conversaciones activas",
+      "3",
+      "En todos los canales",
+      "Ventas de la semana"
+    ]
+  },
+  "note": "Stytch usa public token placeholder en mock; el login real requiere credenciales de test de Stytch."
+}

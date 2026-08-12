@@ -110,6 +110,13 @@ func (s *moduleService) SaveOrgModuleConfig(ctx context.Context, orgID int32, mo
 }
 
 func (s *moduleService) SyncModulesFromMetadata(ctx context.Context, orgID int32, moduleKeys []string) error {
+	// Absent/empty metadata key sets express no module change: reconciling
+	// against an empty list would disable every org module. Treat as a no-op
+	// (defense in depth; the webhook path also stops passing empty keys).
+	if len(moduleKeys) == 0 {
+		return nil
+	}
+
 	enabled := make(map[string]bool, len(moduleKeys))
 	for _, k := range moduleKeys {
 		enabled[k] = true

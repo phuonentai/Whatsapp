@@ -1,0 +1,26 @@
+# Tasks: Dashboard home recomposition — steady-state ops + first-run checklist
+
+Recomposición de la home del dashboard al export de diseño, con datos reales o estados honestos ("—"/vacío), sin endpoints nuevos y con la verificación de pagos intacta. Frontend only (`next_b2b_starter/`).
+
+## 1. Composición y widgets [FE-NEXT]
+
+- [x] 1.1 Reorganizar `app/dashboard/components/dashboard-home.tsx` al layout del diseño: header (saludo + fecha + selector de periodo + CTA "Nueva Conversación"), fila 4 KPIs, fila chart + panel Copiloto, fila 3 paneles (Conversaciones Recientes / Rendimiento del Equipo / Facturas Siigo), banner Auto-Piloto, Acciones Rápidas. Verify: `pnpm build`; inspección visual en `pnpm dev`
+- [x] 1.2 Panel "Conversaciones Recientes": reutilizar `useConversationsQuery`, ordenar por `last_message_at` desc, límite 4-5, snippet + hora relativa + badge no leídos si el modelo lo expone; ítems enlazan a `/dashboard/inbox`; SOLO datos a nivel de snippet (sin cuerpos completos, sin hilo en home). Verify: `pnpm build`; estado vacío con CTA; sin export/transferencia de mensajes desde home
+- [x] 1.3 Panel "Rendimiento del Equipo": `useMembersQuery` + métrica derivada si el modelo lo permite; si no hay métrica, estado vacío honesto con CTA a settings. Verify: `pnpm build`; sin % inventados
+- [x] 1.4 Panel "Facturas Siigo": sin endpoint de lista hoy → estado vacío honesto + CTA `settings?view=siigo`; KPI "Facturas emitidas" mantiene "—" con hint. Verify: `pnpm build`
+- [x] 1.5 Banner Auto-Piloto: reflejar `mode` de `useAgentSettingsQuery` (copilot/autopilot) o sugerencia estática + CTA `settings?view=ai`. Verify: `pnpm build`
+- [x] 1.6 Acciones Rápidas operativas: Broadcast (checkpoint de ruta: hoy no hay `/dashboard/campaigns` ni `view=campaigns` — si no existe ruta real al implementar, omitir la acción, regla D2.2), Nueva Factura (`settings?view=siigo`), Nuevo Contacto (`/dashboard/crm`), Exportar (`/dashboard/reportes`). Verify: `pnpm build`; enlaces navegan o acción omitida si no hay ruta
+- [x] 1.7 Badge de delta en KPIs: renderizar solo si hay comparación de periodo calculable desde datos existentes (p. ej. revenue); sin dato → sin badge. Verify: `pnpm build`; sin valores hardcodeados del mockup
+- [x] 1.8 Chart "Rendimiento de Ventas": conservar serie real (revenue) con leyenda; serie "predicción IA" SOLO si existe segunda serie; mantener selector de periodo y `salesAvailable` gate. Verify: `npx vitest run app/dashboard/components/dashboard-home.test.tsx`
+- [x] 1.9 Helpers de onboarding: conservar `AssistantIntro` + `FirstRunChecklist`; envolver en patrón colapsable: en estado parcial, plegado manual con preferencia persistida en localStorage; cuando el checklist está completo (se auto-oculta hoy, `return null`), conservar un shell mínimo colapsado con opción de reabrir; nunca ocultar un checklist incompleto en primer uso; estado de completitud derivado de las queries existentes, sin estado de servidor nuevo. Verify: `pnpm build`; checklist visible en primer uso; completitud sin cambios de contrato `ai-onboarding`
+- [x] 1.10 Copy nueva en `lib/copy/ui.ts` (títulos widgets, estados vacíos, CTAs) en español tipado, sin duplicados; el copy del banner Auto-Piloto NO afirma modo autónomo sin confirmación de `agent-settings`. Verify: `pnpm lint`
+- [x] 1.11 Gates RBAC por widget: cada widget (conversaciones, ventas/chart, Facturas Siigo, Rendimiento Equipo, Auto-Piloto) se renderiza solo bajo la misma condición de permiso/entitlement que su superficie fuente (chart: `useModule("analytics").enabled` AND `hasPermission(invoice:view)`; siigo: `invoice:view`; etc.); sin ensanchar acceso; sin gate explícito → estado vacío honesto. Verify: `pnpm build` + revisión manual de condiciones de render en `dashboard-home.tsx`
+
+## 2. Verificación [OPS-GOV]
+
+- [x] 2.1 Gate estático: `pnpm lint` (0 errores nuevos vs baseline), `pnpm build`, `npx tsc --noEmit`. Verify: los tres comandos PASS
+- [x] 2.2 Gate unitario: `npx vitest run app/dashboard/components/dashboard-home.test.tsx app/dashboard/page.test.tsx` → PASS (incluye routing checkout Polar/MercadoPago intacto). Verify: comando PASS
+- [x] 2.3 Gate visual/a11y: capturas Playwright 390x844/768x1024/1440x900 → `openspec/changes/dashboard-home-redesign/qa/`; verificar contraste, estados vacíos honestos y que el panel de conversaciones muestre solo snippets (sin cuerpos completos). Verify: artefactos en `qa/`
+- [x] 2.4 Cierre: `openspec validate dashboard-home-redesign --type change` PASS; registrar decisión de archivado (ejecutar /opsx-archive o anotar `**Archive deferred:** <razón>`). Verify: comando validate PASS
+
+**Archive deferred:** change implementado y verificado (9/9 tests vitest PASS, lint 0 errores, tsc PASS, build PASS, Playwright 390x844/768x1024/1440x900 → qa/, `openspec validate` PASS). El llenado real de widgets sin fuente (lista facturas Siigo, tiempo respuesta IA, deltas, predicción IA, métrica por miembro) depende de endpoints de backend que se propondrán en un change futuro; este change entrega la composición con estados honestos. Nota de entorno: se agregó un binding DI aditivo `MetricsSink` en `go-b2b-starter/internal/modules/procurement/module.go` para desbloquear el arranque del stack e2e (QA 2.3); sin impacto en el contrato del change.

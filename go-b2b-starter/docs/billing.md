@@ -127,7 +127,7 @@ Located in `internal/billing/polar_handler.go`.
 Webhooks are verified using Polar webhook secret:
 
 ```env
-POLAR_WEBHOOK_SECRET=whsec_xxx
+WEBHOOK_SECRET=whsec_xxx
 ```
 
 Invalid signatures are rejected.
@@ -172,7 +172,7 @@ Configured in `internal/billing/app/services/metering_service.go`.
 ```env
 # Polar.sh
 POLAR_ACCESS_TOKEN=polar_xxx
-POLAR_WEBHOOK_SECRET=whsec_xxx
+WEBHOOK_SECRET=whsec_xxx
 POLAR_ORGANIZATION_ID=org_xxx
 ```
 

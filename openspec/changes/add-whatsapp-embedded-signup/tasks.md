@@ -43,3 +43,8 @@
 - [x] 7.3 Archive decision — **Archive deferred:** verification gap 7.2 (manual smoke) cannot run until a Meta app with embedded-signup config exists and the stack is exercised end-to-end
 - [ ] 7.2 Manual smoke checklist (record results): connect button renders; Meta popup completes; webhook subscription visible in Meta app dashboard; a phone-app-sent message appears in the inbox as outbound; manual form still saves. Verify: all checklist items recorded in this file
 - [x] 7.3 Archive decision: either run `/opsx-archive` or record an explicit `**Archive deferred:** <reason>` entry. Verify: entry present in this file — same decision as 7.3 above: **Archive deferred** (verification gap 7.2, live Meta app required); entry present
+
+## Central re-verification (2026-08-11, Phase 1 of repo-wide active-changes run)
+
+- [x] Re-ran gates on current tree: `go build ./...` + `go vet ./...` PASS (baseline sweep), `go test ./internal/modules/whatsapp/... ./internal/modules/crm/...` PASS (exit 0, cached), `npx tsc --noEmit` PASS, `pnpm lint` PASS (0 errors / 4 pre-existing warnings — flat config landed, the 7.1 lint EXCEPTION note is obsolete), `pnpm build` PASS (baseline sweep).
+- [ ] 7.2 manual smoke (Meta app) remains the sole open item — blocked external, per recorded reason. Archive stays deferred.

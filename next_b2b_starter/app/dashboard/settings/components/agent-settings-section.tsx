@@ -116,7 +116,7 @@ export function AgentSettingsSection() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Sparkles className="h-6 w-6 text-gray-600" />
+            <Sparkles className="h-6 w-6 text-slate-600" />
             <div>
               <CardTitle>{ui.agent.settingsTitle}</CardTitle>
               <CardDescription>
@@ -130,7 +130,7 @@ export function AgentSettingsSection() {
             <div className="space-y-2">
               <Label className="text-sm font-medium">{ui.agent.mode}</Label>
               <select
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
                 value={form.mode}
                 onChange={(e) => set("mode", e.target.value as AgentSettings["mode"])}
                 disabled={updateMutation.isPending}
@@ -138,7 +138,7 @@ export function AgentSettingsSection() {
                 <option value="copilot">{ui.agent.modeCopilot}</option>
                 <option value="autopilot">{ui.agent.modeAutopilot}</option>
               </select>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 {ui.agent.modeHint}
               </p>
             </div>
@@ -146,7 +146,7 @@ export function AgentSettingsSection() {
             <div className="space-y-2">
               <Label className="text-sm font-medium">{ui.agent.tone}</Label>
               <select
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
                 value={form.tone}
                 onChange={(e) => set("tone", e.target.value as AgentSettings["tone"])}
                 disabled={updateMutation.isPending}
@@ -154,7 +154,7 @@ export function AgentSettingsSection() {
                 <option value="formal">{ui.agent.toneFormal}</option>
                 <option value="casual">{ui.agent.toneCasual}</option>
               </select>
-              <p className="text-xs text-gray-500">{ui.agent.toneHint}</p>
+              <p className="text-xs text-slate-500">{ui.agent.toneHint}</p>
             </div>
           </div>
 
@@ -227,10 +227,10 @@ export function AgentSettingsSection() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div>
               <Label className="text-sm font-medium">{ui.agent.killSwitch}</Label>
-              <p className="text-xs text-gray-500">{ui.agent.killSwitchHint}</p>
+              <p className="text-xs text-slate-500">{ui.agent.killSwitchHint}</p>
             </div>
             <Switch
               checked={form.kill_switch}
@@ -239,7 +239,7 @@ export function AgentSettingsSection() {
             />
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-lg border border-slate-200 p-4">
             <Label className="text-sm font-medium">{ui.agent.forbiddenTerms}</Label>
             <div className="mt-2 flex flex-wrap gap-2">
               {(form.guardrails.never?.forbidden_terms ?? []).map((term, i) => (
@@ -265,9 +265,9 @@ export function AgentSettingsSection() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-lg border border-slate-200 p-4">
             <Label className="text-sm font-medium">{ui.agent.escalateTerms}</Label>
-            <p className="text-xs text-gray-500">{ui.agent.escalateHint}</p>
+            <p className="text-xs text-slate-500">{ui.agent.escalateHint}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(form.guardrails.escalate?.terms ?? []).map((term, i) => (
                 <span key={`escalate-${i}`} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700">
@@ -292,10 +292,10 @@ export function AgentSettingsSection() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div>
               <Label className="text-sm font-medium">{ui.agent.consentRequired}</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 {ui.agent.consentHint}
               </p>
             </div>
@@ -310,7 +310,7 @@ export function AgentSettingsSection() {
             <div className="space-y-2">
               <Label className="text-sm font-medium">{ui.agent.consentMessage}</Label>
               <textarea
-                className="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
                 value={form.consent_template ?? ""}
                 onChange={(e) => set("consent_template", e.target.value)}
                 disabled={updateMutation.isPending}
@@ -323,7 +323,7 @@ export function AgentSettingsSection() {
             <Button
               onClick={handleSave}
               disabled={updateMutation.isPending}
-              className="bg-gray-900 text-white hover:bg-gray-800"
+              className="bg-emerald-500 text-white hover:bg-emerald-600"
             >
               {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {ui.agent.saveConfig}

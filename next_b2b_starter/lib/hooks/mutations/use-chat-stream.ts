@@ -5,7 +5,11 @@
 
 import { useCallback, useState } from "react";
 import { apiClient, resolveAccessToken } from "@/lib/api/api/client/api-client";
-import type { ChatRequest, ChatResponse } from "@/lib/models/cognitive.model";
+import type {
+  ChatRequest,
+  ChatResponse,
+  SimilarDocument,
+} from "@/lib/models/cognitive.model";
 
 interface UseChatStreamOptions {
   onToken?: (token: string) => void;
@@ -17,7 +21,7 @@ interface StreamState {
   messageId?: number;
   fullText: string;
   tokensUsed: number;
-  referencedDocs?: unknown[];
+  referencedDocs?: SimilarDocument[];
 }
 
 export function useChatStream(options: UseChatStreamOptions = {}) {
@@ -57,13 +61,19 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         if (!response.ok) {
           // Fall back to the JSON error body when available.
           let message = `Request failed (${response.status})`;
+          let code: string | undefined;
           try {
             const body = await response.json();
             if (body?.message) message = body.message;
+            // Surface the machine-readable code (e.g. funcionalidad_no_disponible)
+            // so callers can render the entitlement upgrade gate.
+            if (typeof body?.error === "string" && body.error) code = body.error;
           } catch {
             // non-JSON error body
           }
-          throw new Error(message);
+          const failed = new Error(message) as Error & { code?: string };
+          if (code) failed.code = code;
+          throw failed;
         }
 
         const contentType = response.headers.get("content-type") || "";
@@ -96,6 +106,18 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
               doneEventReceived = true;
               if (typeof parsed.session_id === "number") state.sessionId = parsed.session_id;
               if (typeof parsed.message_id === "number") state.messageId = parsed.message_id;
+              if (Array.isArray(parsed.referenced_docs)) {
+                state.referencedDocs = (parsed.referenced_docs as Array<Record<string, unknown>>)
+                  .filter((d) => typeof d?.document_id === "number")
+                  .map((d) => ({
+                    id: typeof d.id === "number" ? d.id : 0,
+                    documentId: d.document_id as number,
+                    contentPreview:
+                      typeof d.content_preview === "string" ? d.content_preview : "",
+                    similarityScore:
+                      typeof d.similarity_score === "number" ? d.similarity_score : 0,
+                  }));
+              }
             }
           } catch {
             // skip malformed event lines
@@ -147,6 +169,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
             tokensUsed: 0,
             createdAt: new Date(),
           },
+          referencedDocs: state.referencedDocs,
           tokensUsed: 0,
         };
         onDone?.(chatResponse);

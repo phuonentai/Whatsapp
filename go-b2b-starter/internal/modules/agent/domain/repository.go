@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"time"
+
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 )
 
 // Channel identifies the messaging provider a conversation belongs to.
@@ -44,13 +46,29 @@ type AgentRepository interface {
 	ResolveContactByIGUser(ctx context.Context, orgID int32, igUserID, displayName string, lastMessageAt time.Time) (*ContactRef, error)
 	GetContactRef(ctx context.Context, orgID, contactID int32) (*ContactRef, error)
 	ResolveConversation(ctx context.Context, orgID, contactID int32, channel string, lastMessageAt time.Time) (*ConversationRef, error)
-	GetConversationRef(ctx context.Context, orgID, conversationID int32) (*ConversationRef, error)
-	ListConversationsByContact(ctx context.Context, orgID, contactID int32) ([]*ConversationRef, error)
+	GetConversationRef(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*ConversationRef, error)
+	ListConversationsByContact(ctx context.Context, orgID, contactID int32, scope conversationscope.Scope) ([]*ConversationRef, error)
 	ListMessagesByConversation(ctx context.Context, orgID, conversationID int32, limit, offset int32) ([]*MessageRef, error)
 
 	// Compliance (Ley 1581)
 	UpdateContactConsent(ctx context.Context, orgID, contactID int32, status ConsentStatus, consentedAt *time.Time) (*ContactRef, error)
 	AnonymizeContact(ctx context.Context, orgID, contactID int32) error
+
+	// Conversation context (AI context intelligence)
+	UpsertConversationContext(ctx context.Context, orgID int32, c *ConversationContext) (*ConversationContext, error)
+	GetConversationContext(ctx context.Context, orgID, conversationID int32) (*ConversationContext, error)
+	GetConversationContextMeta(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*ConversationContextMeta, error)
+	ListRecentConversationMessages(ctx context.Context, orgID, conversationID int32, limit int32, scope conversationscope.Scope) ([]*MessageRef, error)
+}
+
+// ConversationContextMeta is the structural projection of a conversation used
+// for consent-gated reads and regeneration cursors.
+type ConversationContextMeta struct {
+	Channel         string
+	MessageCount    int64
+	LatestMessageID int64
+	FirstMessageAt  *time.Time
+	LastMessageAt   *time.Time
 }
 
 // OutboundGateway sends an outbound WhatsApp message through the existing

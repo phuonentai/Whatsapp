@@ -3,8 +3,10 @@ package adapters
 
 import (
 	"context"
+	"errors"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/billing/app/services"
+	"github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 	"github.com/moasq/go-b2b-starter/internal/modules/paywall"
 )
 
@@ -28,6 +30,13 @@ func NewStatusProviderAdapter(service services.BillingService) paywall.Subscript
 func (a *StatusProviderAdapter) GetSubscriptionStatus(ctx context.Context, organizationID int32) (*paywall.SubscriptionStatus, error) {
 	billingStatus, err := a.service.GetBillingStatus(ctx, organizationID)
 	if err != nil {
+		// Sentinel translation (design D1): the service returns
+		// domain.ErrSubscriptionNotFound unwrapped for no-subscription orgs;
+		// the paywall middleware checks for paywall.ErrNoSubscription.
+		if errors.Is(err, domain.ErrSubscriptionNotFound) {
+			return nil, paywall.ErrNoSubscription
+		}
+		// DB errors propagate wrapped — never swallowed into a 402.
 		return nil, err
 	}
 
@@ -41,8 +50,6 @@ func (a *StatusProviderAdapter) GetSubscriptionStatus(ctx context.Context, organ
 	// Determine status string from reason
 	if billingStatus.HasActiveSubscription {
 		status.Status = paywall.StatusActive
-	} else if billingStatus.Reason == "no active subscription found" {
-		status.Status = paywall.StatusNone
 	} else {
 		// Parse status from reason if available, otherwise default to inactive
 		status.Status = parseStatusFromReason(billingStatus.Reason)
@@ -60,6 +67,10 @@ func (a *StatusProviderAdapter) RefreshSubscriptionStatus(ctx context.Context, o
 	// Delegate to the BillingService.RefreshSubscriptionStatus method
 	billingStatus, err := a.service.RefreshSubscriptionStatus(ctx, organizationID)
 	if err != nil {
+		// Same sentinel translation as GetSubscriptionStatus.
+		if errors.Is(err, domain.ErrSubscriptionNotFound) {
+			return nil, paywall.ErrNoSubscription
+		}
 		return nil, err
 	}
 
@@ -73,8 +84,6 @@ func (a *StatusProviderAdapter) RefreshSubscriptionStatus(ctx context.Context, o
 	// Determine status string from reason
 	if billingStatus.HasActiveSubscription {
 		status.Status = paywall.StatusActive
-	} else if billingStatus.Reason == "no active subscription found" {
-		status.Status = paywall.StatusNone
 	} else {
 		// Parse status from reason if available, otherwise default to inactive
 		status.Status = parseStatusFromReason(billingStatus.Reason)
@@ -84,19 +93,28 @@ func (a *StatusProviderAdapter) RefreshSubscriptionStatus(ctx context.Context, o
 }
 
 // parseStatusFromReason attempts to extract a subscription status from the reason string.
+//
+// Unrecognized statuses map to a distinct unknown-inactive state
+// (paywall.StatusUnknown), never paywall.StatusNone: "none" means no
+// subscription exists, while an unknown status represents a real subscription
+// whose state the local layer does not recognize (e.g. Polar revoked/incomplete,
+// MP raw paused/in_process, or MP pending). Keeping it distinct lets the paywall
+// lazy guard attempt a provider refresh instead of treating the org as
+// subscriptionless. The raw status is preserved in the reason string itself
+// (built by the billing service as "subscription status: <status>").
 func parseStatusFromReason(reason string) string {
 	// Check for common status patterns in reason
 	switch {
 	case containsStatus(reason, "past_due"):
 		return paywall.StatusPastDue
 	case containsStatus(reason, "canceled"):
-		return paywall.StatusCanceled
+		return paywall.StatusUnpaid
 	case containsStatus(reason, "unpaid"):
 		return paywall.StatusUnpaid
 	case containsStatus(reason, "trialing"):
 		return paywall.StatusTrialing
 	default:
-		return paywall.StatusNone
+		return paywall.StatusUnknown
 	}
 }
 

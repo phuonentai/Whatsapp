@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { moduleRepository } from "@/lib/api/api/repositories/module-repository";
 import { ticketRepository, type TicketDto } from "@/lib/api/api/repositories/ticket-repository";
+import { copy } from "@/lib/copy/ui";
 import { queryKeys } from "../queries/query-keys";
 
 export function useSaveModuleConfig() {
@@ -72,6 +73,23 @@ export function useAddInternalNote() {
       toast.success("Nota interna agregada");
     },
     onError: () => toast.error("No se pudo agregar la nota"),
+  });
+}
+
+// useAiTriageMutation drafts an internal note and suggests a priority for a
+// ticket. Triage never mutates the ticket, so nothing is invalidated; the
+// caller fills the draft and shows the suggestion. Failure (including 402
+// ai_credits_exhausted) surfaces as a toast and leaves the form untouched.
+export function useAiTriageMutation() {
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => ticketRepository.aiTriage(id),
+    onError: (error) => {
+      if (error instanceof Error && error.message.includes("ai_credits_exhausted")) {
+        toast.error(copy("tickets", "triageCreditsExhausted"));
+        return;
+      }
+      toast.error(copy("tickets", "triageError"));
+    },
   });
 }
 

@@ -13,8 +13,10 @@ type EmbeddingRepository interface {
 	// GetByDocumentID retrieves all embeddings for a document
 	GetByDocumentID(ctx context.Context, orgID, documentID int32) ([]*DocumentEmbedding, error)
 
-	// SearchSimilar finds similar documents using vector similarity
-	SearchSimilar(ctx context.Context, orgID int32, embedding []float64, limit int32) ([]*SimilarDocument, error)
+	// SearchSimilar finds similar documents using vector similarity.
+	// includeAdminOnly=false restricts results to workspace documents (the
+	// requesting member does not hold org:manage); true includes admin_only docs.
+	SearchSimilar(ctx context.Context, orgID int32, embedding []float64, limit int32, includeAdminOnly bool) ([]*SimilarDocument, error)
 
 	// Delete removes embeddings for a document
 	Delete(ctx context.Context, orgID, documentID int32) error

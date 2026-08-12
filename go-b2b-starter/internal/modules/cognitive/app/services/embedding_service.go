@@ -69,15 +69,15 @@ func (s *embeddingService) GetDocumentEmbeddings(ctx context.Context, orgID, doc
 	return s.embeddingRepo.GetByDocumentID(ctx, orgID, documentID)
 }
 
-func (s *embeddingService) SearchSimilarDocuments(ctx context.Context, orgID int32, text string, limit int32) ([]*domain.SimilarDocument, error) {
+func (s *embeddingService) SearchSimilarDocuments(ctx context.Context, orgID int32, text string, limit int32, includeAdminOnly bool) ([]*domain.SimilarDocument, error) {
 	// Generate embedding for the search query
 	embedding, err := s.textVectorizer.Vectorize(ctx, text)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrEmbeddingGenerationFailed, err)
 	}
 
-	// Search for similar documents
-	return s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, limit)
+	// Search for similar documents (ACL-filtered by visibility)
+	return s.embeddingRepo.SearchSimilar(ctx, orgID, embedding, limit, includeAdminOnly)
 }
 
 func (s *embeddingService) DeleteDocumentEmbeddings(ctx context.Context, orgID, documentID int32) error {

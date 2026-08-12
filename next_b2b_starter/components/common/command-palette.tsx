@@ -15,7 +15,8 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { commandRegistry } from "@/lib/command-registry";
+import { aiActionRegistry, commandRegistry, type AiActionRouter } from "@/lib/command-registry";
+import { ui } from "@/lib/copy/ui";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import type { ContactDto } from "@/lib/api/api/dto/crm.dto";
 import {
@@ -37,9 +38,11 @@ function useDebouncedValue(value: string, delay: number): string {
 interface PaletteBodyProps {
   mode: CommandPaletteMode;
   onNavigate: (url: string) => void;
+  router: AiActionRouter;
+  onClose: () => void;
 }
 
-function PaletteBody({ mode, onNavigate }: PaletteBodyProps) {
+function PaletteBody({ mode, onNavigate, router, onClose }: PaletteBodyProps) {
   const [query, setQuery] = useState("");
   const [activeMode, setActiveMode] = useState<"command" | "search">(mode);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,18 +85,34 @@ function PaletteBody({ mode, onNavigate }: PaletteBodyProps) {
     });
   }, [activeMode, query]);
 
+  const aiFiltered = useMemo(() => {
+    if (activeMode !== "command") return [];
+    const term = query.trim().toLowerCase();
+    if (!term) return aiActionRegistry;
+    return aiActionRegistry.filter((action) => {
+      const haystack = `${action.title} ${action.keywords?.join(" ") ?? ""}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [activeMode, query]);
+
   const promoteToSearch = useCallback(() => {
     if (promotionTimerRef.current !== null) {
       window.clearTimeout(promotionTimerRef.current);
     }
     const trimmed = query.trim();
-    if (trimmed.length >= 2 && filteredDestinations.length === 0) {
+    // Promote only when nothing matches at all — AI actions included — so a
+    // query that hits the IA group (e.g. "audiencia") stays in command mode.
+    if (
+      trimmed.length >= 2 &&
+      filteredDestinations.length === 0 &&
+      aiFiltered.length === 0
+    ) {
       promotionTimerRef.current = window.setTimeout(() => {
         promotionTimerRef.current = null;
         setActiveMode((current) => (current === "search" ? current : "search"));
       }, SEARCH_DEBOUNCE_MS);
     }
-  }, [query, filteredDestinations.length]);
+  }, [query, filteredDestinations.length, aiFiltered.length]);
 
   const handleValueChange = (value: string) => {
     setQuery(value);
@@ -130,6 +149,23 @@ function PaletteBody({ mode, onNavigate }: PaletteBodyProps) {
         {activeMode === "command" ? (
           <>
             <CommandEmpty>No commands found.</CommandEmpty>
+            {aiFiltered.length > 0 && (
+              <CommandGroup heading={ui.palette.iaGroup}>
+                {aiFiltered.map((action) => (
+                  <CommandItem
+                    key={action.id}
+                    value={`${action.title} ${action.keywords?.join(" ") ?? ""}`.toLowerCase()}
+                    onSelect={() => {
+                      action.onSelect(router);
+                      onClose();
+                    }}
+                  >
+                    <action.icon className="mr-2 h-4 w-4" aria-hidden />
+                    <span>{action.title}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
             {sections.map(([section, destinations]) => (
               <CommandGroup key={section} heading={section}>
                 {destinations.map((destination) => (
@@ -210,7 +246,15 @@ export function CommandPalette() {
       <DialogDescription className="sr-only">
         Search across the app and navigate with the keyboard.
       </DialogDescription>
-      {open ? <PaletteBody key={session} mode={mode} onNavigate={navigate} /> : null}
+      {open ? (
+        <PaletteBody
+          key={session}
+          mode={mode}
+          onNavigate={navigate}
+          router={router}
+          onClose={closePalette}
+        />
+      ) : null}
     </CommandDialog>
   );
 }

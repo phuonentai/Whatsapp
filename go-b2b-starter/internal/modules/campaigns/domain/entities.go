@@ -30,12 +30,15 @@ const (
 )
 
 // Campaign is a draft or launched campaign. v1 covers draft -> ready
-// (audience captured); the scheduler consumes recipients later.
+// (audience captured); the scheduler consumes recipients later. Mensaje is
+// the optional message body stored with the draft; nothing sends at create
+// or launch (send path is future work).
 type Campaign struct {
 	ID             int32
 	OrganizationID int32
 	Nombre         string
 	SegmentID      int32
+	Mensaje        *string
 	Status         CampaignStatus
 	RecipientCount int32
 	LaunchedAt     *time.Time
@@ -74,9 +77,12 @@ type EvalResult struct {
 	ExcludedByGates int64
 }
 
-// AudienceBuildResult is the AI builder output: a validated candidate spec
-// plus its live preview. Nothing is persisted by the builder.
+// AudienceBuildResult is the AI builder output: a validated candidate spec,
+// its live preview, and an optional Spanish message draft from the same
+// metered call. Nothing is persisted by the builder; the message draft is
+// omitted when the model output for it is unparsable or empty.
 type AudienceBuildResult struct {
-	FilterSpec []Filter
-	Preview    *EvalResult
+	FilterSpec   []Filter
+	Preview      *EvalResult
+	MessageDraft string
 }

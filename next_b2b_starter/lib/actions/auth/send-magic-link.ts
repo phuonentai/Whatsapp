@@ -1,14 +1,44 @@
 "use server";
 
+import { headers } from "next/headers";
 import {
   getStytchB2BClient,
   getOrganizationIdsForMemberSearch,
 } from "@/lib/auth/stytch/server";
+import { recordAuthAudit } from "@/lib/auth/audit";
+import { checkMagicLinkRateLimit } from "@/lib/auth/magic-link-limiter";
 import {
   createActionSuccess,
   createActionError,
   type ActionResult,
 } from "@/lib/utils/server-action-helpers";
+
+const NEUTRAL_SEND_MESSAGE =
+  "If an account exists with that email, a magic link has been sent.";
+
+/**
+ * Derive the client IP from proxy headers.
+ *
+ * Trust order: `x-forwarded-for` first entry -> `x-real-ip` -> localhost
+ * fallback. In production the frontend sits behind a known ingress that sets
+ * these headers; in local dev the fallback keeps the action usable.
+ */
+function deriveClientIp(headerStore: {
+  get(name: string): string | null;
+}): string {
+  const forwardedFor = headerStore.get("x-forwarded-for");
+  if (forwardedFor) {
+    const firstEntry = forwardedFor.split(",")[0]?.trim();
+    if (firstEntry) {
+      return firstEntry;
+    }
+  }
+  const realIp = headerStore.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+  return "127.0.0.1";
+}
 
 /**
  * Send Magic Link Server Action
@@ -26,6 +56,25 @@ export async function sendMagicLink(
     // Validate input
     if (!email || typeof email !== "string") {
       return createActionError("Email address is required");
+    }
+
+    // Rate limit BEFORE any outbound Stytch call: throttle hit => no Stytch
+    // call => neutral success-shaped response (no enumeration leak).
+    const headerStore = await headers();
+    const { allowed } = checkMagicLinkRateLimit({
+      email,
+      ip: deriveClientIp(headerStore),
+    });
+
+    if (!allowed) {
+      console.info(
+        "[Magic Link] Rate limit hit, suppressing send (not revealing to client):",
+        email
+      );
+      return createActionSuccess(
+        { message: NEUTRAL_SEND_MESSAGE },
+        { throttled: true }
+      );
     }
 
     const client = getStytchB2BClient();
@@ -63,10 +112,7 @@ export async function sendMagicLink(
         "[Magic Link] No member found for email (not revealing to client):",
         email
       );
-      return createActionSuccess({
-        message:
-          "If an account exists with that email, a magic link has been sent.",
-      });
+      return createActionSuccess({ message: NEUTRAL_SEND_MESSAGE });
     }
 
     // Member exists - prepare login redirect URL
@@ -87,10 +133,7 @@ export async function sendMagicLink(
         "[Magic Link] Member search succeeded but no organization IDs were returned for email:",
         email
       );
-      return createActionSuccess({
-        message:
-          "If an account exists with that email, a magic link has been sent.",
-      });
+      return createActionSuccess({ message: NEUTRAL_SEND_MESSAGE });
     }
 
     if (memberOrganizationIds.length > 1) {
@@ -116,10 +159,19 @@ export async function sendMagicLink(
 
     console.info("[Magic Link] Successfully sent magic link to:", email);
 
-    return createActionSuccess({
-      message:
-        "If an account exists with that email, a magic link has been sent.",
-    });
+    // Record one audit row per organization the link was sent to
+    // (design D4 — matches how the send loops per org). Best-effort: the
+    // helper never throws, so the action outcome is unaffected.
+    const memberId = searchResult.members[0]?.member_id;
+    for (const organizationId of memberOrganizationIds) {
+      await recordAuthAudit({
+        type: "magic_link_requested",
+        memberId,
+        organizationId,
+      });
+    }
+
+    return createActionSuccess({ message: NEUTRAL_SEND_MESSAGE });
   } catch (error: any) {
     console.error("[Magic Link] Error sending magic link:", error);
 

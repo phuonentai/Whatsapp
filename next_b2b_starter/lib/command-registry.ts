@@ -15,6 +15,8 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { ui } from "@/lib/copy/ui";
+import { useCommandPaletteStore } from "@/lib/stores/command-palette-store";
 
 export interface CommandDestination {
   id: string;
@@ -165,4 +167,62 @@ export const globalShortcuts: GlobalShortcut[] = [
   { id: "settings", keys: ["g", "s"], label: "Go to Settings", url: "/dashboard/settings" },
   { id: "help", keys: ["?"], label: "Shortcuts help" },
   { id: "palette", keys: ["⌘", "K"], label: "Command palette" },
+];
+
+/**
+ * Minimal router surface AI actions need. Structurally compatible with the
+ * `AppRouterInstance` returned by `useRouter()` from `next/navigation`
+ * (whose `push` takes an optional second argument).
+ */
+export interface AiActionRouter {
+  push: (href: string) => void;
+}
+
+export interface AiAction {
+  id: string;
+  title: string;
+  section: "IA";
+  icon: LucideIcon;
+  keywords?: string[];
+  /**
+   * Executed by the command palette, which provides the router (actions never
+   * call `useRouter` themselves) and closes the palette afterwards.
+   */
+  onSelect: (router: AiActionRouter) => void;
+}
+
+/**
+ * Command-palette AI actions: rendered as a dedicated "IA" group above the
+ * navigation destinations. A parallel registry on purpose — navigation
+ * destinations and the `g <key>` shortcuts keep reading `commandRegistry`,
+ * so this group cannot regress them.
+ */
+export const aiActionRegistry: AiAction[] = [
+  {
+    id: "ai-ask-assistant",
+    title: ui.palette.askAssistant,
+    section: "IA",
+    icon: Bot,
+    keywords: ["asistente", "assistant", "ia", "knowledge", "conocimiento", "ayuda"],
+    onSelect: (router) => router.push("/dashboard/knowledge"),
+  },
+  {
+    id: "ai-new-chat",
+    title: ui.palette.newAiChat,
+    section: "IA",
+    icon: MessageCircle,
+    keywords: ["nueva", "conversación", "conversacion", "chat", "ia", "empezar"],
+    onSelect: (router) => {
+      useCommandPaletteStore.getState().requestNewAiChat();
+      router.push("/dashboard/knowledge");
+    },
+  },
+  {
+    id: "ai-campaign-audience",
+    title: ui.palette.aiCampaignAudience,
+    section: "IA",
+    icon: Users,
+    keywords: ["audiencia", "audience", "campañas", "campanas", "campaña", "crm", "ia"],
+    onSelect: (router) => router.push("/dashboard/crm?view=campanas"),
+  },
 ];

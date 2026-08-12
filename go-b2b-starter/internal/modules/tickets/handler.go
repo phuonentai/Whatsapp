@@ -11,15 +11,17 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
 	ticketsServices "github.com/moasq/go-b2b-starter/internal/modules/tickets/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/tickets/domain"
+	"github.com/moasq/go-b2b-starter/pkg/httperr"
 	"github.com/moasq/go-b2b-starter/pkg/response"
 )
 
 type Handler struct {
-	ticketService ticketsServices.TicketService
+	ticketService   ticketsServices.TicketService
+	aiTriageService *ticketsServices.AITriageService
 }
 
-func NewHandler(ticketService ticketsServices.TicketService) *Handler {
-	return &Handler{ticketService: ticketService}
+func NewHandler(ticketService ticketsServices.TicketService, aiTriageService *ticketsServices.AITriageService) *Handler {
+	return &Handler{ticketService: ticketService, aiTriageService: aiTriageService}
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -221,6 +223,45 @@ func (h *Handler) ListEvents(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, mapEvents(events))
+}
+
+// AiTriage drafts an internal note and suggests a priority for the stored
+// ticket via the metered, credit-gated LLM pipeline. Contract: 200
+// {"data":{"note":...,"priority":"low|normal|high"|null},"success":true};
+// 400 invalid id; 402 ai_credits_exhausted; 404 missing/foreign-org ticket;
+// 500 wrapped on failure. Never mutates the ticket.
+func (h *Handler) AiTriage(c *gin.Context) {
+	reqCtx := authcontext.GetRequestContext(c)
+	ticketID := parseID(c)
+	if ticketID <= 0 {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_id", "Identificador de ticket inválido."))
+		return
+	}
+
+	result, err := h.aiTriageService.Triage(c.Request.Context(), reqCtx.OrganizationID, ticketID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrTicketNotFound):
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(http.StatusNotFound, "ticket_not_found", "Ticket no encontrado."))
+		case errors.Is(err, ticketsServices.ErrAiCreditsExhausted):
+			c.JSON(http.StatusPaymentRequired, httperr.NewHTTPError(
+				http.StatusPaymentRequired, "ai_credits_exhausted",
+				"Has agotado tus créditos de IA para este periodo. Actualiza tu plan o espera a que se renueven.",
+			))
+		default:
+			c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+				http.StatusInternalServerError, "ai_triage_failed",
+				"No se pudo generar la nota. Inténtalo de nuevo.",
+			))
+		}
+		return
+	}
+
+	var priority any
+	if result.Priority != nil {
+		priority = string(*result.Priority)
+	}
+	response.Success(c, http.StatusOK, gin.H{"note": result.Note, "priority": priority})
 }
 
 func parseID(c *gin.Context) int32 {

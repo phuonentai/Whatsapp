@@ -58,7 +58,8 @@ describe("FirstRunChecklist", () => {
     expect(screen.getByText("Elige un plan")).toBeDefined();
     expect(screen.getByText("Conoce a tu asistente")).toBeDefined();
     expect(screen.getByText("Abre tu bandeja de entrada")).toBeDefined();
-    expect(screen.getAllByText("Pendiente")).toHaveLength(4);
+    expect(screen.getByText("Agrega tu primer documento")).toBeDefined();
+    expect(screen.getAllByText("Pendiente")).toHaveLength(5);
   });
 
   it("marks the WhatsApp step done when connected", () => {
@@ -108,6 +109,10 @@ describe("FirstRunChecklist", () => {
       "href",
       "/dashboard/inbox"
     );
+    expect(screen.getByText("Agrega tu primer documento").closest("a")).toHaveAttribute(
+      "href",
+      "/dashboard/knowledge"
+    );
   });
 
   it("opens the plans modal from the plan step", () => {
@@ -134,6 +139,7 @@ describe("FirstRunChecklist", () => {
       isError: false,
     } as never);
     localStorage.setItem("ai-onboarding.assistant-intro-dismissed", "true");
+    localStorage.setItem("ai-onboarding.knowledge-visited", "true");
 
     const { container } = renderChecklist();
     expect(container.firstChild).toBeNull();

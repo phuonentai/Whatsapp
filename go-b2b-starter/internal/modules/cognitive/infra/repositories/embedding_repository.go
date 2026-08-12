@@ -71,11 +71,12 @@ func (r *embeddingRepository) GetByDocumentID(ctx context.Context, orgID, docume
 	return embeddings, nil
 }
 
-func (r *embeddingRepository) SearchSimilar(ctx context.Context, orgID int32, embedding []float64, limit int32) ([]*domain.SimilarDocument, error) {
+func (r *embeddingRepository) SearchSimilar(ctx context.Context, orgID int32, embedding []float64, limit int32, includeAdminOnly bool) ([]*domain.SimilarDocument, error) {
 	params := sqlc.SearchSimilarDocumentsParams{
-		Column1:        helpers.ToVector(embedding),
-		OrganizationID: orgID,
-		Limit:          limit,
+		Column1:          helpers.ToVector(embedding),
+		OrganizationID:   orgID,
+		Limit:            limit,
+		IncludeAdminOnly: includeAdminOnly,
 	}
 
 	results, err := r.store.SearchSimilarDocuments(ctx, params)

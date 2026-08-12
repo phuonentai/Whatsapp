@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { getStytchB2BClient } from "@/lib/auth/stytch/server";
+import { mapAuthErrorToDetail, recordAuthAudit } from "@/lib/auth/audit";
 import {
   SESSION_COOKIE_NAME,
   SESSION_JWT_COOKIE_NAME,
@@ -62,6 +63,17 @@ export async function consumeMagicLink(
     });
 
     if (!result.member_authenticated) {
+      // MFA challenge not yet passed — record the gated attempt. Best-effort
+      // and non-blocking; the audit helper never throws.
+      if (result.mfa_required) {
+        await recordAuthAudit({
+          type: "mfa_challenge_failed",
+          memberId: result.member?.member_id,
+          organizationId: result.organization?.organization_id,
+          detail: "mfa_required",
+        });
+      }
+
       return createActionSuccess({
         memberAuthenticated: false,
         intermediateSessionToken: result.intermediate_session_token,
@@ -101,6 +113,15 @@ export async function consumeMagicLink(
       });
     }
 
+    // Record the successful login (best-effort; never blocks the auth outcome).
+    // The session JWT was just set above, so the audit helper can authenticate
+    // its POST to the Go activity endpoint.
+    await recordAuthAudit({
+      type: "login_succeeded",
+      memberId: result.member?.member_id,
+      organizationId: result.organization?.organization_id,
+    });
+
     return createActionSuccess({
       memberAuthenticated: true,
       member: result.member
@@ -117,10 +138,33 @@ export async function consumeMagicLink(
           }
         : undefined,
     });
-  } catch (error: any) {
-    const errorMessage =
-      error?.error_message || error?.message || "Unable to verify magic link.";
+  } catch (error: unknown) {
+    const errorMessage = extractErrorMessage(error);
+
+    // Record the rejected token consumption (best-effort, non-blocking). Only
+    // a bounded error code is recorded — never the raw error body.
+    await recordAuthAudit({
+      type: "login_failed",
+      detail: mapAuthErrorToDetail(error),
+    });
 
     return createActionError(errorMessage);
   }
+}
+
+/** Extract a safe, user-displayable message from a Stytch API error. */
+function extractErrorMessage(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "error_message" in error &&
+    typeof error.error_message === "string" &&
+    error.error_message.length > 0
+  ) {
+    return error.error_message;
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Unable to verify magic link.";
 }

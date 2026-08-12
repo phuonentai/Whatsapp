@@ -5,9 +5,10 @@ import { useCreateActivity } from "@/lib/hooks/mutations/use-crm-mutations";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { ErrorState } from "@/components/common/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { toast } from "sonner";
+import { useCsvExport } from "@/lib/csv-export";
 
 const TIPO_OPTIONS = [
   { value: "nota", label: "Nota" },
@@ -32,19 +33,11 @@ export function ActivityTimeline() {
 
   const { hasPermission } = usePermissions();
   const canExport = hasPermission("activity:export");
-  const [isExporting, setIsExporting] = useState(false);
-
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      await crmRepository.exportActivities();
-      toast.success("Actividades exportadas");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al exportar actividades");
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  const { isExporting, handleExport } = useCsvExport({
+    run: () => crmRepository.exportActivities(),
+    successMessage: "Actividades exportadas",
+    errorMessage: "Error al exportar actividades",
+  });
 
   const handleSubmit = () => {
     createActivity.mutate({
@@ -65,7 +58,22 @@ export function ActivityTimeline() {
     tarea: "✅", whatsapp_message: "💬", sistema: "⚙️",
   };
 
-  if (isLoading) return <div className="text-gray-500">Cargando actividades...</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-3" data-testid="activity-timeline" aria-busy="true">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex gap-3 p-3 bg-white rounded border">
+            <Skeleton className="h-8 w-8 rounded" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (isError) {
     return (
@@ -97,7 +105,7 @@ export function ActivityTimeline() {
           </select>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+            className="bg-emerald-500 text-white px-4 py-2 rounded text-sm hover:bg-emerald-600"
           >
             {showForm ? "Cancelar" : "Nueva actividad"}
           </button>
@@ -154,7 +162,7 @@ export function ActivityTimeline() {
               </select>
             </div>
           )}
-          <button onClick={handleSubmit} className="bg-blue-600 text-white px-4 py-2 rounded text-sm">
+          <button onClick={handleSubmit} className="bg-emerald-500 text-white px-4 py-2 rounded text-sm">
             Guardar
           </button>
         </div>

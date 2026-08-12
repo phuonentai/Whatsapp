@@ -47,7 +47,8 @@ export function useAiBuild() {
 export function useCreateCampaign() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { nombre: string; segment_id: number }) => campaignRepository.createCampaign(data),
+    mutationFn: (data: { nombre: string; segment_id: number; mensaje?: string }) =>
+      campaignRepository.createCampaign(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.crm.campaigns() }),
     onError: onMutationError,
   });

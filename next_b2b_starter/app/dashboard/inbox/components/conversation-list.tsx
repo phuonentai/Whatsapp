@@ -37,6 +37,12 @@ const channelTabs: Array<{ label: string; value: Channel | "all" }> = [
   { label: ui.inbox.channelInstagram, value: "instagram" },
 ];
 
+const statusLabels: Record<string, string> = {
+  active: ui.inbox.labelActive,
+  closed: ui.inbox.labelClosed,
+  archived: ui.inbox.labelArchived,
+};
+
 function timeAgo(dateStr?: string): string {
   if (!dateStr) return "";
   const date = new Date(dateStr);
@@ -48,6 +54,11 @@ function timeAgo(dateStr?: string): string {
   if (hrs < 24) return tpl(ui.inbox.timeHour, { n: hrs });
   const days = Math.floor(hrs / 24);
   return tpl(ui.inbox.timeDay, { n: days });
+}
+
+function getInitials(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0] ?? "").join("").toUpperCase() || "?";
 }
 
 export function ConversationList({
@@ -67,34 +78,34 @@ export function ConversationList({
 }: ConversationListProps) {
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-900">{ui.inbox.title}</h2>
-        <div className="mt-2 flex gap-1">
+      <div className="border-b border-border p-4">
+        <h2 className="text-lg font-semibold text-foreground">{ui.inbox.title}</h2>
+        <div className="mt-3 flex gap-1.5">
           {channelTabs.map((tab) => (
             <button
               key={tab.value}
               onClick={() => onChannelFilterChange(tab.value)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 channelFilter === tab.value
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-slate-100"
               )}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <div className="mt-2 flex gap-1">
+        <div className="mt-1.5 flex gap-1.5">
           {statusTabs.map((tab) => (
             <button
               key={tab.value}
               onClick={() => onStatusFilterChange(tab.value)}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 statusFilter === tab.value
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-slate-100"
               )}
             >
               {tab.label}
@@ -127,7 +138,7 @@ export function ConversationList({
           </div>
         ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {channelFilter === "instagram"
                 ? ui.inbox.emptyInstagram
                 : channelFilter === "whatsapp"
@@ -140,88 +151,105 @@ export function ConversationList({
                   ? "/dashboard/settings?view=instagram"
                   : "/dashboard/settings?view=whatsapp"
               }
-              className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+              className="mt-2 text-xs font-medium text-primary hover:text-primary"
             >
               {ui.inbox.goToSettings}
             </a>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {conversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => onSelect(conv)}
-                className={cn(
-                  "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50",
-                  selectedId === conv.id && "bg-gray-100"
-                )}
-              >
-                <div className="relative">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
-                    {conv.contactAvatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={conv.contactAvatarUrl}
-                        alt={conv.contactDisplayName || conv.contactInstagramUsername || ""}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      (conv.contactDisplayName || conv.contactInstagramUsername || conv.contactPhone || "?").charAt(0)
-                    )}
-                  </div>
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white">
-                    {conv.channel === "instagram" ? (
-                      <Instagram className="h-3.5 w-3.5 text-pink-600" />
-                    ) : (
-                      <MessageCircle className="h-3.5 w-3.5 text-green-600" />
-                    )}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-gray-900">
-                      {conv.contactDisplayName || conv.contactInstagramUsername || conv.contactPhone || ui.inbox.unknownContact}
+          <div className="divide-y divide-slate-100">
+            {conversations.map((conv) => {
+              const displayName =
+                conv.contactDisplayName ||
+                conv.contactInstagramUsername ||
+                conv.contactPhone ||
+                ui.inbox.unknownContact;
+              const subtitle =
+                conv.channel === "instagram"
+                  ? conv.contactInstagramUsername && conv.contactInstagramUsername !== conv.contactDisplayName
+                    ? `@${conv.contactInstagramUsername}`
+                    : ""
+                  : conv.contactPhone && conv.contactPhone !== conv.contactDisplayName
+                    ? conv.contactPhone
+                    : "";
+              const unread = isConversationUnread(conv, lastSeenAt ?? {});
+              return (
+                <button
+                  key={conv.id}
+                  onClick={() => onSelect(conv)}
+                  className={cn(
+                    "group flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-slate-50",
+                    selectedId === conv.id && "bg-slate-50"
+                  )}
+                >
+                  <div className="relative">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-muted-foreground">
+                      {conv.contactAvatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={conv.contactAvatarUrl}
+                          alt={displayName}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        getInitials(displayName)
+                      )}
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-white">
+                      {conv.channel === "instagram" ? (
+                        <Instagram className="h-3 w-3 text-pink-600" />
+                      ) : (
+                        <MessageCircle className="h-3 w-3 text-green-600" />
+                      )}
                     </span>
-                    <span className="flex items-center gap-1.5 shrink-0">
-                      {pendingCounts && pendingCounts[conv.id] > 0 && (
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-semibold text-white">
-                          {pendingCounts[conv.id]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "truncate text-sm font-medium text-foreground",
+                          unread && "font-semibold"
+                        )}
+                      >
+                        {displayName}
+                      </span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {pendingCounts && pendingCounts[conv.id] > 0 && (
+                          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-white">
+                            {pendingCounts[conv.id]}
+                          </span>
+                        )}
+                        {unread && (
+                          <span
+                            aria-label={ui.inbox.unreadAria}
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-primary"
+                          />
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {timeAgo(conv.lastMessageAt)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      {subtitle && (
+                        <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
+                      )}
+                      {conv.status !== "active" && (
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                            conv.status === "closed" && "bg-slate-100 text-muted-foreground",
+                            conv.status === "archived" && "bg-orange-50 text-orange-600"
+                          )}
+                        >
+                          {statusLabels[conv.status] ?? conv.status}
                         </span>
                       )}
-                      {isConversationUnread(conv, lastSeenAt ?? {}) && (
-                        <span
-                          aria-label={ui.inbox.unreadAria}
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500"
-                        />
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {timeAgo(conv.lastMessageAt)}
-                      </span>
-                    </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="truncate text-xs text-gray-500">
-                      {conv.channel === "instagram"
-                        ? conv.contactInstagramUsername && conv.contactInstagramUsername !== conv.contactDisplayName
-                          ? `@${conv.contactInstagramUsername}`
-                          : ""
-                        : conv.contactPhone && conv.contactPhone !== conv.contactDisplayName
-                          ? conv.contactPhone
-                          : ""}
-                    </span>
-                    {conv.status !== "active" && (
-                      <span className={cn(
-                        "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                        conv.status === "closed" && "bg-gray-100 text-gray-600",
-                        conv.status === "archived" && "bg-orange-50 text-orange-600",
-                      )}>
-                        {conv.status}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

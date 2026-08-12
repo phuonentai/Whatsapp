@@ -74,8 +74,10 @@ type BillingService interface {
 	RefreshSubscriptionStatus(ctx context.Context, organizationID int32) (*domain.BillingStatus, error)
 
 	// CreateMPCheckout creates a MercadoPago checkout (preapproval) and returns
-	// a BillingStatus carrying the redirect URL for the hosted Checkout Pro flow
-	CreateMPCheckout(ctx context.Context, planID string) (*domain.BillingStatus, error)
+	// a BillingStatus carrying the redirect URL for the hosted Checkout Pro flow.
+	// stytchOrgID is resolved by the handler from the Gin context
+	// ("stytch_org_id" populated by RequireOrganization).
+	CreateMPCheckout(ctx context.Context, stytchOrgID, planID string) (*domain.BillingStatus, error)
 
 	// VerifyMPPayment verifies a MercadoPago payment after checkout redirect by
 	// polling the MercadoPago API. On approval, upserts the local subscription,
@@ -87,8 +89,9 @@ type BillingService interface {
 	ProcessMPWebhookEvent(ctx context.Context, rawPayload json.RawMessage) error
 
 	// CancelMPSubscription cancels a MercadoPago preapproval via the API and
-	// marks the local subscription as canceled
-	CancelMPSubscription(ctx context.Context, subscriptionID string) (*domain.BillingStatus, error)
+	// marks the local subscription as canceled. stytchOrgID is resolved by the
+	// handler from the Gin context ("stytch_org_id").
+	CancelMPSubscription(ctx context.Context, stytchOrgID, subscriptionID string) (*domain.BillingStatus, error)
 
 	// GetAiUsageStatus returns the read-only AI usage state for the org's
 	// current billing period (tokens, credits used/max/remaining). Does not

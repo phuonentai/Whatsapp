@@ -1,0 +1,143 @@
+[
+  {
+    "page": "/dashboard/knowledge?mode=chat",
+    "viewport": "390x844",
+    "liveRegions": 1,
+    "composerInputs": 1,
+    "consoleErrors": [
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ]
+  },
+  {
+    "page": "/dashboard/knowledge?mode=chat",
+    "viewport": "768x1024",
+    "liveRegions": 1,
+    "composerInputs": 1,
+    "consoleErrors": [
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ]
+  },
+  {
+    "page": "/dashboard/knowledge?mode=chat",
+    "viewport": "1440x900",
+    "liveRegions": 1,
+    "composerInputs": 1,
+    "consoleErrors": [
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions."
+    ]
+  },
+  {
+    "page": "/dashboard/knowledge?mode=docs",
+    "viewport": "390x844",
+    "consoleErrors": [
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  {
+    "page": "/dashboard/knowledge?mode=docs",
+    "viewport": "768x1024",
+    "consoleErrors": [
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  {
+    "page": "/dashboard/knowledge?mode=docs",
+    "viewport": "1440x900",
+    "consoleErrors": [
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/projects/bootstrap/public-token-test-14abee49-f345-40d9-8724-083898e5dfc7' from origin 'http://localhost:3001",
+      "Failed to load resource: net::ERR_FAILED",
+      "[Stytch] StytchAPIUnreachableError: Unable to contact our servers.\n    at http://localhost:3001/_next/static/chunks/82e3f_%40stytch_vanilla-js_dist_internal-CSY",
+      "[Stytch] Unable to retrieve RBAC policy from servers. Assuming caller has no permissions.",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED",
+      "Access to fetch at 'https://test.stytch.com/sdk/v1/events' from origin 'http://localhost:3001' has been blocked by CORS policy: Request header field x-test-org-",
+      "Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  {
+    "page": "restricted detail",
+    "viewport": "390x844",
+    "titleLeaked": false
+  },
+  {
+    "page": "restricted detail",
+    "viewport": "768x1024",
+    "titleLeaked": false
+  },
+  {
+    "page": "restricted detail",
+    "viewport": "1440x900",
+    "titleLeaked": false
+  }
+]

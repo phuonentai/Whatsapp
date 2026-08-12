@@ -47,6 +47,11 @@ RETURNING *;
 SELECT * FROM whatsapp.whatsapp_configs
 WHERE verify_token = $1 AND is_active = true;
 
+-- name: GetWhatsAppConfigByWABAID :one
+SELECT * FROM whatsapp.whatsapp_configs
+WHERE waba_id = $1 AND is_active = true
+LIMIT 1;
+
 -- name: InsertWebhookLog :one
 INSERT INTO whatsapp.webhook_logs (
     organization_id,
@@ -122,3 +127,74 @@ SET
     updated_at = NOW()
 WHERE organization_id = $1
 RETURNING *;
+
+-- WhatsApp message templates (org-scoped registry; Meta is approval authority)
+
+-- name: InsertWhatsAppTemplate :one
+INSERT INTO whatsapp.templates (
+    organization_id,
+    name,
+    category,
+    language,
+    body,
+    param_count,
+    status,
+    meta_template_id,
+    rejection_reason,
+    is_active
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING *;
+
+-- name: GetWhatsAppTemplateByID :one
+SELECT * FROM whatsapp.templates
+WHERE id = $1 AND organization_id = $2;
+
+-- name: GetWhatsAppTemplateByOrgAndNameLanguage :one
+SELECT * FROM whatsapp.templates
+WHERE organization_id = $1 AND name = $2 AND language = $3;
+
+-- name: GetWhatsAppTemplateByMetaTemplateID :one
+SELECT * FROM whatsapp.templates
+WHERE meta_template_id = $1 AND organization_id = $2;
+
+-- name: ListWhatsAppTemplatesByOrg :many
+SELECT * FROM whatsapp.templates
+WHERE organization_id = $1
+ORDER BY updated_at DESC;
+
+-- name: UpdateWhatsAppTemplate :one
+-- Editable fields are draft-only; the caller enforces the draft guard.
+UPDATE whatsapp.templates
+SET
+    name = $3,
+    category = $4,
+    language = $5,
+    body = $6,
+    param_count = $7,
+    updated_at = NOW()
+WHERE id = $1 AND organization_id = $2
+RETURNING *;
+
+-- name: UpdateWhatsAppTemplateStatus :one
+-- Transaction-isolated state check: when the new status equals the stored
+-- status (re-delivered webhook, redundant refresh) no row is returned and the
+-- caller treats it as a no-op (no duplicate audit events).
+UPDATE whatsapp.templates
+SET
+    status = $3,
+    meta_template_id = COALESCE($4, meta_template_id),
+    rejection_reason = $5,
+    is_active = CASE WHEN $3 = 'approved' THEN true WHEN $3 = 'rejected' THEN false ELSE is_active END,
+    updated_at = NOW()
+WHERE id = $1 AND organization_id = $2 AND status IS DISTINCT FROM $3
+RETURNING *;
+
+-- name: DeleteWhatsAppTemplate :one
+DELETE FROM whatsapp.templates
+WHERE id = $1 AND organization_id = $2
+RETURNING *;
+
+-- name: CountWhatsAppTemplatesByOrg :one
+SELECT COUNT(*) FROM whatsapp.templates
+WHERE organization_id = $1;

@@ -87,10 +87,13 @@ func (r *subscriptionRepository) GetQuotaByOrgID(ctx context.Context, organizati
 }
 
 func (r *subscriptionRepository) UpsertQuota(ctx context.Context, quota *domain.QuotaTracking) (*domain.QuotaTracking, error) {
+	// invoice_count/max_seats of -1 mean "no new value" (metadata/status-only
+	// update): the SQL preserves the stored values atomically instead of
+	// overwriting them, so a concurrent decrement is never clobbered back.
 	params := sqlc.UpsertQuotaParams{
 		OrganizationID: quota.OrganizationID,
 		InvoiceCount:   quota.InvoiceCount,
-		MaxSeats:       helpers.ToPgInt4(quota.MaxSeats),
+		MaxSeats:       quota.MaxSeats,
 		PeriodStart:    toPgTimestamp(quota.PeriodStart),
 		PeriodEnd:      toPgTimestamp(quota.PeriodEnd),
 	}
@@ -106,6 +109,11 @@ func (r *subscriptionRepository) UpsertQuota(ctx context.Context, quota *domain.
 func (r *subscriptionRepository) DecrementInvoiceCount(ctx context.Context, organizationID int32) (*domain.QuotaTracking, error) {
 	result, err := r.store.DecrementInvoiceCount(ctx, organizationID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// The bounded WHERE clause (invoice_count > 0) matched no row:
+			// the count is already exhausted.
+			return nil, domain.ErrQuotaExhausted
+		}
 		return nil, fmt.Errorf("failed to decrement invoice count: %w", err)
 	}
 

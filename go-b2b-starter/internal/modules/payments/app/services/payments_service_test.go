@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	crmdomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 	crmServices "github.com/moasq/go-b2b-starter/internal/modules/crm/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/payments/domain"
 	loggerDomain "github.com/moasq/go-b2b-starter/internal/platform/logger/domain"
@@ -127,7 +129,7 @@ type fakeConvRepo struct {
 	byContact map[int32]*crmdomain.Conversation
 }
 
-func (m *fakeConvRepo) GetByID(ctx context.Context, orgID, convID int32) (*crmdomain.Conversation, error) {
+func (m *fakeConvRepo) GetByID(ctx context.Context, orgID, convID int32, scope conversationscope.Scope) (*crmdomain.Conversation, error) {
 	return nil, nil
 }
 func (m *fakeConvRepo) GetActiveByContact(ctx context.Context, orgID, contactID int32) (*crmdomain.Conversation, error) {
@@ -148,10 +150,22 @@ func (m *fakeConvRepo) EnsureActive(ctx context.Context, conv *crmdomain.Convers
 func (m *fakeConvRepo) UpdateLastMessageAt(ctx context.Context, orgID, convID int32, lastMessageAt *time.Time) (*crmdomain.Conversation, error) {
 	return nil, nil
 }
-func (m *fakeConvRepo) UpdateStatus(ctx context.Context, orgID, convID int32, status crmdomain.ConversationStatus) (*crmdomain.Conversation, error) {
+func (m *fakeConvRepo) UpdateStatus(ctx context.Context, orgID, convID int32, status crmdomain.ConversationStatus, scope conversationscope.Scope) (*crmdomain.Conversation, error) {
 	return nil, nil
 }
-func (m *fakeConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string) ([]*crmdomain.ConversationWithContact, error) {
+func (m *fakeConvRepo) ListByOrganization(ctx context.Context, orgID int32, limit, offset int32, statusFilter, channelFilter string, view conversationscope.ViewScope, scope conversationscope.Scope) ([]*crmdomain.ConversationWithContact, error) {
+	return nil, nil
+}
+func (m *fakeConvRepo) UpdateAssignee(ctx context.Context, orgID, convID int32, assignee *string) (*crmdomain.Conversation, error) {
+	return nil, nil
+}
+func (m *fakeConvRepo) InsertEvent(ctx context.Context, event *crmdomain.ConversationEvent) error {
+	return nil
+}
+func (m *fakeConvRepo) ResolveContactAssignee(ctx context.Context, orgID, contactID int32) (*string, error) {
+	return nil, nil
+}
+func (m *fakeConvRepo) ResolveCompanyOwnerMemberByPhone(ctx context.Context, orgID int32, phone string) (*string, error) {
 	return nil, nil
 }
 
@@ -182,6 +196,11 @@ type fakeOutbound struct {
 
 func (m *fakeOutbound) SendMessage(ctx context.Context, orgID, convID int32, content string) (*crmdomain.Message, error) {
 	m.sent = append(m.sent, content)
+	return &crmdomain.Message{}, nil
+}
+
+func (m *fakeOutbound) SendTemplateMessage(ctx context.Context, orgID, convID int32, templateID int64, params []string) (*crmdomain.Message, error) {
+	m.sent = append(m.sent, fmt.Sprintf("template:%d", templateID))
 	return &crmdomain.Message{}, nil
 }
 

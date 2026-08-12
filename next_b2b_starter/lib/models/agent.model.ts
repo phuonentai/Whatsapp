@@ -70,3 +70,26 @@ export interface ComplianceExport {
     }>;
   }>;
 }
+
+export type ConversationContextStatus = "available" | "unavailable" | "structural";
+
+export interface ConversationContext {
+  conversationId: number;
+  summary?: string;
+  detectedIntent?: string;
+  keyFacts: string[];
+  sourceCursor: number;
+  generatedAt?: string;
+  consentGated: boolean;
+  status: ConversationContextStatus;
+  channel?: string;
+  messageCount?: number;
+  firstMessageAt?: string;
+  lastMessageAt?: string;
+}
+
+export type RephraseMode = "rephrase" | "formal" | "casual" | "summarize";
+
+export interface RephraseResponse {
+  text: string;
+}

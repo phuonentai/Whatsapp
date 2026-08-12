@@ -23,6 +23,7 @@ export interface CampaignDto {
   organization_id: number;
   nombre: string;
   segment_id: number;
+  mensaje?: string | null;
   status: CampaignStatus;
   recipient_count: number;
   launched_at?: string | null;
@@ -39,6 +40,8 @@ export interface EvalResultDto {
 export interface AudienceBuildResultDto {
   filter_spec: SegmentFilter[];
   preview: EvalResultDto;
+  /** Optional Spanish WhatsApp promotional draft; omitted when unparsable. */
+  message_draft?: string;
 }
 
 export type RecipientStatus = "pending" | "sent" | "failed" | "skipped";

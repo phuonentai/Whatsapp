@@ -20,7 +20,7 @@ type SegmentService interface {
 
 // CampaignService manages campaign drafts, launches, and recipient snapshots.
 type CampaignService interface {
-	Create(ctx context.Context, orgID int32, nombre string, segmentID int32, createdBy string) (*domain.Campaign, error)
+	Create(ctx context.Context, orgID int32, nombre string, segmentID int32, mensaje string, createdBy string) (*domain.Campaign, error)
 	Get(ctx context.Context, orgID, id int32) (*domain.Campaign, error)
 	List(ctx context.Context, orgID int32) ([]*domain.Campaign, error)
 	// Launch evaluates the campaign's segment, snapshots the audience

@@ -14,6 +14,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // Next.js uses this package to guard server-only modules from client
+      // bundles; vitest resolves it to a no-op so server auth code is testable.
+      "server-only": path.resolve(__dirname, "test/mocks/server-only.ts"),
     },
   },
 });

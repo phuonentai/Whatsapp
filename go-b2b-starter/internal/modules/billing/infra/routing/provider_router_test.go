@@ -102,6 +102,25 @@ func (f *fixedOrgAdapter) GetOrganizationIDByStytchOrgID(ctx context.Context, st
 	return f.orgID, nil
 }
 
+func TestProviderRouter_UnconfiguredMPDelegatesAllOrgsToPolar(t *testing.T) {
+	// MercadoPago is optional in DI: when unconfigured the router receives a
+	// nil MP adapter and MUST degrade to Polar-only routing for every org,
+	// including ones whose provider is recorded as "mercadopago".
+	router := NewProviderRouter(
+		&fakeAdapter{name: "polar", subscription: &domain.Subscription{SubscriptionID: "pol_1"}},
+		nil,
+		&fakeResolver{providers: map[int32]string{1: "polar", 2: "mercadopago", 3: ""}},
+		&fakeOrgAdapter{},
+	).(*ProviderRouter)
+
+	for _, orgID := range []int32{1, 2, 3} {
+		router.orgAdapter = &fixedOrgAdapter{orgID: orgID}
+		sub, err := router.GetSubscription(context.Background(), "org-stytch")
+		require.NoError(t, err)
+		assert.Equal(t, "pol_1", sub.SubscriptionID, "org %d must delegate to Polar when MP is unconfigured", orgID)
+	}
+}
+
 func TestProviderRouter_UnknownProviderErrors(t *testing.T) {
 	router := newTestRouter()
 	router.orgAdapter = &fixedOrgAdapter{orgID: 3}

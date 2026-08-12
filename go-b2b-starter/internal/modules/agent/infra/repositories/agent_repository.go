@@ -13,6 +13,8 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
+	"github.com/moasq/go-b2b-starter/internal/platform/dbctx"
 )
 
 // agentRepository implements domain.AgentRepository on top of sqlc.Store.
@@ -23,6 +25,12 @@ type agentRepository struct {
 // NewAgentRepository creates the agent repository.
 func NewAgentRepository(store sqlc.Store) domain.AgentRepository {
 	return &agentRepository{store: store}
+}
+
+// storeOf prefiere la store transaccional del request (RLS); si no, la del
+// pool (enforcement primario: query layer).
+func (r *agentRepository) storeOf(ctx context.Context) sqlc.Store {
+	return dbctx.StoreFrom(ctx, r.store)
 }
 
 // ---------- Flows ----------
@@ -324,14 +332,23 @@ func (r *agentRepository) ResolveConversation(ctx context.Context, orgID, contac
 	if channel == "" {
 		channel = domain.ChannelWhatsapp
 	}
+	// Auto-match org-scoped (conversation-row-scoping, task 4.3): en creación
+	// net-nueva se resuelve el assignee desde el contacto (assigned_to →
+	// fallback owner de empresa); si la conversación ya existe, el insert
+	// idempotente conserva su assignee (no-sobreescritura).
+	assignee, _ := r.store.ResolveContactAssignee(ctx, sqlc.ResolveContactAssigneeParams{
+		ID:             contactID,
+		OrganizationID: orgID,
+	})
 	// Idempotent insert of an active conversation; on conflict, fall back to
 	// the existing active conversation (same pattern as CRMService).
 	row, err := r.store.InsertActiveConversationIdempotent(ctx, sqlc.InsertActiveConversationIdempotentParams{
-		OrganizationID: orgID,
-		ContactID:      contactID,
-		Channel:        channel,
-		LastMessageAt:  helpers.ToPgTimestamp(lastMessageAt),
-		Metadata:       []byte(`{}`),
+		OrganizationID:         orgID,
+		ContactID:              contactID,
+		Channel:                channel,
+		LastMessageAt:          helpers.ToPgTimestamp(lastMessageAt),
+		Metadata:               []byte(`{}`),
+		AssigneeStytchMemberID: assignee,
 	})
 	if err == nil {
 		return mapConversationRef(&row), nil
@@ -347,10 +364,14 @@ func (r *agentRepository) ResolveConversation(ctx context.Context, orgID, contac
 	return mapConversationRef(&existing), nil
 }
 
-func (r *agentRepository) GetConversationRef(ctx context.Context, orgID, conversationID int32) (*domain.ConversationRef, error) {
-	row, err := r.store.GetConversationByID(ctx, sqlc.GetConversationByIDParams{
-		ID:             conversationID,
-		OrganizationID: orgID,
+func (r *agentRepository) GetConversationRef(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*domain.ConversationRef, error) {
+	row, err := r.storeOf(ctx).GetConversationByID(ctx, sqlc.GetConversationByIDParams{
+		ID:              conversationID,
+		OrganizationID:  orgID,
+		ScopeEnabled:    scope.FlagEnabled,
+		ScopeViewAll:    scope.ViewAll,
+		ScopeMember:     scope.MemberID,
+		ScopeUnassigned: scope.ViewUnassigned,
 	})
 	if err != nil {
 		if isNoRows(err) {
@@ -361,10 +382,14 @@ func (r *agentRepository) GetConversationRef(ctx context.Context, orgID, convers
 	return mapConversationRef(&row), nil
 }
 
-func (r *agentRepository) ListConversationsByContact(ctx context.Context, orgID, contactID int32) ([]*domain.ConversationRef, error) {
-	rows, err := r.store.ListConversationsByContact(ctx, sqlc.ListConversationsByContactParams{
-		OrganizationID: orgID,
-		ContactID:      contactID,
+func (r *agentRepository) ListConversationsByContact(ctx context.Context, orgID, contactID int32, scope conversationscope.Scope) ([]*domain.ConversationRef, error) {
+	rows, err := r.storeOf(ctx).ListConversationsByContact(ctx, sqlc.ListConversationsByContactParams{
+		OrganizationID:  orgID,
+		ContactID:       contactID,
+		ScopeEnabled:    scope.FlagEnabled,
+		ScopeViewAll:    scope.ViewAll,
+		ScopeMember:     scope.MemberID,
+		ScopeUnassigned: scope.ViewUnassigned,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list conversations by contact: %w", err)
@@ -583,4 +608,129 @@ func pgTimeToTime(t pgtype.Time) string {
 
 func isNoRows(err error) bool {
 	return err != nil && (err.Error() == "no rows in result set" || strings.Contains(err.Error(), "no rows"))
+}
+
+// ---------- Conversation context (AI context intelligence) ----------
+
+func (r *agentRepository) UpsertConversationContext(ctx context.Context, orgID int32, c *domain.ConversationContext) (*domain.ConversationContext, error) {
+	facts, err := json.Marshal(c.KeyFacts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode key facts: %w", err)
+	}
+	row, err := r.store.UpsertConversationContext(ctx, sqlc.UpsertConversationContextParams{
+		ConversationID: c.ConversationID,
+		Summary:        pgtype.Text{String: c.Summary, Valid: c.Summary != ""},
+		KeyFacts:       facts,
+		DetectedIntent: pgtype.Text{String: c.DetectedIntent, Valid: c.DetectedIntent != ""},
+		SourceCursor:   c.SourceCursor,
+		ConsentGated:   c.ConsentGated,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert conversation context: %w", err)
+	}
+	return mapConversationContext(&row), nil
+}
+
+func (r *agentRepository) GetConversationContext(ctx context.Context, orgID, conversationID int32) (*domain.ConversationContext, error) {
+	row, err := r.store.GetConversationContext(ctx, conversationID)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, domain.ErrContextNotFound
+		}
+		return nil, fmt.Errorf("failed to get conversation context: %w", err)
+	}
+	// The row is scoped by conversation PK; verify org ownership so reads are
+	// org-scoped even though the PK lookup itself is not.
+	if _, err := r.store.GetConversationByID(ctx, sqlc.GetConversationByIDParams{
+		ID:             conversationID,
+		OrganizationID: orgID,
+	}); err != nil {
+		if isNoRows(err) {
+			return nil, domain.ErrConversationNotFound
+		}
+		return nil, fmt.Errorf("failed to verify conversation ownership: %w", err)
+	}
+	return mapConversationContext(&row), nil
+}
+
+func (r *agentRepository) GetConversationContextMeta(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*domain.ConversationContextMeta, error) {
+	row, err := r.storeOf(ctx).GetConversationContextMeta(ctx, sqlc.GetConversationContextMetaParams{
+		ID:              conversationID,
+		OrganizationID:  orgID,
+		ScopeEnabled:    scope.FlagEnabled,
+		ScopeViewAll:    scope.ViewAll,
+		ScopeMember:     scope.MemberID,
+		ScopeUnassigned: scope.ViewUnassigned,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get conversation context meta: %w", err)
+	}
+	return &domain.ConversationContextMeta{
+		Channel:         row.Channel,
+		MessageCount:    row.MessageCount,
+		LatestMessageID: row.LatestMessageID,
+		FirstMessageAt:  toTimePtr(row.FirstMessageAt),
+		LastMessageAt:   toTimePtr(row.LastMessageAt),
+	}, nil
+}
+
+// toTimePtr converts a pgx-scanned nullable timestamp (interface{}) into a
+// *time.Time, tolerating nil, time.Time, and *time.Time representations.
+func toTimePtr(v interface{}) *time.Time {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case time.Time:
+		return &t
+	case *time.Time:
+		return t
+	default:
+		return nil
+	}
+}
+
+func (r *agentRepository) ListRecentConversationMessages(ctx context.Context, orgID, conversationID int32, limit int32, scope conversationscope.Scope) ([]*domain.MessageRef, error) {
+	rows, err := r.storeOf(ctx).ListRecentConversationMessages(ctx, sqlc.ListRecentConversationMessagesParams{
+		ConversationID:  conversationID,
+		OrganizationID:  orgID,
+		ScopeEnabled:    scope.FlagEnabled,
+		ScopeViewAll:    scope.ViewAll,
+		ScopeMember:     scope.MemberID,
+		ScopeUnassigned: scope.ViewUnassigned,
+		LimitCount:      limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list recent conversation messages: %w", err)
+	}
+	out := make([]*domain.MessageRef, 0, len(rows))
+	for i := range rows {
+		ref := &domain.MessageRef{
+			ID:             rows[i].ID,
+			OrganizationID: orgID,
+			ConversationID: conversationID,
+			Direction:      rows[i].Direction,
+			Content:        helpers.FromPgText(rows[i].Content),
+			CreatedAt:      rows[i].CreatedAt.Time,
+		}
+		out = append(out, ref)
+	}
+	return out, nil
+}
+
+func mapConversationContext(row *sqlc.AgentConversationContext) *domain.ConversationContext {
+	var facts []string
+	if len(row.KeyFacts) > 0 {
+		_ = json.Unmarshal(row.KeyFacts, &facts)
+	}
+	return &domain.ConversationContext{
+		ConversationID: row.ConversationID,
+		Summary:        helpers.FromPgText(row.Summary),
+		KeyFacts:       facts,
+		DetectedIntent: helpers.FromPgText(row.DetectedIntent),
+		SourceCursor:   row.SourceCursor,
+		ConsentGated:   row.ConsentGated,
+		GeneratedAt:    row.GeneratedAt.Time,
+		UpdatedAt:      row.UpdatedAt.Time,
+		Status:         domain.ContextStatusAvailable,
+	}
 }

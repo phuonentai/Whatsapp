@@ -38,7 +38,7 @@ export const campaignRepository = {
 
   // Campaigns
   listCampaigns: () => unwrap(apiClient.get<Envelope<CampaignDto[]>>(`${BASE}`)),
-  createCampaign: (data: { nombre: string; segment_id: number }) =>
+  createCampaign: (data: { nombre: string; segment_id: number; mensaje?: string }) =>
     unwrap(apiClient.post<Envelope<CampaignDto>>(`${BASE}`, data)),
   launchCampaign: (id: number) => unwrap(apiClient.post<Envelope<CampaignDto>>(`${BASE}/${id}/launch`)),
   listRecipients: (id: number, params?: { limit?: number; offset?: number }) =>

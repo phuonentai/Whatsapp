@@ -13,7 +13,9 @@ type SegmentRepository interface {
 
 // CampaignRepository persists campaigns and the recipient snapshot.
 type CampaignRepository interface {
-	Create(ctx context.Context, organizationID int32, nombre string, segmentID int32, createdBy string) (*Campaign, error)
+	// Create persists a draft. mensaje is optional; an empty value stores
+	// NULL (old clients create null-message drafts).
+	Create(ctx context.Context, organizationID int32, nombre string, segmentID int32, mensaje string, createdBy string) (*Campaign, error)
 	Get(ctx context.Context, organizationID, id int32) (*Campaign, error)
 	List(ctx context.Context, organizationID int32) ([]*Campaign, error)
 	// Launch transitions draft -> ready guarded. Returns ErrCampaignNotDraft

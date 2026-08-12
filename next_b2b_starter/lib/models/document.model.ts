@@ -2,6 +2,8 @@
 
 export type DocumentStatus = "pending" | "processing" | "processed" | "failed";
 
+export type DocumentVisibility = "workspace" | "admin_only";
+
 export interface Document {
   id: number;
   title: string;
@@ -9,6 +11,7 @@ export interface Document {
   contentType: string;
   fileSize: number;
   status: DocumentStatus;
+  visibility: DocumentVisibility;
   extractedText?: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
@@ -32,27 +35,40 @@ export const DocumentHelpers = {
   getStatusConfig: (status: DocumentStatus) => {
     const configs: Record<DocumentStatus, { label: string; color: string; bgColor: string }> = {
       pending: {
-        label: "Pending",
+        label: "Pendiente",
         color: "text-amber-700",
         bgColor: "bg-amber-100 border-amber-200",
       },
       processing: {
-        label: "Processing",
-        color: "text-blue-700",
-        bgColor: "bg-blue-100 border-blue-200",
+        label: "Procesando",
+        color: "text-amber-700",
+        bgColor: "bg-amber-100 border-amber-200",
       },
       processed: {
-        label: "Processed",
+        label: "Listo",
         color: "text-emerald-700",
         bgColor: "bg-emerald-100 border-emerald-200",
       },
       failed: {
-        label: "Failed",
+        label: "Error",
         color: "text-red-700",
         bgColor: "bg-red-100 border-red-200",
       },
     };
     return configs[status] || configs.pending;
+  },
+
+  formatVisibility: (visibility: DocumentVisibility): string => {
+    return visibility === "admin_only"
+      ? "Solo administradores"
+      : "Visible para todos";
+  },
+
+  /**
+   * Legible similarity label — never raw JSON (app rule).
+   */
+  getSimilarityLabel: (score: number): string => {
+    return `${Math.round(score * 100)}% coincidencia`;
   },
 
   formatFileSize: (bytes: number): string => {
@@ -64,7 +80,7 @@ export const DocumentHelpers = {
   },
 
   formatDate: (date: Date): string => {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("es-CO", {
       month: "short",
       day: "numeric",
       year: "numeric",

@@ -1,47 +1,111 @@
-import type { MetadataRoute } from 'next';
+import type { MetadataRoute } from "next";
+import { getBlogPosts, getCourse, getCourses } from "@/lib/content";
+
+const BASE_URL = "https://yourdomain.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = 'https://yourdomain.com';
   const now = new Date();
 
-  const pages: MetadataRoute.Sitemap = [
+  const staticPages: MetadataRoute.Sitemap = [
     {
-      url: `${base}/`,
+      url: `${BASE_URL}/`,
       lastModified: now,
-      changeFrequency: 'daily',
+      changeFrequency: "daily",
       priority: 1,
     },
     {
-      url: `${base}/about`,
+      url: `${BASE_URL}/features`,
       lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.7,
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
     {
-      url: `${base}/faq`,
+      url: `${BASE_URL}/plataforma`,
       lastModified: now,
-      changeFrequency: 'weekly',
+      changeFrequency: "weekly",
       priority: 0.8,
     },
     {
-      url: `${base}/security`,
+      url: `${BASE_URL}/pricing`,
       lastModified: now,
-      changeFrequency: 'monthly',
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/academy`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/onboarding-info`,
+      lastModified: now,
+      changeFrequency: "weekly",
       priority: 0.6,
     },
     {
-      url: `${base}/privacy`,
+      url: `${BASE_URL}/about`,
       lastModified: now,
-      changeFrequency: 'monthly',
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/faq`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/security`,
+      lastModified: now,
+      changeFrequency: "monthly",
       priority: 0.4,
     },
     {
-      url: `${base}/terms`,
+      url: `${BASE_URL}/privacy`,
       lastModified: now,
-      changeFrequency: 'monthly',
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${BASE_URL}/terms`,
+      lastModified: now,
+      changeFrequency: "monthly",
       priority: 0.4,
     },
   ];
 
-  return pages;
+  const blogPages: MetadataRoute.Sitemap = getBlogPosts().map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: post.date ? new Date(post.date) : now,
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }));
+
+  const academyPages: MetadataRoute.Sitemap = getCourses().flatMap((course) => {
+    const full = getCourse(course.slug);
+    const entries: MetadataRoute.Sitemap = [
+      {
+        url: `${BASE_URL}/academy/${course.slug}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.8,
+      },
+      ...(full?.lessons ?? []).map((lesson) => ({
+        url: `${BASE_URL}/academy/${course.slug}/${lesson.slug}`,
+        lastModified: now,
+        changeFrequency: "weekly" as const,
+        priority: 0.6,
+      })),
+    ];
+    return entries;
+  });
+
+  return [...staticPages, ...blogPages, ...academyPages];
 }

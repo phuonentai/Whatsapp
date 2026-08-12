@@ -26,6 +26,10 @@ type Conversation struct {
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 	CreatedAt      time.Time              `json:"created_at"`
 	UpdatedAt      time.Time              `json:"updated_at"`
+	// AssigneeStytchMemberID es el stytch_member_id del miembro asignado (FK
+	// lógico a Stytch, patrón crm.tickets). NULL = conversación no asignada
+	// (cola de leads) — conversation-row-scoping.
+	AssigneeStytchMemberID *string `json:"assignee_stytch_member_id,omitempty"`
 }
 
 func (c *Conversation) IsActive() bool {

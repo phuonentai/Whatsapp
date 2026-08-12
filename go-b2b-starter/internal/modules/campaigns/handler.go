@@ -185,12 +185,13 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	var body struct {
 		Nombre    string `json:"nombre" binding:"required"`
 		SegmentID int32  `json:"segment_id" binding:"required"`
+		Mensaje   string `json:"mensaje"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, http.StatusBadRequest, "Solicitud inválida", err)
 		return
 	}
-	campaign, err := h.campaignService.Create(c.Request.Context(), reqCtx.OrganizationID, body.Nombre, body.SegmentID, memberID(reqCtx))
+	campaign, err := h.campaignService.Create(c.Request.Context(), reqCtx.OrganizationID, body.Nombre, body.SegmentID, body.Mensaje, memberID(reqCtx))
 	if err != nil {
 		if errors.Is(err, domain.ErrSegmentNotFound) {
 			response.Error(c, http.StatusBadRequest, domain.ErrSegmentNotFound.Error(), err)

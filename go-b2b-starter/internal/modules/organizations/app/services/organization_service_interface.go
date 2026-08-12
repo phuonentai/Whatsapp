@@ -18,6 +18,18 @@ type OrganizationService interface {
 	ListOrganizations(ctx context.Context, req *ListOrganizationsRequest) (*ListOrganizationsResponse, error)
 	GetOrganizationStats(ctx context.Context, orgID int32) (*domain.OrganizationStats, error)
 
+	// UpdateMfaPolicy sets the organization's MFA policy in the auth provider
+	// (SSOT). orgID is the auth provider's organization ID.
+	UpdateMfaPolicy(ctx context.Context, orgID string, policy domain.MfaPolicy, methods domain.MfaMethods, allowedMethods []domain.MfaMethod) error
+
+	// GetAuthPolicy reads the organization's auth policy mirror from the auth
+	// provider (display-only; never consulted for authorization). orgID is the
+	// auth provider's organization ID.
+	GetAuthPolicy(ctx context.Context, orgID string) (*domain.AuthPolicy, error)
+	// UpdateAuthPolicy sets the organization's auth policy in the auth provider
+	// (SSOT). orgID is the auth provider's organization ID.
+	UpdateAuthPolicy(ctx context.Context, orgID string, emailJitPolicy domain.JitPolicy, allowedDomains []string, allowedAuthMethods []domain.AllowedAuthMethod, ssoJitPolicy domain.SsoJitPolicy, ssoJitAllowedConnections []string, ssoDefaultConnectionID string) error
+
 	// Account operations
 	CreateAccount(ctx context.Context, orgID int32, req *CreateAccountRequest) (*domain.Account, error)
 	GetAccount(ctx context.Context, orgID, accountID int32) (*domain.Account, error)

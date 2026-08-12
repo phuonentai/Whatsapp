@@ -1,50 +1,34 @@
 ## Purpose
 
-Define how the Next.js frontend renders pre-built Stytch B2B UI components for authentication flows, replacing custom auth page code.
+Define the custom authentication frontend: `/auth` renders a custom email-only form with membership pre-validation and anti-enumeration, and `/settings` uses the application's custom member management components. Pre-built Stytch B2B / AdminPortal component mandates are removed.
 
 ## Requirements
 
-### Requirement: Login page renders pre-built Stytch B2B component
+### Requirement: Login page renders a custom email form
+The `/auth` login page SHALL render a custom email-only form (no password input) that validates membership via the Stytch B2B `members.search` API before sending a magic link. For emails with no matching member, the page SHALL show the identical neutral message as for existing members and SHALL NOT call `magicLinks.email.loginOrSignup`.
 
-The system SHALL render `<StytchB2B />` from `@stytch/nextjs/b2b` on the `/login` page with Discovery auth flow, Email Magic Links, and SSO products enabled.
+#### Scenario: Known member submits email
 
-#### Scenario: Login page loads Stytch component
+- **WHEN** a browser submits an email that belongs to an existing member
+- **THEN** the system SHALL send a magic link via `magicLinks.email.loginOrSignup` for the member's organization(s)
+- **AND** SHALL display the neutral "If an account exists with that email, a magic link has been sent." message
 
-- **WHEN** a user navigates to `/login`
-- **THEN** the page SHALL render the `<StytchB2B />` component
-- **AND** the auth flow type SHALL be `AuthFlowType.Discovery`
-- **AND** `B2BProducts.emailMagicLinks` and `B2BProducts.sso` SHALL be enabled
+#### Scenario: Unknown member submits email
 
-#### Scenario: User completes magic link login
+- **WHEN** a browser submits an email with no matching member
+- **THEN** the system SHALL NOT call the magic-link send API
+- **AND** SHALL display the same neutral message (no enumeration)
 
-- **WHEN** a user submits their email on the login page
-- **AND** Stytch sends a magic link email
-- **AND** the user clicks the magic link
-- **THEN** Stytch redirects the user to the authenticated session
-- **AND** the `stytch_session_jwt` cookie SHALL be set
+#### Scenario: No password input
 
-### Requirement: Settings page renders Stytch admin portal components
+- **WHEN** a browser visits `/auth`
+- **THEN** the page SHALL NOT contain any `input[type="password"]` element
 
-The system SHALL render `<AdminPortalMemberManagement />` and `<AdminPortalSSO />` from `@stytch/nextjs/b2b` on the `/settings` page.
-
-#### Scenario: Settings page loads admin components
-
-- **WHEN** an authenticated admin user navigates to `/settings`
-- **THEN** the page SHALL render the `<AdminPortalMemberManagement />` component for member invites and role management
-- **AND** the page SHALL render the `<AdminPortalSSO />` component for SSO configuration
+### Requirement: Settings uses custom member management
+The `/settings` page SHALL render the application's custom member management components (`member-list.tsx` and `invite-member.tsx`) and SHALL NOT depend on Stytch AdminPortal UI components.
 
 #### Scenario: Admin invites a member
 
-- **WHEN** an admin user fills the invite form in `<AdminPortalMemberManagement />` and submits
-- **THEN** Stytch SHALL send an invite magic link email to the new member
-- **AND** the member SHALL appear in the member list
-
-### Requirement: No custom form components in auth pages
-
-The `/login` and `/settings` pages SHALL NOT contain custom form components, password fields, or session generation code.
-
-#### Scenario: Login page has zero custom form elements
-
-- **WHEN** inspecting the `/login` page source
-- **THEN** there SHALL be no `<form>`, `<input>`, or custom button elements outside the `<StytchB2B />` component
-- **AND** no password-related fields or validation logic SHALL exist in the page component
+- **WHEN** an admin submits the invite form for a new member
+- **THEN** the invite SHALL be processed through the application's invite flow (Stytch `SendInvite`)
+- **AND** the member SHALL appear in the custom member list after acceptance

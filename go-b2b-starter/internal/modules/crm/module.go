@@ -6,10 +6,13 @@ import (
 	igDomain "github.com/moasq/go-b2b-starter/internal/modules/instagram/domain"
 	igGraphapi "github.com/moasq/go-b2b-starter/internal/modules/instagram/infra/graphapi"
 	whatsappDomain "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain"
+	"github.com/moasq/go-b2b-starter/pkg/whatsapp"
 	"github.com/moasq/go-b2b-starter/internal/platform/eventbus"
 	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	"github.com/moasq/go-b2b-starter/internal/platform/logger"
 	"github.com/moasq/go-b2b-starter/internal/platform/outbox"
+	"time"
+
 	"go.uber.org/dig"
 )
 
@@ -168,8 +171,18 @@ func (m *Module) RegisterDependencies() error {
 		whatsappRepo whatsappDomain.ConfigRepository,
 		igConfigRepo igDomain.ConfigRepository,
 		outboxRepo outbox.Repository,
+		templateRepo whatsappDomain.TemplateRepository,
 	) services.OutboundService {
-		return services.NewOutboundService(convRepo, contactRepo, msgRepo, whatsappRepo, igConfigRepo, outboxRepo)
+		return services.NewOutboundService(
+			convRepo,
+			contactRepo,
+			msgRepo,
+			whatsappRepo,
+			igConfigRepo,
+			outboxRepo,
+			templateRepo,
+			whatsapp.NewClientWithBreaker(5, 30*time.Second, 2),
+		)
 	}); err != nil {
 		return err
 	}

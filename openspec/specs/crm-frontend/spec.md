@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the CRM SPA: sidebar access, Spanish view navigation, and a tab bar built dynamically from enabled features.
-
 ## Requirements
-
 ### Requirement: CRM page is accessible from sidebar navigation
 
 The system SHALL add a "CRM" navigation item to the dashboard sidebar with paywall check (hidden if no active subscription) and `contact:view` permission check.
@@ -297,7 +295,6 @@ The system SHALL provide a "Nuevo pipeline" dialog in the Pipelines view that co
 - **AND** each stage SHALL be created via `POST /api/crm/pipelines/:id/etapas`
 - **AND** the pipeline SHALL appear in the pipeline list with its stages
 
-
 ### Requirement: Auth pages use pre-built Stytch components
 
 The system SHALL replace any custom auth-related pages (`/login`, `/signup`, `/settings/members`, `/settings/sso`) with Stytch pre-built B2B components from `@stytch/nextjs/b2b`.
@@ -496,3 +493,48 @@ The frontend API envelope type SHALL support an optional `total` field alongside
 
 - **WHEN** a paginated CRM list request resolves with a `total` field
 - **THEN** the envelope SHALL carry `total` as a number alongside the `data` array
+
+### Requirement: CRM and ticket lists use skeletons and distinct empty states
+
+CRM and ticket list views SHALL render `Skeleton` rows while loading instead of "Cargando..." text, SHALL render a no-results state distinct from the empty-data state when filters match nothing, and SHALL keep the existing empty-data state for truly empty lists.
+
+#### Scenario: Loading shows skeleton rows
+
+- **WHEN** a CRM or ticket list query is pending
+- **THEN** the view SHALL render skeleton rows
+
+#### Scenario: Filter with no matches shows no-results state
+
+- **WHEN** the list has data but the active search/filter matches nothing
+- **THEN** the view SHALL display a no-results message with a clear-filter action, distinct from the empty-data message
+
+#### Scenario: Truly empty list shows empty-data state
+
+- **WHEN** the org has no rows
+- **THEN** the view SHALL display the existing empty-data message
+
+### Requirement: AI audience builder renders structured results
+
+The CRM campaign manager SHALL accept a natural-language audience description, call the AI build mutation, and render the result as a structured card (segment criteria as labeled chips/lists, estimated audience size, consent-exclusion notice) with accept, edit, and regenerate actions. The result SHALL be presented as structured UI, NOT as a raw JSON `<pre>` block. Labels and errors SHALL be in Colombian Spanish.
+
+#### Scenario: Natural-language input builds an audience
+
+- **WHEN** a user types an audience description and submits it
+- **THEN** the builder SHALL call the AI build mutation and render a pending state while it runs
+
+#### Scenario: Result renders as structured card
+
+- **WHEN** the AI build returns a result
+- **THEN** the result SHALL render criteria as labeled chips/lists, the audience size, and the consent-exclusion notice
+- **AND** the raw JSON payload SHALL NOT be the primary display
+
+#### Scenario: Build failure shows Spanish error
+
+- **WHEN** the AI build mutation fails
+- **THEN** a Spanish error message SHALL render inline and the builder SHALL remain usable
+
+#### Scenario: Accept creates the segment
+
+- **WHEN** the user accepts the AI-built audience
+- **THEN** the segment SHALL be created via the existing segment creation path and SHALL appear in the segments list
+

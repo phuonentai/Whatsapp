@@ -1,5 +1,7 @@
 // lib/api/api/dto/agent.dto.ts
 
+import type { RephraseMode } from "@/lib/models/agent.model";
+
 export interface AgentSettingsDto {
   id?: number;
   organization_id: number;
@@ -64,4 +66,30 @@ export interface ComplianceExportDto {
       created_at: string;
     }>;
   }>;
+}
+
+export type ConversationContextStatus = "available" | "unavailable" | "structural";
+
+export interface ConversationContextDto {
+  conversation_id: number;
+  summary?: string | null;
+  detected_intent?: string | null;
+  key_facts: string[];
+  source_cursor: number;
+  generated_at?: string | null;
+  consent_gated: boolean;
+  status: ConversationContextStatus;
+  channel?: string | null;
+  message_count?: number | null;
+  first_message_at?: string | null;
+  last_message_at?: string | null;
+}
+
+export interface RephraseRequestDto {
+  text: string;
+  mode: RephraseMode;
+}
+
+export interface RephraseResponseDto {
+  text: string;
 }

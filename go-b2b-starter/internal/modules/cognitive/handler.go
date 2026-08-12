@@ -81,18 +81,32 @@ func (h *Handler) Chat(c *gin.Context) {
 
 	ctx := llmdomain.WithOrgID(c.Request.Context(), reqCtx.OrganizationID)
 
+	// Visibility ACL: members without org:manage must not retrieve admin_only
+	// documents. Computed from the effective permissions in the request context
+	// (wildcard grants count, mirroring RequirePermissionFunc semantics).
+	includeAdminOnly := false
+	if reqCtx.Identity != nil {
+		target := authcontext.NewPermission("org", "manage")
+		for _, p := range reqCtx.Identity.Permissions {
+			if p == target || p.MatchesWithWildcard(target) {
+				includeAdminOnly = true
+				break
+			}
+		}
+	}
+
 	// Streaming path: SSE token stream. The credit guard runs before this
 	// handler (RequireCredits middleware), so a 402 is returned before the
 	// stream opens. Tokens are recorded via the metered LLM client after a
 	// successful stream completes.
 	if req.Stream || isSSE(c.GetHeader("Accept")) {
-		h.streamChat(c, ctx, reqCtx, chatReq)
+		h.streamChat(c, ctx, reqCtx, chatReq, includeAdminOnly)
 		return
 	}
 
 	response, err := h.ragService.Chat(
 		ctx,
-		reqCtx.OrganizationID, reqCtx.AccountID, chatReq,
+		reqCtx.OrganizationID, reqCtx.AccountID, chatReq, includeAdminOnly,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
@@ -107,7 +121,7 @@ func (h *Handler) Chat(c *gin.Context) {
 }
 
 // streamChat writes an SSE stream for a streaming chat request.
-func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *authcontext.RequestContext, chatReq *domain.ChatRequest) {
+func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *authcontext.RequestContext, chatReq *domain.ChatRequest, includeAdminOnly bool) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -134,18 +148,29 @@ func (h *Handler) streamChat(c *gin.Context, ctx context.Context, reqCtx *authco
 		data, _ := json.Marshal(map[string]string{"token": ev.Content})
 		writeEvent("", string(data))
 		return nil
-	})
+	}, includeAdminOnly)
 	if err != nil {
 		writeEvent("error", fmt.Sprintf(`{"error":"chat_failed","message":%q}`, err.Error()))
 		return
 	}
 
-	// Final done event carrying the persisted message ids.
+	// Final done event carrying the persisted message ids and the cited
+	// documents (source cards need document_id + score for the jump-to-source).
 	if response != nil {
+		referencedDocs := make([]map[string]any, 0, len(response.ReferencedDocs))
+		for _, d := range response.ReferencedDocs {
+			referencedDocs = append(referencedDocs, map[string]any{
+				"id":               d.ID,
+				"document_id":      d.DocumentID,
+				"content_preview":  d.ContentPreview,
+				"similarity_score": d.SimilarityScore,
+			})
+		}
 		data, _ := json.Marshal(map[string]any{
-			"done":       true,
-			"session_id": response.SessionID,
-			"message_id": response.Message.GetID(),
+			"done":            true,
+			"session_id":      response.SessionID,
+			"message_id":      response.Message.GetID(),
+			"referenced_docs": referencedDocs,
 		})
 		writeEvent("", string(data))
 	}

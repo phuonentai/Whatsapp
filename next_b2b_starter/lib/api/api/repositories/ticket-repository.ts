@@ -30,6 +30,23 @@ export interface TicketDetailDto {
   eventos: TicketEventDto[];
 }
 
+/** Wire DTO for POST /tickets/:id/ai-triage (Wrapped<T> envelope). */
+export interface AiTriageDto {
+  note: string;
+  priority: "low" | "normal" | "high" | null;
+}
+
+/** Client model: the drafted note plus the validated priority suggestion. */
+export interface AiTriage {
+  note: string;
+  priority: TicketDto["priority"] | null;
+}
+
+interface Wrapped<T> {
+  success: boolean;
+  data: T;
+}
+
 const BASE = "/tickets";
 
 export const ticketRepository = {
@@ -53,4 +70,8 @@ export const ticketRepository = {
   setTags: (id: number, tags: string[]) => apiClient.put<TicketDto>(`${BASE}/${id}/etiquetas`, { tags }),
   addInternalNote: (id: number, body: string) =>
     apiClient.post<TicketEventDto>(`${BASE}/${id}/notas`, { body }),
+  aiTriage: async (id: number): Promise<AiTriage> => {
+    const response = await apiClient.post<Wrapped<AiTriageDto>>(`${BASE}/${id}/ai-triage`);
+    return { note: response.data.note, priority: response.data.priority };
+  },
 };

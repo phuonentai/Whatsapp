@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/magiclinks/email"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/organizations"
 	"github.com/stytchauth/stytch-go/v18/stytch/b2b/organizations/members"
+	"github.com/stytchauth/stytch-go/v18/stytch/b2b/sessions"
 )
 
 type stytchMemberRepository struct {
@@ -20,13 +22,73 @@ type stytchMemberRepository struct {
 	logger loggerDomain.Logger
 }
 
+// Ensure stytchMemberRepository implements both the member repository and the
+// session revoker domain contracts.
+var _ domain.AuthMemberRepository = (*stytchMemberRepository)(nil)
+var _ domain.SessionRevoker = (*stytchMemberRepository)(nil)
+
 // NewStytchMemberRepository creates a Stytch-backed member repository.
-func NewStytchMemberRepository(client *stytchcfg.Client, cfg stytchcfg.Config, logger loggerDomain.Logger) domain.AuthMemberRepository {
+// It returns the concrete type so the same instance can satisfy both the
+// AuthMemberRepository and SessionRevoker domain contracts.
+func NewStytchMemberRepository(client *stytchcfg.Client, cfg stytchcfg.Config, logger loggerDomain.Logger) *stytchMemberRepository {
 	return &stytchMemberRepository{
 		client: client,
 		config: cfg,
 		logger: logger,
 	}
+}
+
+// RevokeMemberSessions revokes all active Stytch sessions for a member in an
+// organization. It lists the member's sessions (GET /v1/b2b/sessions) and
+// revokes each (POST /v1/b2b/sessions/revoke). The whole operation runs behind
+// the shared Stytch circuit breaker; when the breaker is open it fails fast
+// with stytchcfg.ErrCircuitOpen so the caller can treat revocation as deferred.
+//
+// Idempotency: revoking an already-revoked (or otherwise gone) session returns
+// a 404 from Stytch, which is treated as a no-op success.
+func (r *stytchMemberRepository) RevokeMemberSessions(ctx context.Context, stytchOrgID, stytchMemberID string) error {
+	if stytchOrgID == "" {
+		return domain.ErrAuthOrganizationIDRequired
+	}
+	if stytchMemberID == "" {
+		return domain.ErrAuthMemberIDRequired
+	}
+
+	if r.client == nil {
+		// Development mode: placeholder credentials mean no Stytch client.
+		// Fail cleanly instead of nil-pointer dereferencing.
+		return domain.ErrAuthConnection
+	}
+
+	return r.client.Run(ctx, func() error {
+		resp, err := r.client.API().Sessions.Get(ctx, &sessions.GetParams{
+			OrganizationID: stytchOrgID,
+			MemberID:       stytchMemberID,
+		})
+		if err != nil {
+			return fmt.Errorf("stytch list member sessions: %w", stytchcfg.MapError(err))
+		}
+
+		for _, memberSession := range resp.MemberSessions {
+			if memberSession.MemberSessionID == "" {
+				continue
+			}
+			_, revokeErr := r.client.API().Sessions.Revoke(ctx, &sessions.RevokeParams{
+				MemberSessionID: memberSession.MemberSessionID,
+			})
+			if revokeErr != nil {
+				mapped := stytchcfg.MapError(revokeErr)
+				// Already-revoked sessions surface as not-found; treat as a
+				// no-op success (idempotent state check).
+				if errors.Is(mapped, stytchcfg.ErrNotFound) {
+					continue
+				}
+				return fmt.Errorf("stytch revoke member session %s: %w", memberSession.MemberSessionID, mapped)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *stytchMemberRepository) CreateMember(ctx context.Context, req *domain.CreateAuthMemberRequest) (*domain.AuthMember, error) {

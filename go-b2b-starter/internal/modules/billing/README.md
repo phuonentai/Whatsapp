@@ -396,7 +396,7 @@ Environment variables for Polar.sh integration:
 
 ```env
 POLAR_API_KEY=your_polar_api_key
-POLAR_WEBHOOK_SECRET=your_webhook_secret
+WEBHOOK_SECRET=your_webhook_secret
 POLAR_ORGANIZATION_ID=your_polar_org_id
 ```
 

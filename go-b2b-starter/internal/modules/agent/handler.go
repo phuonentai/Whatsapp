@@ -7,24 +7,29 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/app/services"
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 	"github.com/moasq/go-b2b-starter/internal/platform/authcontext"
+	"github.com/moasq/go-b2b-starter/internal/platform/features"
 	"github.com/moasq/go-b2b-starter/pkg/httperr"
 )
 
 // Handler exposes the agent HTTP API.
 type Handler struct {
-	agent      services.AgentService
-	compliance services.ComplianceService
+	agent           services.AgentService
+	compliance      services.ComplianceService
+	context         domain.ConversationContextService
+	featureProvider features.FeatureProvider
 }
 
 // NewHandler builds the agent HTTP handler.
-func NewHandler(agent services.AgentService, compliance services.ComplianceService) *Handler {
-	return &Handler{agent: agent, compliance: compliance}
+func NewHandler(agent services.AgentService, compliance services.ComplianceService, context domain.ConversationContextService, featureProvider features.FeatureProvider) *Handler {
+	return &Handler{agent: agent, compliance: compliance, context: context, featureProvider: featureProvider}
 }
 
 // HandleListSuggestions returns the org's pending suggestions.
@@ -263,4 +268,105 @@ func pathID(c *gin.Context, name string) (int32, error) {
 		return 0, err
 	}
 	return int32(id), nil
+}
+
+// HandleRephrase transforms a user-authored draft through the writing-assist
+// endpoint. Contract: bind {text, mode}; 400 text_required / invalid_mode
+// before any LLM call; 200 {"data":{"text":...},"success":true};
+// 402 ai_credits_exhausted; 500 wrapped on failure. Never sends anything.
+func (h *Handler) HandleRephrase(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	var body struct {
+		Text string `json:"text"`
+		Mode string `json:"mode"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_body", "Cuerpo de solicitud inválido."))
+		return
+	}
+	if strings.TrimSpace(body.Text) == "" {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "text_required", "El texto a transformar es requerido."))
+		return
+	}
+	if !services.IsRephraseMode(body.Mode) {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_mode", "Modo de transformación inválido."))
+		return
+	}
+
+	text, err := h.agent.RephraseText(c.Request.Context(), orgID, body.Text, body.Mode)
+	if err != nil {
+		if errors.Is(err, services.ErrAICreditsExhausted) {
+			c.JSON(http.StatusPaymentRequired, httperr.NewHTTPError(
+				http.StatusPaymentRequired, "ai_credits_exhausted",
+				"Has agotado tus créditos de IA para este periodo. Actualiza tu plan o espera a que se renueven.",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError, "rephrase_failed", "No se pudo transformar el mensaje. Inténtalo de nuevo.",
+		))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"text": text}, "success": true})
+}
+
+// HandleGetConversationContext returns AI-generated context for a
+// conversation (summary, intent, key facts) or a structural-only projection
+// when consent gating prevents AI analysis.
+func (h *Handler) HandleGetConversationContext(c *gin.Context) {
+	reqCtx := authcontext.MustGetRequestContext(c)
+	orgID := reqCtx.OrganizationID
+
+	conversationID, err := pathID(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httperr.NewHTTPError(http.StatusBadRequest, "invalid_id", "Identificador inválido."))
+		return
+	}
+
+	// conversation-row-scoping: el contexto IA se acota por el scope del
+	// miembro (flag de entitlement + permisos de la política cacheada). Fuera
+	// de scope → ErrConversationNotFound → 404 (sin filtrar existencia).
+	scope := conversationscope.ResolveFromRequest(c)
+	if h.featureProvider != nil && !scope.FlagEnabled {
+		if ent, entErr := h.featureProvider.GetEntitlement(c.Request.Context(), orgID); entErr == nil && ent != nil {
+			scope.FlagEnabled = ent.Features["conversation_row_scoping"]
+		}
+	}
+
+	ctx, err := h.context.GetContext(c.Request.Context(), orgID, conversationID, scope)
+	if err != nil {
+		if errors.Is(err, domain.ErrConversationNotFound) {
+			c.JSON(http.StatusNotFound, httperr.NewHTTPError(
+				http.StatusNotFound, "conversation_not_found", "La conversación no existe.",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httperr.NewHTTPError(
+			http.StatusInternalServerError, "context_failed", "No se pudo generar el contexto de la conversación.",
+		))
+		return
+	}
+
+	var generatedAt *time.Time
+	if !ctx.GeneratedAt.IsZero() {
+		t := ctx.GeneratedAt
+		generatedAt = &t
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"conversation_id":  ctx.ConversationID,
+		"summary":          ctx.Summary,
+		"detected_intent":  ctx.DetectedIntent,
+		"key_facts":        ctx.KeyFacts,
+		"source_cursor":    ctx.SourceCursor,
+		"generated_at":     generatedAt,
+		"consent_gated":    ctx.ConsentGated,
+		"status":           string(ctx.Status),
+		"channel":          ctx.Channel,
+		"message_count":    ctx.MessageCount,
+		"first_message_at": ctx.FirstMessageAt,
+		"last_message_at":  ctx.LastMessageAt,
+	})
 }

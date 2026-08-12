@@ -18,11 +18,12 @@ func NewRoutes(handler *Handler) *Routes {
 }
 
 // RegisterRoutes registers RBAC routes on the router
-// Note: RBAC endpoints are public and do NOT require authentication
-// These endpoints are used by frontend for role/permission discovery
+// RBAC endpoints require a valid authenticated session (per the
+// stytch-authorization spec: "RBAC API endpoint authentication").
 func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.MiddlewareResolver) {
-	// RBAC info endpoints - NO authentication required for role/permission discovery
+	// RBAC info endpoints - authenticated; used by frontend for role/permission discovery
 	rbacGroup := router.Group("/rbac")
+	rbacGroup.Use(resolver.Get("auth"))
 	{
 		// Get all roles with their permissions - single source of truth for frontend
 		// GET /api/rbac/roles

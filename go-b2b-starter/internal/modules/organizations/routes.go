@@ -81,6 +81,25 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		orgGroup.GET("", auth.RequirePermissionFunc("org", "view"), r.organizationHandler.GetOrganization)
 		orgGroup.PUT("", auth.RequirePermissionFunc("org", "manage"), r.organizationHandler.UpdateOrganization)
 		orgGroup.GET("/stats", auth.RequirePermissionFunc("org", "view"), r.organizationHandler.GetOrganizationStats)
+
+		// Organization MFA policy (authenticated + org:manage). Delegates to the
+		// organizations service which persists the policy to Stytch (SSOT);
+		// breaker-open/5xx answer 503 with a structured error.
+		orgGroup.PUT("/mfa-policy",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.organizationHandler.UpdateMfaPolicy)
+
+		// Organization auth policy (authenticated + org:manage). GET returns the
+		// display-only mirror read from Stytch; PUT persists the full org auth
+		// policy (JIT provisioning, allowed domains, allowed auth methods, SSO
+		// JIT) to Stytch (SSOT); breaker-open/5xx answer 503 with a structured
+		// error on both paths.
+		orgGroup.GET("/auth-policy",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.organizationHandler.GetAuthPolicy)
+		orgGroup.PUT("/auth-policy",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.organizationHandler.UpdateAuthPolicy)
 	}
 
 	// Account routes - require JWT authentication

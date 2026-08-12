@@ -67,4 +67,23 @@ test.describe("Contactos", () => {
     await page.getByRole("button", { name: /volver/i }).click();
     await page.waitForURL(/view=contactos$/);
   });
+
+  test("keyboard: focused row opens detail view with Enter", async ({ page }) => {
+    await contactsPage.goto();
+
+    const phone = uniqueColombianPhone();
+    const name = `Keyboard Contact ${Date.now()}`;
+    await contactsPage.create({ phone, name });
+
+    const row = await contactsPage.getRow(phone);
+    await row!.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/view=contactos&id=\d+/);
+
+    await expect(page.locator(`text=${name}`)).toBeVisible();
+    await expect(page.getByRole("button", { name: /volver/i })).toBeVisible();
+
+    await page.getByRole("button", { name: /volver/i }).click();
+    await page.waitForURL(/view=contactos$/);
+  });
 });

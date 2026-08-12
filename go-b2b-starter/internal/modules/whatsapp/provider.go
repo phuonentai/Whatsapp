@@ -19,8 +19,9 @@ func (p *Provider) RegisterDependencies() error {
 		webhookService services.WebhookService,
 		configService services.ConfigService,
 		signupService services.SignupService,
+		templateService services.TemplateService,
 	) *Handler {
-		return NewHandler(webhookService, configService, signupService)
+		return NewHandler(webhookService, configService, signupService, templateService)
 	}); err != nil {
 		return err
 	}

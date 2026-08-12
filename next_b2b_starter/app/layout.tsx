@@ -9,14 +9,8 @@ import { buildStytchClientConfig } from "@/lib/auth/stytch-server";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { JsonLd } from "@/components/seo/jsonld";
-import { Inter } from "next/font/google";
+import { inter, sora } from "@/components/marketing/fonts";
 import Script from "next/script";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans",
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -100,7 +94,7 @@ export default async function RootLayout({
   const stytchConfig = buildStytchClientConfig();
 
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} ${sora.variable}`} suppressHydrationWarning>
       <head>
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -57,7 +57,12 @@ WHERE organization_id = $1
 LIMIT 1;
 
 -- name: UpsertQuota :one
--- Create or update quota tracking
+-- Create or update quota tracking.
+-- Non-destructive: invoice_count/max_seats of -1 mean "no new value"
+-- (metadata/status-only updates, e.g. customer.updated without a count). On
+-- conflict the stored values are preserved atomically, so a concurrent
+-- decrement can never be clobbered back; on insert -1 normalizes to 0.
+-- ai_credits_max is intentionally NOT touched here (UpdateAiCreditsMax owns it).
 INSERT INTO subscription_billing.quota_tracking (
     organization_id,
     invoice_count,
@@ -67,12 +72,18 @@ INSERT INTO subscription_billing.quota_tracking (
     last_synced_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    sqlc.arg(organization_id),
+    COALESCE(NULLIF(sqlc.arg(invoice_count)::int, -1), 0),
+    COALESCE(NULLIF(sqlc.arg(max_seats)::int, -1), 0),
+    sqlc.arg(period_start),
+    sqlc.arg(period_end),
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
 )
 ON CONFLICT (organization_id)
 DO UPDATE SET
-    invoice_count = EXCLUDED.invoice_count,
-    max_seats = EXCLUDED.max_seats,
+    invoice_count = COALESCE(NULLIF(sqlc.arg(invoice_count)::int, -1), quota_tracking.invoice_count),
+    max_seats = COALESCE(NULLIF(sqlc.arg(max_seats)::int, -1), quota_tracking.max_seats),
     period_start = EXCLUDED.period_start,
     period_end = EXCLUDED.period_end,
     last_synced_at = CURRENT_TIMESTAMP,
@@ -80,12 +91,15 @@ DO UPDATE SET
 RETURNING *;
 
 -- name: DecrementInvoiceCount :one
--- Decrement invoice count by 1 (called after successful invoice processing)
+-- Decrement invoice count by 1 (called after successful invoice processing).
+-- Bounded: guarded by invoice_count > 0 so concurrent consumption can never
+-- drive the count negative. When the count is already 0 no row is updated and
+-- sqlc reports ErrNoRows, which callers map to a quota-exhausted error.
 UPDATE subscription_billing.quota_tracking
 SET
     invoice_count = invoice_count - 1,
     updated_at = CURRENT_TIMESTAMP
-WHERE organization_id = $1
+WHERE organization_id = $1 AND invoice_count > 0
 RETURNING *;
 
 -- name: ResetQuotaForPeriod :one
@@ -100,21 +114,25 @@ WHERE organization_id = $1
 RETURNING *;
 
 -- name: GetQuotaStatus :one
--- Get combined subscription and quota status for fast quota checks
+-- Get combined subscription and quota status for fast quota checks.
+-- LEFT JOIN: the subscription and quota rows are written in separate
+-- non-transactional upserts, so a valid subscription may temporarily have no
+-- quota row. The LEFT JOIN with zeroed quota defaults (invoice_count 0) keeps
+-- the subscription visible with its real status instead of masking it as "none".
 SELECT
     s.subscription_status,
     s.current_period_start,
     s.current_period_end,
     s.cancel_at_period_end,
-    q.invoice_count,
+    COALESCE(q.invoice_count, 0) AS invoice_count,
     q.max_seats,
     CASE
-        WHEN s.subscription_status = 'active' AND q.invoice_count > 0
+        WHEN s.subscription_status IN ('active','trialing') AND COALESCE(q.invoice_count, 0) > 0
         THEN TRUE
         ELSE FALSE
     END AS can_process_invoice
 FROM subscription_billing.subscriptions s
-INNER JOIN subscription_billing.quota_tracking q ON s.organization_id = q.organization_id
+LEFT JOIN subscription_billing.quota_tracking q ON s.organization_id = q.organization_id
 WHERE s.organization_id = $1
 LIMIT 1;
 
@@ -208,3 +226,66 @@ SELECT * FROM subscription_billing.ai_usage_events
 WHERE organization_id = $1
 ORDER BY created_at DESC, id DESC
 LIMIT $2 OFFSET $3;
+
+-- name: InsertLocalTrial :one
+-- Idempotent local trial subscription seed. ON CONFLICT DO NOTHING ensures a
+-- provider-backed row is never overwritten and a bootstrap retry is a no-op.
+-- Synthetic NOT NULL placeholders: external_customer_id='local-trial',
+-- subscription_id='local-trial-'||orgID (unique per org), product_id='trial'.
+INSERT INTO subscription_billing.subscriptions (
+    organization_id,
+    external_customer_id,
+    subscription_id,
+    subscription_status,
+    product_id,
+    product_name,
+    plan_name,
+    current_period_start,
+    current_period_end,
+    metadata
+) VALUES (
+    $1,
+    'local-trial',
+    'local-trial-' || $1::text,
+    'trialing',
+    'trial',
+    'Trial',
+    'Free Trial',
+    NOW(),
+    $2,
+    '{}'
+)
+ON CONFLICT (organization_id) DO NOTHING
+RETURNING *;
+
+-- name: InsertLocalTrialQuota :one
+-- Idempotent trial quota seed with zero grants. Real columns only:
+-- invoice_count=0 (count-down: can_process_invoice=false while paywall passes).
+INSERT INTO subscription_billing.quota_tracking (
+    organization_id,
+    invoice_count,
+    period_start,
+    period_end
+) VALUES (
+    $1,
+    0,
+    NOW(),
+    $2
+)
+ON CONFLICT (organization_id) DO NOTHING
+RETURNING *;
+
+-- name: ListExpiredTrials :many
+-- Global monitoring: trial rows past current_period_end, ordered by org.
+SELECT * FROM subscription_billing.subscriptions
+WHERE subscription_status = 'trialing'
+  AND current_period_end < NOW()
+ORDER BY organization_id;
+
+-- name: ListExpiredTrialByOrg :one
+-- Tenant-safe org-scoped variant (at most one row — organization_id is UNIQUE).
+SELECT * FROM subscription_billing.subscriptions
+WHERE organization_id = $1
+  AND subscription_status = 'trialing'
+  AND current_period_end < NOW()
+LIMIT 1;

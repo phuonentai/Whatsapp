@@ -2,6 +2,8 @@
 
 export type DocumentStatus = "pending" | "processing" | "processed" | "failed";
 
+export type DocumentVisibility = "workspace" | "admin_only";
+
 export interface DocumentDto {
   id: number;
   title: string;
@@ -9,6 +11,7 @@ export interface DocumentDto {
   content_type: string;
   file_size: number;
   status: DocumentStatus;
+  visibility: DocumentVisibility;
   extracted_text?: string;
   metadata?: Record<string, unknown>;
   created_at: string;
@@ -35,6 +38,12 @@ export interface UploadDocumentResponseDto {
   content_type: string;
   file_size: number;
   status: DocumentStatus;
+  visibility: DocumentVisibility;
   created_at: string;
   updated_at: string;
+}
+
+export interface UpdateDocumentRequestDto {
+  title?: string;
+  visibility?: DocumentVisibility;
 }

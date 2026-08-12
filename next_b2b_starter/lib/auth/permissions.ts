@@ -17,6 +17,16 @@ export const PERMISSIONS = {
   ORG_VIEW: "org:view",
   ORG_MANAGE: "org:manage",
 
+  // Inbox tier (inbox-member-tier)
+  INBOX_VIEW: "inbox:view",
+  INBOX_REPLY: "inbox:reply",
+
+  // Inbox scope (conversation-row-scoping): composable con las acciones de
+  // bandeja; nunca concede destructivas (inbox:delete/org:manage).
+  INBOX_VIEW_ALL: "inbox:view_all",
+  INBOX_VIEW_UNASSIGNED: "inbox:view_unassigned",
+  INBOX_REASSIGN: "inbox:reassign",
+
   // Invoice Management
   INVOICE_VIEW: "invoice:view",
   INVOICE_CREATE: "invoice:create",

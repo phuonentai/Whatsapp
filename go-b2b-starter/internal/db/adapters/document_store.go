@@ -17,6 +17,6 @@ type DocumentStore interface {
 	UpdateDocumentExtractedText(ctx context.Context, arg db.UpdateDocumentExtractedTextParams) (db.DocumentsDocument, error)
 	UpdateDocument(ctx context.Context, arg db.UpdateDocumentParams) (db.DocumentsDocument, error)
 	DeleteDocument(ctx context.Context, arg db.DeleteDocumentParams) error
-	CountDocumentsByOrganization(ctx context.Context, organizationID int32) (int64, error)
+	CountDocumentsByOrganization(ctx context.Context, arg db.CountDocumentsByOrganizationParams) (int64, error)
 	CountDocumentsByStatus(ctx context.Context, arg db.CountDocumentsByStatusParams) (int64, error)
 }

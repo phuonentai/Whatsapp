@@ -151,10 +151,13 @@ type ProfileResponse struct {
 
 // ProfileOrganization represents organization info in profile response
 type ProfileOrganization struct {
-	OrganizationID string `json:"organization_id"`
-	Slug           string `json:"slug"`
-	Name           string `json:"name"`
-	Status         string `json:"status"`
+	OrganizationID   string   `json:"organization_id"`
+	Slug             string   `json:"slug"`
+	Name             string   `json:"name"`
+	Status           string   `json:"status"`
+	MFAPolicy        string   `json:"mfa_policy,omitempty"`
+	MFAMethods       string   `json:"mfa_methods,omitempty"`
+	AllowedMFAMethods []string `json:"allowed_mfa_methods,omitempty"`
 }
 
 // CheckEmailRequest represents the request to check if an email exists

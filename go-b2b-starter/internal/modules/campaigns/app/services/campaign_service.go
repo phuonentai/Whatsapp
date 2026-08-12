@@ -31,7 +31,7 @@ func NewCampaignService(
 	}
 }
 
-func (s *campaignService) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, createdBy string) (*domain.Campaign, error) {
+func (s *campaignService) Create(ctx context.Context, orgID int32, nombre string, segmentID int32, mensaje string, createdBy string) (*domain.Campaign, error) {
 	if strings.TrimSpace(nombre) == "" {
 		return nil, fmt.Errorf("%w: el nombre es obligatorio", domain.ErrInvalidFilterSpec)
 	}
@@ -39,7 +39,9 @@ func (s *campaignService) Create(ctx context.Context, orgID int32, nombre string
 	if _, err := s.segmentRepo.Get(ctx, orgID, segmentID); err != nil {
 		return nil, fmt.Errorf("segmento inválido: %w", err)
 	}
-	return s.campaignRepo.Create(ctx, orgID, strings.TrimSpace(nombre), segmentID, createdBy)
+	// Optional message body: trimmed; an empty value persists NULL (old
+	// clients create null-message drafts). Nothing sends at create.
+	return s.campaignRepo.Create(ctx, orgID, strings.TrimSpace(nombre), segmentID, strings.TrimSpace(mensaje), createdBy)
 }
 
 func (s *campaignService) Get(ctx context.Context, orgID, id int32) (*domain.Campaign, error) {

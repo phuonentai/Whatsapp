@@ -36,11 +36,19 @@ class RbacRepository {
       return this.cachedRoles;
     }
 
-    const response = await apiClient.get<RbacRolesResponseDto>("/rbac/roles", {
-      skipAuth: true,
-    });
+    // Backend wraps responses in `{ data: ..., success: true }`; unwrap the
+    // envelope so `response.roles` resolves (same pattern as member-repo).
+    type RbacEnvelope =
+      | RbacRolesResponseDto
+      | { data?: RbacRolesResponseDto; success?: boolean };
 
-    const roles = (response.roles ?? []).map((role) => this.toRbacRole(role));
+    const response = await apiClient.get<RbacEnvelope>("/rbac/roles");
+    const dto: RbacRolesResponseDto =
+      "data" in response && response.data
+        ? (response.data as RbacRolesResponseDto)
+        : (response as RbacRolesResponseDto);
+
+    const roles = (dto.roles ?? []).map((role) => this.toRbacRole(role));
     this.cachedRoles = roles;
     return roles;
   }

@@ -24,6 +24,11 @@ WHERE document_id = $1 AND organization_id = $2
 ORDER BY chunk_index;
 
 -- name: SearchSimilarDocuments :many
+-- Retrieval ACL: chunks are only returned when the requesting member may see
+-- the document. `workspace` documents are visible to every org member;
+-- `admin_only` documents only when the member holds org:manage
+-- (IncludeAdminOnly = true). The filter lives in the shared retrieval path so
+-- no UI-side filtering can bypass it.
 SELECT
     de.id,
     de.document_id,
@@ -35,7 +40,10 @@ SELECT
     de.updated_at,
     (1 - (de.embedding <=> $1::vector))::double precision as similarity_score
 FROM cognitive.document_embeddings de
+JOIN documents.documents d ON d.id = de.document_id
 WHERE de.organization_id = $2
+  AND d.organization_id = de.organization_id
+  AND (d.visibility = 'workspace' OR sqlc.arg('include_admin_only')::boolean)
 ORDER BY de.embedding <=> $1::vector
 LIMIT $3;
 

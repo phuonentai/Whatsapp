@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   DndContext,
+  KeyboardSensor,
   PointerSensor,
+  defaultKeyboardCoordinateGetter,
   useDraggable,
   useDroppable,
   useSensor,
@@ -22,6 +24,8 @@ import { DealDialog } from "@/components/crm/deal-dialog";
 import { ConfirmDialog } from "@/components/crm/confirm-dialog";
 import { ErrorState } from "@/components/common/error-state";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCsvExport } from "@/lib/csv-export";
 import { Download } from "lucide-react";
 
 interface DealCardProps {
@@ -52,9 +56,14 @@ function DealCard({ deal, stage, allStages, onOpen, onEdit, onDelete, onMove }: 
         <div className="font-medium text-sm text-blue-600 hover:underline">{deal.nombre}</div>
         <button
           aria-label="Arrastrar negocio"
+          data-drag-handle
           className="text-gray-400 text-sm cursor-grab active:cursor-grabbing"
           {...attributes}
           {...listeners}
+          // The handle is a drag affordance only: swallowing the click keeps
+          // the click that follows a keyboard drag end (Enter on the handle)
+          // from bubbling into the card's open-detail handler.
+          onClick={(e) => e.stopPropagation()}
         >
           ⋮⋮
         </button>
@@ -150,21 +159,31 @@ function StageColumn({
 
 export function DealKanban() {
   const router = useRouter();
-  const { data: pipelines, isError: isPipelinesError, refetch: refetchPipelines, isRefetching: isPipelinesRefetching } = usePipelinesQuery();
+  const { data: pipelines, isLoading: isPipelinesLoading, isError: isPipelinesError, refetch: refetchPipelines, isRefetching: isPipelinesRefetching } = usePipelinesQuery();
   const defaultPipeline = useMemo(
     () => pipelines?.find((p) => p.es_predeterminado) ?? pipelines?.[0],
     [pipelines]
   );
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | undefined>(undefined);
   const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? defaultPipeline;
-  const { data: deals, isError: isDealsError, refetch: refetchDeals, isRefetching: isDealsRefetching } = useDealsQuery({ pipeline_id: pipeline?.id });
+  const { data: deals, isLoading: isDealsLoading, isError: isDealsError, refetch: refetchDeals, isRefetching: isDealsRefetching } = useDealsQuery({ pipeline_id: pipeline?.id });
   const moveStage = useMoveDealStage();
   const deleteMutation = useDeleteDeal();
   const canManage = useFeature("crm_deals");
   const { hasPermission } = usePermissions();
   const canExport = hasPermission("deal:export");
-  const [isExporting, setIsExporting] = useState(false);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const { isExporting, handleExport } = useCsvExport({
+    run: () => crmRepository.exportDeals(),
+    successMessage: "Negocios exportados",
+    errorMessage: "Error al exportar negocios",
+  });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Keyboard drag: Enter/Space on the per-card drag handle starts a drag,
+    // arrow keys move, Enter drops. The handle carries the dnd-kit listeners,
+    // so keyboard activation is scoped to it.
+    useSensor(KeyboardSensor, { coordinateGetter: defaultKeyboardCoordinateGetter })
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DealDto | null>(null);
@@ -199,18 +218,6 @@ export function DealKanban() {
       setDeleting(null);
     } catch {
       // error toast handled by mutation
-    }
-  };
-
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      await crmRepository.exportDeals();
-      toast.success("Negocios exportados");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al exportar negocios");
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -266,25 +273,37 @@ export function DealKanban() {
         />
       )}
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div data-testid="kanban-board" className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => (
-            <StageColumn
-              key={stage.id}
-              stage={stage}
-              deals={deals?.filter((d) => d.stage_id === stage.id) || []}
-              allStages={stages}
-              onOpen={(deal) => router.push(`/dashboard/crm?view=negocios&id=${deal.id}`)}
-              onEdit={(deal) => {
-                setEditing(deal);
-                setDialogOpen(true);
-              }}
-              onDelete={setDeleting}
-              onMove={handleMove}
-            />
+      {(isPipelinesLoading || isDealsLoading) ? (
+        <div data-testid="kanban-board" className="flex gap-4 overflow-x-auto pb-4" aria-busy="true">
+          {[0, 1, 2].map((col) => (
+            <div key={col} className="min-w-[250px] bg-gray-50 rounded-lg p-3">
+              <Skeleton className="h-5 w-24 mb-3" />
+              <Skeleton className="h-24 w-full mb-2 rounded border" />
+              <Skeleton className="h-24 w-full mb-2 rounded border" />
+            </div>
           ))}
         </div>
-      </DndContext>
+      ) : (
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div data-testid="kanban-board" className="flex gap-4 overflow-x-auto pb-4">
+            {stages.map((stage) => (
+              <StageColumn
+                key={stage.id}
+                stage={stage}
+                deals={deals?.filter((d) => d.stage_id === stage.id) || []}
+                allStages={stages}
+                onOpen={(deal) => router.push(`/dashboard/crm?view=negocios&id=${deal.id}`)}
+                onEdit={(deal) => {
+                  setEditing(deal);
+                  setDialogOpen(true);
+                }}
+                onDelete={setDeleting}
+                onMove={handleMove}
+              />
+            ))}
+          </div>
+        </DndContext>
+      )}
 
       <DealDialog
         open={dialogOpen}

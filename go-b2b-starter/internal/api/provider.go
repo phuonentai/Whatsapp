@@ -17,6 +17,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/invoicing"
 	"github.com/moasq/go-b2b-starter/internal/modules/organizations"
 	"github.com/moasq/go-b2b-starter/internal/modules/playbooks"
+	"github.com/moasq/go-b2b-starter/internal/modules/procurement"
 	"github.com/moasq/go-b2b-starter/internal/modules/registry"
 	"github.com/moasq/go-b2b-starter/internal/modules/tickets"
 	"github.com/moasq/go-b2b-starter/internal/modules/whatsapp"
@@ -54,6 +55,7 @@ type moduleRoutes struct {
 	PlaybooksRoutes     *playbooks.Routes
 	AgentRoutes         *agent.Routes
 	AnalyticsRoutes     *analytics.Routes
+	ProcurementRoutes   *procurement.Routes
 }
 
 func Init(container *dig.Container) error {
@@ -81,6 +83,7 @@ func registerAPI(container *dig.Container) error {
 		playbooksRoutes *playbooks.Routes,
 		agentRoutes *agent.Routes,
 		analyticsRoutes *analytics.Routes,
+		procurementRoutes *procurement.Routes,
 	) *moduleRoutes {
 		return &moduleRoutes{
 			OrganizationRoutes:  organizationRoutes,
@@ -96,6 +99,7 @@ func registerAPI(container *dig.Container) error {
 			PlaybooksRoutes:     playbooksRoutes,
 			AgentRoutes:         agentRoutes,
 			AnalyticsRoutes:     analyticsRoutes,
+			ProcurementRoutes:   procurementRoutes,
 		}
 	}); err != nil {
 		return err
@@ -122,6 +126,7 @@ func registerAPI(container *dig.Container) error {
 		srv.RegisterRoutes(modules.PlaybooksRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.AgentRoutes.Routes, server.ApiPrefix)
 		srv.RegisterRoutes(modules.AnalyticsRoutes.Routes, server.ApiPrefix)
+		srv.RegisterRoutes(modules.ProcurementRoutes.Routes, server.ApiPrefix)
 	})
 }
 

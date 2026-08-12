@@ -14,6 +14,21 @@ const (
 	DocumentStatusFailed     DocumentStatus = "failed"
 )
 
+// DocumentVisibility represents the per-document visibility ACL.
+// workspace: visible and retrievable by every org member (default).
+// admin_only: visible and retrievable only by members with org:manage.
+type DocumentVisibility string
+
+const (
+	DocumentVisibilityWorkspace  DocumentVisibility = "workspace"
+	DocumentVisibilityAdminOnly  DocumentVisibility = "admin_only"
+)
+
+// IsValid reports whether the visibility value is one of the supported values.
+func (v DocumentVisibility) IsValid() bool {
+	return v == DocumentVisibilityWorkspace || v == DocumentVisibilityAdminOnly
+}
+
 // Document represents an uploaded document (PDF)
 type Document struct {
 	ID             int32                  `json:"id"`
@@ -25,6 +40,7 @@ type Document struct {
 	FileSize       int64                  `json:"file_size"`
 	ExtractedText  string                 `json:"extracted_text,omitempty"`
 	Status         DocumentStatus         `json:"status"`
+	Visibility     DocumentVisibility     `json:"visibility"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 	CreatedAt      time.Time              `json:"created_at"`
 	UpdatedAt      time.Time              `json:"updated_at"`
@@ -84,4 +100,15 @@ type DocumentStats struct {
 	PendingCount   int64 `json:"pending_count"`
 	ProcessedCount int64 `json:"processed_count"`
 	FailedCount    int64 `json:"failed_count"`
+}
+
+// ComplianceDocument represents a row of the compliance (Ley 1581) export:
+// a document that contributed chunks to the org's RAG index, with the
+// visibility that governed its retrieval.
+type ComplianceDocument struct {
+	ID         int32              `json:"id"`
+	Title      string             `json:"title"`
+	Status     DocumentStatus     `json:"status"`
+	Visibility DocumentVisibility `json:"visibility"`
+	CreatedAt  time.Time          `json:"created_at"`
 }

@@ -4,6 +4,8 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/app/services"
+	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	"github.com/moasq/go-b2b-starter/internal/platform/features"
 )
 
 // Provider registers the agent HTTP handler and routes.
@@ -21,8 +23,10 @@ func (p *Provider) RegisterDependencies() error {
 	if err := p.container.Provide(func(
 		agentService services.AgentService,
 		compliance services.ComplianceService,
+		contextService domain.ConversationContextService,
+		featureProvider features.FeatureProvider,
 	) *Handler {
-		return NewHandler(agentService, compliance)
+		return NewHandler(agentService, compliance, contextService, featureProvider)
 	}); err != nil {
 		return err
 	}

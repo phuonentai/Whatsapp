@@ -128,6 +128,18 @@ test.describe("Surrounding processes", () => {
     expect(res.status).toBe(401);
   });
 
+  test("mock-auth guard: RBAC roles require a session (401 without X-Test-Org-ID)", async () => {
+    const res = await fetch("http://localhost:8080/api/rbac/roles");
+    expect(res.status).toBe(401);
+  });
+
+  test("mock-auth guard: RBAC roles return 200 with X-Test-Org-ID", async () => {
+    const res = await fetch("http://localhost:8080/api/rbac/roles", {
+      headers: { "X-Test-Org-ID": "test-org-pro:admin-pro@test.com" },
+    });
+    expect(res.status).toBe(200);
+  });
+
   test("member cannot access org:manage-gated WhatsApp config (403)", async () => {
     const res = await fetch("http://localhost:8080/api/v1/whatsapp/config", {
       method: "GET",

@@ -13,6 +13,9 @@ var (
 	// Not found errors
 	ErrDocumentNotFound = errors.New("document not found")
 
+	// Visibility errors
+	ErrInvalidVisibility = errors.New("invalid document visibility: must be workspace or admin_only")
+
 	// Processing errors
 	ErrDocumentAlreadyProcessed = errors.New("document has already been processed")
 	ErrDocumentProcessingFailed = errors.New("document processing failed")

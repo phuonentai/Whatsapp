@@ -143,7 +143,8 @@ const (
 	StatusPastDue  = "past_due"
 	StatusCanceled = "canceled"
 	StatusUnpaid   = "unpaid"
-	StatusNone     = "none" // No subscription exists
+	StatusNone     = "none"    // No subscription exists
+	StatusUnknown  = "unknown" // A subscription exists with an unrecognized status
 )
 
 // IsActiveStatus returns true if the given status represents an active subscription.

@@ -115,7 +115,7 @@ test.describe("Knowledge Base UI", () => {
     const knowledge = new KnowledgePage(page);
     await knowledge.goto();
     await knowledge.openSources();
-    await expect(page.getByText("No documents yet")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Agrega tu primer documento" })).toBeVisible();
   });
 
   test("failed upload adds no document and surfaces an error", async ({ page }) => {

@@ -4,12 +4,12 @@ import "errors"
 
 // Organization errors
 var (
-	ErrOrganizationNotFound      = errors.New("organization not found")
-	ErrOrganizationNameRequired  = errors.New("organization name is required")
-	ErrOrganizationSlugRequired  = errors.New("organization slug is required")
-	ErrOrganizationSlugTooShort  = errors.New("organization slug must be at least 3 characters")
-	ErrOrganizationSlugTaken     = errors.New("organization slug is already taken")
-	ErrOrganizationInactive      = errors.New("organization is inactive")
+	ErrOrganizationNotFound     = errors.New("organization not found")
+	ErrOrganizationNameRequired = errors.New("organization name is required")
+	ErrOrganizationSlugRequired = errors.New("organization slug is required")
+	ErrOrganizationSlugTooShort = errors.New("organization slug must be at least 3 characters")
+	ErrOrganizationSlugTaken    = errors.New("organization slug is already taken")
+	ErrOrganizationInactive     = errors.New("organization is inactive")
 )
 
 // Account errors
@@ -64,6 +64,20 @@ var (
 	ErrAuthOperation    = errors.New("auth provider operation failed")
 	ErrAuthUnauthorized = errors.New("unauthorized auth operation")
 	ErrAuthRateLimit    = errors.New("auth provider rate limit exceeded")
+)
+
+// MFA policy errors
+var (
+	ErrInvalidMfaPolicy     = errors.New("invalid MFA policy")
+	ErrInvalidMfaMethods    = errors.New("invalid MFA methods setting")
+	ErrInvalidMfaMethod     = errors.New("invalid MFA method")
+	ErrMfaPolicyUnavailable = errors.New("MFA policy service is temporarily unavailable")
+)
+
+// Org auth policy errors
+var (
+	ErrInvalidAuthPolicy     = errors.New("invalid auth policy")
+	ErrAuthPolicyUnavailable = errors.New("auth policy service is temporarily unavailable")
 )
 
 // OrganizationError represents a domain-specific organization error

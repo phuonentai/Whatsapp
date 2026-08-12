@@ -82,6 +82,18 @@ func TestParseAIFeatures_StringBoolValue(t *testing.T) {
 	assert.False(t, off["ai_assistant"])
 }
 
+// conversation-row-scoping (Decisión 8): el flag es grant base solo para
+// suscripciones activas/trialing/past_due; free/inactiva → false.
+func TestBasePaidPlanFeatures_ActiveGrantsScoping(t *testing.T) {
+	features := basePaidPlanFeatures(true)
+	assert.True(t, features["conversation_row_scoping"])
+}
+
+func TestBasePaidPlanFeatures_InactiveOrFreeNoScoping(t *testing.T) {
+	features := basePaidPlanFeatures(false)
+	assert.False(t, features["conversation_row_scoping"])
+}
+
 func TestParseQuotas_IncludesAiCredits(t *testing.T) {
 	quotas := parseQuotas(map[string]any{
 		"ai_credits_max": "1000",

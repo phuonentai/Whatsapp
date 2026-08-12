@@ -1,0 +1,36 @@
+# Tasks — add-council-market-read-gate
+
+> **Sequencing:** this change SHALL be applied BEFORE `use-inout-council-for-a-better-design` (the revision-loop change edits `pipeline.sh`'s REJECTED branch, `council.md`, `iso.md`, `AGENTS.md`, and the same `native-agent-pipeline` delta requirement; its edits rebase cleanly onto this change's `council_required()`/persona changes).
+
+## 1. Council Personas in council.md [OPS-GOV]
+
+- [x] 1.1 Add the **Staff Product/GTM** persona (the SaaS-expert lens) to `.pi/prompts/council.md` (after SRE, in fixed order): checklist for unit economics (USD token cost per AI action vs price point in COP, plan/fee margins at Polar + MercadoPago/PSE/Nequi), pricing coherence (plan tiers vs feature gating vs credit guard/`ai-usage-metering`), activation/churn surface (onboarding, empty states, funnel), competitive substitution (Meta native WhatsApp AI, local incumbents). Severity-tagged findings in the existing format; evidence rule per D6 (repo-grounded; external facts flagged as assumptions, never asserted). Verification: read-through confirms the persona is checklist-driven and severity-tagged; no change to existing personas, prohibitions, or the `--tools read,write` posture.
+- [x] 1.2 Add the **Colombia IT & Market** persona (after Product/GTM) as the local-expert lens: checklist for Ley 1581/Habeas Data (consent, export/forget, transfer), Ley 1480 consumer law, the payment and invoicing ecosystem (PSE/Nequi; DIAN electronic invoicing — tools like SIIGO are examples, not the point), data retention, and WhatsApp Business Platform policy drift (conversation pricing, template approval, AI-agent terms, native AI messaging) as an existential channel risk surface. Same evidence rule as 1.1. Verification: read-through; grep confirms the persona names legal/regulatory dependencies as risk surfaces, not asserted facts.
+- [x] 1.3 Add the **Market Read deliverable** to the Deliverable section: `VERDICT.md` SHALL always contain a `MARKET: PASS | CONDITIONAL | FAIL | N/A` line plus a `## Market Read` prose section for in-scope changes; coupling rubric — `MARKET: FAIL` without an accepted residual in the design's `## Market Risk` SHALL NOT accompany `STATUS: APPROVED`; `MARKET: CONDITIONAL` requires each condition fixed or recorded as an accepted residual. Verification: grep shows the first-`STATUS:`-line marker contract text is byte-identical to the pre-change version; a sample VERDICT with `MARKET: FAIL` + `STATUS: APPROVED` is described as a contract violation the council SHALL NOT produce.
+- [x] 1.4 Add the **market-in-scope definition** and **design.md section requirement** to the Method section: in-scope surfaces (billing/pricing/paywall/quotas/credits; AI metering/model routing/LLM cost/agent behavior; WhatsApp/Meta channel; compliance; marketing site/signup funnel/onboarding/activation); in-scope designs SHALL carry `## Market & Unit Economics` and `## Market Risk` sections; absence is a REJECT-level design defect when unmitigated. Verification: read-through; the in-scope list matches design D2 exactly.
+
+## 2. pipeline.sh Market-Read Gating [OPS-GOV]
+
+- [x] 2.1 Add `[[ "$(routing_get '.requires_market_read' 'false')" == "true" ]] && return 0` to `council_required()` in `scripts/pipeline.sh` and document the field in the routing.json header comment (~line 28). No other pipeline behavior changes (revision-loop machinery stays with the sibling `use-inout-council-for-a-better-design` change). Verification: `bash -n scripts/pipeline.sh`; a fixture change dir with `routing.json` `{"requires_market_read": true, "complexity": "medium"}` run with `scripts/pipeline.sh <change> --dry-run` prints the council stage; the same fixture without the field (complexity medium) prints no council stage; existing `council_required` behaviors (`--with-council`, `requires_council`, complexity high) unchanged.
+
+## 3. Traceability and Documentation [OPS-GOV]
+
+- [x] 3.1 Add a line item to `.pi/prompts/iso.md` instructing the iso stage to record the `MARKET:` line (or `N/A` when absent) and the top 1–3 market risks from the verdict's Market Read section in `docs/compliance/ISO_TRACEABILITY_MATRIX.md`. Verification: read-through; a fixture iso run against a change with a `MARKET:` verdict adds the line to the matrix.
+- [x] 3.2 Update the `AGENTS.md` "Agent Pipeline" section: the council runs five personas (Security/DBA/SRE + Product/GTM + Colombia IT & Market), applies the market-read lens to market-in-scope changes, and `VERDICT.md` carries a `MARKET:` line; document the advisory `requires_market_read` routing field. Verification: read-through; no OpenSpec schema or marker-contract text altered in `AGENTS.md`.
+
+## 4. Delta Spec Conformance [OPS-GOV]
+
+- [x] 4.1 Confirm `specs/native-agent-pipeline/spec.md` MODIFIED requirement headers match the living spec exactly (whitespace-insensitive) and carry the FULL updated requirement blocks (from `### Requirement:` through all scenarios); confirm the ADDED "Council market-read lens" requirement uses `#### Scenario:` (exactly 4 hashtags) with WHEN/THEN and at least one scenario per requirement. Verification: `grep -n "^### Requirement"` on both the delta and the living spec shows the three modified names present; `grep -c "^#### Scenario" specs/native-agent-pipeline/spec.md` >= number of requirements.
+- [x] 4.2 Run `openspec validate add-council-market-read-gate` and fix any reported issues. Verification: command exits 0 with no errors.
+
+## 5. Verification Gate [OPS-GOV]
+
+- [x] 5.1 Run the full verification set: `bash -n scripts/pipeline.sh`; `scripts/pipeline.sh <fixture-change> --dry-run` (with and without `requires_market_read`); existing `parse_verdict` fixture checks under `scripts/tests/fixtures/` (all pass, marker contract untouched); grep proof that `^STATUS:` remains the first `STATUS:`-prefixed line in the council prompt; `openspec validate add-council-market-read-gate`. Verification: every command passes; record results below.
+- [x] 5.2 Record verification results and the archive decision (archive or "Archive deferred: <reason>") in this `tasks.md`, per the lifecycle gates in `AGENTS.md`. Verification: entries present.
+
+---
+
+## Verification results (recorded at gate time)
+
+- 5.1 gate run 2026-08-12: `bash -n scripts/pipeline.sh` PASS; `scripts/pipeline.sh fixture-market-read --dry-run` with `routing.json` `{"requires_market_read": true, "complexity": "medium"}` → council branch entered (`council verdict gate skipped in dry-run mode`); same fixture without the field (complexity medium) → `council skipped (not required by routing.json or flags)`; `--with-council` regression → council still forced; `scripts/tests/test-verdict-parse.sh` → 4/4 PASS (APPROVED/REJECTED/INCONCLUSIVE/does-not-exist), marker contract untouched; grep: council.md deliverable retains `1. A marker as the FIRST `STATUS:`-prefixed line in the file` with `MARKET:` line added as a non-STATUS line; `openspec validate add-council-market-read-gate` PASS (exit 0).
+- 5.2 Archive decision: **Archive deferred** — this change ships as a prerequisite for the sibling `use-inout-council-for-a-better-design` (revision loop), which is being applied immediately after; archive both together once the loop change lands and its verification gate runs.

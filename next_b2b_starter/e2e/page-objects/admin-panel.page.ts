@@ -1,5 +1,12 @@
 import { Page, Locator, expect } from "@playwright/test";
 
+// Sidebar navigation is Spanish-first (copy layer). Map the English test names
+// to the Spanish labels rendered in the dark template sidebar.
+const SIDEBAR_LABELS: Record<string, string> = {
+  Inbox: "Conversaciones",
+  CRM: "Contactos",
+};
+
 const SETTINGS_VIEW_HEADINGS: Record<string, string> = {
   profile: "Account & workspace",
   members: "Team access",
@@ -37,7 +44,8 @@ export class AdminPanelPage {
   }
 
   async sidebarEntry(name: string): Promise<Locator> {
-    return this.sidebar.locator(`[aria-label="${name}"]`);
+    const label = SIDEBAR_LABELS[name] ?? name;
+    return this.sidebar.locator(`[aria-label="${label}"]`);
   }
 
   async hasSidebarEntry(name: string): Promise<boolean> {

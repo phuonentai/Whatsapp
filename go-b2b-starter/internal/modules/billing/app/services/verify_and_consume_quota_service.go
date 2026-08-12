@@ -49,7 +49,7 @@ func (s *billingService) VerifyAndConsumeQuota(ctx context.Context, organization
 	if !quotaStatus.CanProcessInvoice {
 		return &domain.BillingStatus{
 			OrganizationID:        organizationID,
-			HasActiveSubscription: quotaStatus.SubscriptionStatus == "active",
+			HasActiveSubscription: isActiveSubscriptionStatus(quotaStatus.SubscriptionStatus),
 			CanProcessInvoices:    false,
 			InvoiceCount:          quotaStatus.InvoiceCount,
 			Reason:                "quota exceeded or subscription inactive",
@@ -79,5 +79,5 @@ func (s *billingService) needsFallbackVerification(status *domain.QuotaStatus) b
 	// 1. Very few invoices remaining (< 10)
 	// 2. Subscription is inactive but we're checking
 
-	return status.InvoiceCount < 10 || status.SubscriptionStatus != "active"
+	return status.InvoiceCount < 10 || !isActiveSubscriptionStatus(status.SubscriptionStatus)
 }

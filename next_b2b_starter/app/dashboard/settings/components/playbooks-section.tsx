@@ -29,7 +29,7 @@ export function PlaybookSetupCard() {
         <CardHeader>
           <CardTitle className="text-base">Plantillas de negocio</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-gray-500">Cargando plantillas...</CardContent>
+        <CardContent className="text-sm text-slate-500">Cargando plantillas...</CardContent>
       </Card>
     );
   }
@@ -87,10 +87,10 @@ export function PlaybookSetupCard() {
   };
 
   return (
-    <Card className="border-gray-200">
+    <Card className="border-slate-200">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Store className="h-5 w-5 text-gray-600" />
+          <Store className="h-5 w-5 text-slate-600" />
           <CardTitle className="text-base">
             {applied.length > 0 ? "Tu plantilla de negocio" : "¿Qué tipo de negocio es el tuyo?"}
           </CardTitle>
@@ -136,19 +136,19 @@ function PlaybookRow({
   const isConfirming = confirmReset === playbook.key;
 
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
       <div className="min-w-0 space-y-1">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-gray-900">{playbook.name}</p>
+          <p className="text-sm font-semibold text-slate-900">{playbook.name}</p>
           {playbook.applied ? (
             <Badge variant="default" className="bg-green-600">
               <CheckCircle2 className="mr-1 h-3 w-3" /> Activa
             </Badge>
           ) : null}
         </div>
-        <p className="text-sm text-gray-600 line-clamp-2">{playbook.description}</p>
+        <p className="text-sm text-slate-600 line-clamp-2">{playbook.description}</p>
         {playbook.applied && playbook.guiones && playbook.guiones.length > 0 ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             {playbook.guiones.length} guiones listos en la bandeja de entrada
           </p>
         ) : null}
@@ -182,7 +182,7 @@ function PlaybookRow({
         ) : (
           <Button
             size="sm"
-            className="bg-gray-900 text-white hover:bg-gray-800"
+            className="bg-emerald-500 text-white hover:bg-emerald-600"
             onClick={() => onApply(playbook.key)}
             disabled={isApplying}
           >

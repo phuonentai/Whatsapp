@@ -51,7 +51,7 @@ export function ProfileTab({
   return (
     <div className={cn("grid gap-6", canManageMembers ? "lg:grid-cols-[360px,1fr]" : "")}>
       <Card className="self-start">
-        <CardHeader className="border-b border-gray-100 pb-4">
+        <CardHeader className="border-b border-slate-100 pb-4">
           <CardTitle>Profile</CardTitle>
           <CardDescription>
             Personal details visible to your teammates.
@@ -65,7 +65,7 @@ export function ProfileTab({
       {canManageMembers && (
         <div className="space-y-6">
           <Card>
-            <CardHeader className="border-b border-gray-100 pb-4">
+            <CardHeader className="border-b border-slate-100 pb-4">
               <CardTitle>Invite a teammate</CardTitle>
               <CardDescription>
                 Send a secure invitation email and assign the right role upfront.
@@ -89,7 +89,7 @@ export function ProfileTab({
           </Card>
 
           <Card>
-            <CardHeader className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4">
+            <CardHeader className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <CardTitle>Team members</CardTitle>
                 <CardDescription>
@@ -119,7 +119,7 @@ export function ProfileTab({
               )}
               {isMembersLoading && members.length > 0 && (
                 <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-gray-200 border-t-primary-500" />
+                  <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-slate-200 border-t-primary-500" />
                   Refreshing team roster...
                 </div>
               )}

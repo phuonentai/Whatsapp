@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 )
 
 // complianceService implements ComplianceService (Ley 1581 export/forget).
@@ -28,7 +29,8 @@ func (s *complianceService) ExportContact(ctx context.Context, orgID, contactID 
 		Conversations: []*ConversationExport{},
 	}
 
-	conversations, err := s.repo.ListConversationsByContact(ctx, orgID, contactID)
+	// Compliance export/forget es org:manage (admin) → scope org-wide.
+	conversations, err := s.repo.ListConversationsByContact(ctx, orgID, contactID, conversationscope.Scope{ViewAll: true})
 	if err != nil {
 		return nil, err
 	}

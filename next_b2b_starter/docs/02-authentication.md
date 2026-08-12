@@ -48,6 +48,22 @@ The app uses **two cookies** for authentication:
 - **Auto-Refresh**: Happens automatically when expired
 - **Grace Period**: 60 seconds (handles clock skew)
 
+### Sliding Sessions
+
+Sessions slide instead of hard-expiring: while the app is open and visible, the
+client (`useSlidingSession`) calls `POST /api/auth/session/refresh` every 10
+minutes with `session_duration_minutes` (default 480), which extends the
+underlying Stytch session. Renewal pauses while the tab is hidden and stops
+entirely when no session exists (public pages). If a renewal fails because the
+session was revoked or expired, the client clears the session cookies and
+redirects to `/auth?returnTo=<current-path>`.
+
+When an admin deactivates a member, the backend revokes the member's active
+Stytch sessions after the local status update succeeds. The local status change
+is authoritative for app access; Stytch revocation closes the identity-layer
+window. The Go JWT fast path may accept a deactivated member's JWT until its
+own expiry, bounded by the 8-hour sliding session.
+
 ## Checking if User is Authenticated
 
 ### In Server Components

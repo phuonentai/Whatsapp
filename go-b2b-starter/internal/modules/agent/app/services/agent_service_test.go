@@ -10,6 +10,7 @@ import (
 	"github.com/moasq/go-b2b-starter/internal/modules/agent/domain"
 	billingDomain "github.com/moasq/go-b2b-starter/internal/modules/billing/domain"
 	crmDomain "github.com/moasq/go-b2b-starter/internal/modules/crm/domain"
+	"github.com/moasq/go-b2b-starter/internal/modules/crm/domain/conversationscope"
 	whatsappEvents "github.com/moasq/go-b2b-starter/internal/modules/whatsapp/domain/events"
 	llmdomain "github.com/moasq/go-b2b-starter/internal/platform/llm/domain"
 )
@@ -140,10 +141,10 @@ func (m *mockRepo) ResolveContactByIGUser(ctx context.Context, orgID int32, igUs
 func (m *mockRepo) ResolveConversation(ctx context.Context, orgID, contactID int32, channel string, lastMessageAt time.Time) (*domain.ConversationRef, error) {
 	return m.conv, nil
 }
-func (m *mockRepo) GetConversationRef(ctx context.Context, orgID, conversationID int32) (*domain.ConversationRef, error) {
+func (m *mockRepo) GetConversationRef(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*domain.ConversationRef, error) {
 	return m.conv, nil
 }
-func (m *mockRepo) ListConversationsByContact(ctx context.Context, orgID, contactID int32) ([]*domain.ConversationRef, error) {
+func (m *mockRepo) ListConversationsByContact(ctx context.Context, orgID, contactID int32, scope conversationscope.Scope) ([]*domain.ConversationRef, error) {
 	return []*domain.ConversationRef{m.conv}, nil
 }
 func (m *mockRepo) ListMessagesByConversation(ctx context.Context, orgID, conversationID int32, limit, offset int32) ([]*domain.MessageRef, error) {
@@ -160,6 +161,25 @@ func (m *mockRepo) AnonymizeContact(ctx context.Context, orgID, contactID int32)
 	m.contact.ConsentStatus = domain.ConsentWithdrawn
 	return nil
 }
+func (m *mockRepo) UpsertConversationContext(ctx context.Context, orgID int32, c *domain.ConversationContext) (*domain.ConversationContext, error) {
+	c.UpdatedAt = time.Now()
+	return c, nil
+}
+func (m *mockRepo) GetConversationContext(ctx context.Context, orgID, conversationID int32) (*domain.ConversationContext, error) {
+	return nil, domain.ErrContextNotFound
+}
+func (m *mockRepo) GetConversationContextMeta(ctx context.Context, orgID, conversationID int32, scope conversationscope.Scope) (*domain.ConversationContextMeta, error) {
+	return &domain.ConversationContextMeta{
+		Channel:         domain.ChannelWhatsapp,
+		MessageCount:    1,
+		LatestMessageID: 1,
+	}, nil
+}
+func (m *mockRepo) ListRecentConversationMessages(ctx context.Context, orgID, conversationID int32, limit int32, scope conversationscope.Scope) ([]*domain.MessageRef, error) {
+	return []*domain.MessageRef{
+		{ID: 1, OrganizationID: orgID, ConversationID: conversationID, Direction: "inbound", Content: "hola", CreatedAt: time.Now()},
+	}, nil
+}
 
 type mockOutbound struct {
 	sent [][]any // [orgID, convID, content]
@@ -172,6 +192,14 @@ func (m *mockOutbound) SendMessage(ctx context.Context, orgID, convID int32, con
 	}
 	m.sent = append(m.sent, []any{orgID, convID, content})
 	return &crmDomain.Message{ID: 9}, nil
+}
+
+func (m *mockOutbound) SendTemplateMessage(ctx context.Context, orgID, convID int32, templateID int64, params []string) (*crmDomain.Message, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	m.sent = append(m.sent, []any{orgID, convID, templateID, params})
+	return &crmDomain.Message{ID: 10}, nil
 }
 
 type mockGuardrails struct {
@@ -192,11 +220,13 @@ func (m *mockGuardrails) Evaluate(ctx context.Context, orgID int32, input domain
 }
 
 type mockLLM struct {
-	text string
-	err  error
+	text  string
+	err   error
+	calls int
 }
 
 func (m *mockLLM) Complete(ctx context.Context, request llmdomain.CompletionRequest) (*llmdomain.CompletionResponse, error) {
+	m.calls++
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -210,15 +240,19 @@ func (m *mockLLM) GenerateEmbedding(ctx context.Context, text string, model stri
 }
 
 type mockBilling struct {
-	status *billingDomain.AiUsageStatus
-	err    error
+	status        *billingDomain.AiUsageStatus
+	err           error
+	billingStatus *billingDomain.BillingStatus // nil -> active subscription (legacy tests assume one)
 }
 
 func (m *mockBilling) ProcessWebhookEvent(ctx context.Context, eventType string, payload map[string]any) error {
 	return nil
 }
 func (m *mockBilling) GetBillingStatus(ctx context.Context, organizationID int32) (*billingDomain.BillingStatus, error) {
-	return &billingDomain.BillingStatus{}, nil
+	if m.billingStatus != nil {
+		return m.billingStatus, nil
+	}
+	return &billingDomain.BillingStatus{OrganizationID: organizationID, HasActiveSubscription: true, Reason: "ok"}, nil
 }
 func (m *mockBilling) CheckQuotaAvailability(ctx context.Context, organizationID int32) (*billingDomain.BillingStatus, error) {
 	return &billingDomain.BillingStatus{}, nil
@@ -238,7 +272,7 @@ func (m *mockBilling) VerifyPaymentFromCheckout(ctx context.Context, sessionID s
 func (m *mockBilling) RefreshSubscriptionStatus(ctx context.Context, organizationID int32) (*billingDomain.BillingStatus, error) {
 	return &billingDomain.BillingStatus{}, nil
 }
-func (m *mockBilling) CreateMPCheckout(ctx context.Context, planID string) (*billingDomain.BillingStatus, error) {
+func (m *mockBilling) CreateMPCheckout(ctx context.Context, stytchOrgID, planID string) (*billingDomain.BillingStatus, error) {
 	return &billingDomain.BillingStatus{}, nil
 }
 func (m *mockBilling) VerifyMPPayment(ctx context.Context, paymentID string) (*billingDomain.BillingStatus, error) {
@@ -247,7 +281,7 @@ func (m *mockBilling) VerifyMPPayment(ctx context.Context, paymentID string) (*b
 func (m *mockBilling) ProcessMPWebhookEvent(ctx context.Context, rawPayload json.RawMessage) error {
 	return nil
 }
-func (m *mockBilling) CancelMPSubscription(ctx context.Context, subscriptionID string) (*billingDomain.BillingStatus, error) {
+func (m *mockBilling) CancelMPSubscription(ctx context.Context, stytchOrgID, subscriptionID string) (*billingDomain.BillingStatus, error) {
 	return &billingDomain.BillingStatus{}, nil
 }
 func (m *mockBilling) GetAiUsageStatus(ctx context.Context, organizationID int32) (*billingDomain.AiUsageStatus, error) {
@@ -273,10 +307,10 @@ type billingInterface interface {
 	SyncSubscriptionFromPolar(ctx context.Context, organizationID int32) error
 	VerifyPaymentFromCheckout(ctx context.Context, sessionID string) (*billingDomain.BillingStatus, error)
 	RefreshSubscriptionStatus(ctx context.Context, organizationID int32) (*billingDomain.BillingStatus, error)
-	CreateMPCheckout(ctx context.Context, planID string) (*billingDomain.BillingStatus, error)
+	CreateMPCheckout(ctx context.Context, stytchOrgID, planID string) (*billingDomain.BillingStatus, error)
 	VerifyMPPayment(ctx context.Context, paymentID string) (*billingDomain.BillingStatus, error)
 	ProcessMPWebhookEvent(ctx context.Context, rawPayload json.RawMessage) error
-	CancelMPSubscription(ctx context.Context, subscriptionID string) (*billingDomain.BillingStatus, error)
+	CancelMPSubscription(ctx context.Context, stytchOrgID, subscriptionID string) (*billingDomain.BillingStatus, error)
 	GetAiUsageStatus(ctx context.Context, organizationID int32) (*billingDomain.AiUsageStatus, error)
 }
 
@@ -493,6 +527,61 @@ func TestKillSwitchCancelsFlow(t *testing.T) {
 	}
 	if len(out.sent) != 0 {
 		t.Fatalf("kill switch must block sends")
+	}
+}
+
+// ---------- subscription gate (4.2) ----------
+
+func TestNoSubscriptionOrgRefusedWithNoMeteredLLMCall(t *testing.T) {
+	repo := newMockRepo()
+	repo.settings = &domain.AgentSettings{OrganizationID: 42, Mode: domain.ModeCopilot, ConsentRequired: false}
+	llm := &mockLLM{text: `{"intent":"compra","suggested_reply":"Claro."}`}
+	out := &mockOutbound{}
+	billing := &mockBilling{
+		billingStatus: &billingDomain.BillingStatus{
+			OrganizationID:        42,
+			HasActiveSubscription: false,
+			Reason:                "no active subscription found",
+		},
+	}
+	svc := newTestService(repo, &mockGuardrails{}, llm, billing, out)
+
+	if err := svc.HandleMessageReceived(context.Background(), inEvent("Hola")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if llm.calls != 0 {
+		t.Fatalf("metered LLM must not be called for a subscriptionless org, got %d calls", llm.calls)
+	}
+	if len(out.sent) != 0 {
+		t.Fatalf("subscriptionless org must not send, got %d sends", len(out.sent))
+	}
+	// The message is not silently dropped: it escalates to a human.
+	if len(repo.suggestions) != 1 || repo.suggestions[0].Type != domain.SuggestionEscalation {
+		t.Fatalf("expected escalation suggestion, got %+v", repo.suggestions)
+	}
+	if repo.flow.Status != domain.FlowStatusAwaitingHuman {
+		t.Fatalf("flow should await human, got %s", repo.flow.Status)
+	}
+}
+
+func TestActiveOrgAnalysisProceeds(t *testing.T) {
+	repo := newMockRepo()
+	repo.settings = &domain.AgentSettings{OrganizationID: 42, Mode: domain.ModeCopilot, ConsentRequired: false}
+	llm := &mockLLM{text: `{"intent":"compra","sentiment":"positivo","suggested_reply":"Con gusto."}`}
+	out := &mockOutbound{}
+	svc := newTestService(repo, &mockGuardrails{}, llm, &mockBilling{}, out)
+
+	if err := svc.HandleMessageReceived(context.Background(), inEvent("¿Tienen stock?")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if llm.calls != 1 {
+		t.Fatalf("metered LLM must run once for an active org, got %d calls", llm.calls)
+	}
+	if len(repo.suggestions) != 1 || repo.suggestions[0].Status != domain.SuggestionPending {
+		t.Fatalf("expected a pending reply suggestion, got %+v", repo.suggestions)
+	}
+	if repo.suggestions[0].Body != "Con gusto." {
+		t.Fatalf("unexpected draft: %q", repo.suggestions[0].Body)
 	}
 }
 

@@ -60,6 +60,26 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		mgmt.POST("/config/logs/:id/replay",
 			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.HandleReplayLog)
+
+		// Template registry: manage requires org:manage, list requires org:view.
+		mgmt.GET("/templates",
+			auth.RequirePermissionFunc("org", "view"),
+			r.handler.HandleListTemplates)
+		mgmt.POST("/templates",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleCreateTemplate)
+		mgmt.PATCH("/templates/:id",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleUpdateTemplate)
+		mgmt.DELETE("/templates/:id",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleDeleteTemplate)
+		mgmt.POST("/templates/:id/submit",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleSubmitTemplate)
+		mgmt.POST("/templates/:id/sync",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.HandleSyncTemplate)
 	}
 }
 

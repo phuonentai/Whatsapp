@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the WhatsApp settings frontend: overview section, config detail form, and active and inactive toggle.
-
 ## Requirements
-
 ### Requirement: WhatsApp section appears in settings overview
 
 The workspace settings overview at `/dashboard/settings` SHALL display a "Messaging" (WhatsApp) card and an "Instagram" card, each visible to users with `org:manage` permission. The Instagram card SHALL link to the Instagram settings view (`/dashboard/settings?view=instagram`).
@@ -175,10 +173,9 @@ The config view SHALL include a setup guide or info box that explains how to obt
 - **WHEN** a user views the WhatsApp config page and the organization has an active config
 - **THEN** the setup guide SHALL be collapsed or shown as a collapsible section
 
-
 ### Requirement: WhatsApp settings view supports embedded signup entry
 
-When the organization has no WhatsApp config, the `whatsapp` settings view SHALL surface the embedded signup connect flow (Meta SDK login → code exchange → status polling) as the primary entry point, in addition to the existing manual configuration form.
+When the organization has no WhatsApp config, the `whatsapp` settings view SHALL surface the embedded signup connect flow (Meta SDK login → code exchange → status polling) as the primary entry point, in addition to the existing manual configuration form. Once a connection succeeds, the view SHALL render the post-connect next-steps flow instead of terminating at the connected banner alone.
 
 #### Scenario: No config exists — connect flow offered first
 
@@ -201,3 +198,14 @@ When the organization has no WhatsApp config, the `whatsapp` settings view SHALL
 
 - **WHEN** the signup status reaches `failed` or the exchange returns an error
 - **THEN** the view SHALL display the error with a "Try again" action that restarts the flow
+
+#### Scenario: Post-connect flow rendered after success
+
+- **WHEN** the embedded signup exchange succeeds and the configuration becomes active
+- **THEN** the WhatsApp settings view SHALL render the post-connect next-steps card alongside the connected state
+
+#### Scenario: Connect entry preserved for inactive state
+
+- **WHEN** no active configuration exists
+- **THEN** the existing connect empty-state entry SHALL remain unchanged
+

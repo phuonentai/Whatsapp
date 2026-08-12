@@ -25,20 +25,44 @@ func (r *Routes) RegisterRoutes(router *gin.RouterGroup, resolver serverDomain.M
 		resolver.Get("subscription"),
 	)
 	{
-		// Upload document
+		// Upload document — admin-only in v1 (a document index is a compliance
+		// surface: org:manage is required server-side, not just hidden in the UI).
 		docsGroup.POST("/upload",
-			auth.RequirePermissionFunc("resource", "create"),
+			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.UploadDocument)
 
-		// List documents
+		// List documents — members see workspace docs; the handler filters
+		// admin_only docs server-side for members without org:manage.
 		docsGroup.GET("",
 			auth.RequirePermissionFunc("resource", "view"),
 			r.handler.ListDocuments)
 
-		// Delete document
+		// Document detail — same visibility filter as list (restricted doc =
+		// 404 for members without org:manage).
+		docsGroup.GET("/:id",
+			auth.RequirePermissionFunc("resource", "view"),
+			r.handler.GetDocument)
+
+		// Update (title/visibility) — admin-only in v1.
+		docsGroup.PATCH("/:id",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.UpdateDocument)
+
+		// Reprocess (Retry) — re-extract + re-embed; admin-only in v1.
+		docsGroup.POST("/:id/reprocess",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.ReprocessDocument)
+
+		// Delete document — admin-only in v1.
 		docsGroup.DELETE("/:id",
-			auth.RequirePermissionFunc("resource", "delete"),
+			auth.RequirePermissionFunc("org", "manage"),
 			r.handler.DeleteDocument)
+
+		// Compliance export (Ley 1581) — indexed documents with visibility.
+		// Admin-only: the export is a compliance surface.
+		docsGroup.GET("/export/compliance.csv",
+			auth.RequirePermissionFunc("org", "manage"),
+			r.handler.ExportCompliance)
 	}
 }
 

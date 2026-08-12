@@ -129,6 +129,22 @@ The system SHALL guard AI-facing routes so an organization with exhausted credit
 - **WHEN** an organization has `ai_credits_max = 0` (no allowance configured)
 - **THEN** the credit guard SHALL NOT block the request (recording still applies)
 
+### Requirement: Metered LLM invocations require an active subscription
+
+On non-paywalled inbound paths (WhatsApp webhook → agent), the system SHALL require an active or trialing subscription before invoking a metered LLM call: organizations without one SHALL be refused the AI analysis and SHALL NOT accrue billed credit consumption.
+
+#### Scenario: Subscriptionless org is refused metered analysis
+
+- **WHEN** an inbound message arrives for an organization with no active subscription
+- **THEN** the AI analysis SHALL be refused
+- **AND** no usage SHALL be recorded against the AI usage ledger
+
+#### Scenario: Active org analysis is metered as before
+
+- **WHEN** an inbound message arrives for an organization with an active or trialing subscription
+- **THEN** the metered analysis SHALL run
+- **AND** usage SHALL be recorded idempotently per the existing ledger rules
+
 ### Requirement: Billing provider AI meter ingestion
 
 The system SHALL ingest AI consumption to the billing provider as a best-effort background meter event, and SHALL apply provider meter-grant events for the AI meter to the local credit allowance.

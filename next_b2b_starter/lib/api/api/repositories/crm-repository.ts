@@ -1,4 +1,5 @@
 import { apiClient, resolveAccessToken } from "../client/api-client";
+import { downloadCsvFile } from "@/lib/csv-export";
 import type { ContactDto, CompanyDto, DealDto, PipelineDto, ActivityDto, TagDto, EntitlementDto } from "../dto/crm.dto";
 
 const BASE = "/crm";
@@ -7,30 +8,6 @@ export interface ImportSummaryDto {
   importados: number;
   omitidos: number;
   errores: { fila: number; razon: string }[];
-}
-
-// CSV endpoints stream a file, so they cannot use the JSON unwrapping ApiClient.
-// Fetch + blob carries the Stytch session token in the request headers (a bare
-// window.location navigation cannot attach it).
-async function downloadCSV(endpoint: string, filename: string): Promise<void> {
-  const token = await resolveAccessToken();
-  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-  const response = await fetch(`${apiClient.getBaseUrl()}${endpoint}`, {
-    headers,
-    credentials: "include",
-  });
-  if (!response.ok) {
-    throw new Error(`API Error ${response.status}: no se pudo descargar el archivo`);
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 // The backend wraps all CRM responses in a { data, success } envelope. For
@@ -121,12 +98,12 @@ export const crmRepository = {
   untagEntity: (entityType: string, entityId: number, tagId: number) =>
     unwrap(apiClient.delete<Envelope<null>>(`${BASE}/etiquetas/entity/${entityType}/${entityId}/${tagId}`)),
 
-  exportContacts: () => downloadCSV(`${BASE}/export/contactos.csv`, "contactos.csv"),
-  exportCompanies: () => downloadCSV(`${BASE}/export/empresas.csv`, "empresas.csv"),
-  exportDeals: () => downloadCSV(`${BASE}/export/negocios.csv`, "negocios.csv"),
-  exportActivities: () => downloadCSV(`${BASE}/export/actividades.csv`, "actividades.csv"),
+  exportContacts: () => downloadCsvFile(`${BASE}/export/contactos.csv`, "contactos.csv"),
+  exportCompanies: () => downloadCsvFile(`${BASE}/export/empresas.csv`, "empresas.csv"),
+  exportDeals: () => downloadCsvFile(`${BASE}/export/negocios.csv`, "negocios.csv"),
+  exportActivities: () => downloadCsvFile(`${BASE}/export/actividades.csv`, "actividades.csv"),
 
-  downloadImportTemplate: () => downloadCSV(`${BASE}/import/contactos/template.csv`, "plantilla-contactos.csv"),
+  downloadImportTemplate: () => downloadCsvFile(`${BASE}/import/contactos/template.csv`, "plantilla-contactos.csv"),
 
   importContacts: async (file: File): Promise<ImportSummaryDto> => {
     const token = await resolveAccessToken();

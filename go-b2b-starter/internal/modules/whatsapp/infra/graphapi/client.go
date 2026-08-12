@@ -72,6 +72,10 @@ type Client interface {
 	RegisterAppSubscriptions(ctx context.Context, userToken, appID, callbackURL, verifyToken string) error
 	// SendTestMessage sends a text message through the Cloud API (used for TTV validation).
 	SendTestMessage(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, to string) error
+	// SubmitTemplate creates a message template at Meta and returns its template id.
+	SubmitTemplate(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, name, language, category, body string) (string, error)
+	// GetTemplateStatus fetches a template's approval status from Meta.
+	GetTemplateStatus(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, metaTemplateID string) (string, error)
 }
 
 // client is the real Graph API implementation, guarded by a two-tier circuit breaker
@@ -383,4 +387,76 @@ func (c *client) SendTestMessage(ctx context.Context, accessToken, graphAPIURL, 
 		}
 		return nil
 	})
+}
+
+// SubmitTemplate creates a message template at Meta for the org's phone number
+// and returns the Meta-assigned template id. The body components use the same
+// {{N}} placeholders stored locally; Meta validates the component count.
+func (c *client) SubmitTemplate(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, name, language, category, body string) (string, error) {
+	var templateID string
+	err := c.run(func() error {
+		base := c.cfg.APIBase
+		if graphAPIURL != "" {
+			base = graphAPIURL
+		}
+		version := c.cfg.APIVersion
+		if apiVersion != "" {
+			version = apiVersion
+		}
+
+		components, err := json.Marshal([]map[string]any{{
+			"type": "BODY",
+			"text": body,
+		}})
+		if err != nil {
+			return fmt.Errorf("failed to marshal template components: %w", err)
+		}
+
+		form := url.Values{}
+		form.Set("name", name)
+		form.Set("language", language)
+		form.Set("category", category)
+		form.Set("components", string(components))
+
+		var created struct {
+			ID string `json:"id"`
+		}
+		if err := c.doJSON(ctx, http.MethodPost, base, version, phoneNumberID+"/message_templates", accessToken, form, &created); err != nil {
+			return err
+		}
+		if created.ID == "" {
+			return fmt.Errorf("graph api returned no template id")
+		}
+		templateID = created.ID
+		return nil
+	})
+	return templateID, err
+}
+
+// GetTemplateStatus fetches a template's approval status from Meta. Returns
+// the raw status string (e.g. APPROVED, REJECTED, PAUSED, IN_APPEAL).
+func (c *client) GetTemplateStatus(ctx context.Context, accessToken, graphAPIURL, apiVersion, phoneNumberID, metaTemplateID string) (string, error) {
+	var status string
+	err := c.run(func() error {
+		base := c.cfg.APIBase
+		if graphAPIURL != "" {
+			base = graphAPIURL
+		}
+		version := c.cfg.APIVersion
+		if apiVersion != "" {
+			version = apiVersion
+		}
+
+		form := url.Values{}
+		form.Set("fields", "status")
+		var out struct {
+			Status string `json:"status"`
+		}
+		if err := c.doJSON(ctx, http.MethodGet, base, version, metaTemplateID, accessToken, form, &out); err != nil {
+			return err
+		}
+		status = out.Status
+		return nil
+	})
+	return status, err
 }

@@ -18,6 +18,9 @@ var ErrContactNotFound = errors.New("contact not found")
 // ErrConversationNotFound is returned when a conversation cannot be resolved.
 var ErrConversationNotFound = errors.New("conversation not found")
 
+// ErrContextNotFound is returned when no cached context exists for a conversation.
+var ErrContextNotFound = errors.New("conversation context not found")
+
 // ErrActionDenied is returned by the pipeline when the guardrail layer denied
 // an action. The denial is already audited.
 var ErrActionDenied = errors.New("agent action denied by guardrails")

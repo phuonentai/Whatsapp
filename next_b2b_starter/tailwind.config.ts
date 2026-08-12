@@ -24,6 +24,12 @@ const config: Config = {
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif'
+  			],
+  			heading: [
+  				'var(--font-heading)',
+  				'ui-sans-serif',
+  				'system-ui',
+  				'sans-serif'
   			]
   		},
   		colors: {

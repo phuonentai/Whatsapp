@@ -30,6 +30,11 @@ type Account struct {
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	// SessionRevocationPending is a transient notice carried on the
+	// deactivation result when the auth-provider session revocation could not
+	// run (e.g. Stytch unreachable or circuit breaker open). It is NOT
+	// persisted locally; repositories map fields explicitly.
+	SessionRevocationPending bool `json:"session_revocation_pending,omitempty"`
 }
 
 // OrganizationContext provides context for operations within an organization

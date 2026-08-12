@@ -1,0 +1,7 @@
+{
+  "requires_council": true,
+  "requires_market_read": true,
+  "requires_playwright": true,
+  "requires_iso": true,
+  "complexity": "high"
+}

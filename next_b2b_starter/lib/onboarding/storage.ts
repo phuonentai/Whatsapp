@@ -4,6 +4,7 @@ export const ONBOARDING_STORAGE_KEYS = {
   businessContext: "ai-onboarding.business-context",
   assistantIntroDismissed: "ai-onboarding.assistant-intro-dismissed",
   inboxVisited: "ai-onboarding.inbox-visited",
+  knowledgeVisited: "ai-onboarding.knowledge-visited",
 } as const;
 
 function readJson<T>(key: string): T | null {
@@ -51,4 +52,12 @@ export function isInboxVisited(): boolean {
 
 export function markInboxVisited(): void {
   write(ONBOARDING_STORAGE_KEYS.inboxVisited, JSON.stringify(true));
+}
+
+export function isKnowledgeVisited(): boolean {
+  return readFlag(ONBOARDING_STORAGE_KEYS.knowledgeVisited);
+}
+
+export function markKnowledgeVisited(): void {
+  write(ONBOARDING_STORAGE_KEYS.knowledgeVisited, JSON.stringify(true));
 }

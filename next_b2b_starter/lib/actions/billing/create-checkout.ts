@@ -6,6 +6,7 @@ import { getServerPermissions } from "@/lib/auth/server-permissions";
 import { getPolarClient } from "@/lib/polar/client";
 import { getDefaultPlan, getPlanById, getPlanByProductId, type PolarPlan } from "@/lib/polar/plans";
 import { getActiveSubscription } from "@/lib/polar/subscription";
+import { coerceNumericMetadata } from "@/lib/polar/plan-metadata";
 import {
   createActionError,
   createActionSuccess,
@@ -100,22 +101,14 @@ export async function createCheckout(
         const planId = typeof metadata.plan_id === "string" ? metadata.plan_id : product.id;
 
         const includedSeats =
-          typeof metadata.included_seats === "number"
-            ? metadata.included_seats
-            : typeof metadata.max_seats === "number"
-              ? metadata.max_seats
-              : typeof metadata.seats === "number"
-                ? metadata.seats
-                : null;
+          coerceNumericMetadata(metadata.included_seats) ??
+          coerceNumericMetadata(metadata.max_seats) ??
+          coerceNumericMetadata(metadata.seats);
 
         const includedInvoices =
-          typeof metadata.included_invoices === "number"
-            ? metadata.included_invoices
-            : typeof metadata.invoice_limit === "number"
-              ? metadata.invoice_limit
-              : typeof metadata.invoices === "number"
-                ? metadata.invoices
-                : null;
+          coerceNumericMetadata(metadata.included_invoices) ??
+          coerceNumericMetadata(metadata.invoice_limit) ??
+          coerceNumericMetadata(metadata.invoices);
 
         const benefits =
           product.benefits?.map((b) => b.description).filter(Boolean) ?? [];

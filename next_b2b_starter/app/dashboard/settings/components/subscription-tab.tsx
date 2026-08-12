@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  CircleOff,
   Clock,
   LifeBuoy,
   Loader2,
@@ -17,7 +18,6 @@ import { toast } from "sonner";
 
 import { PlansModal } from "@/components/billing/plans-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusChip } from "@/components/ui/status-chip";
 import {
   Dialog,
   DialogContent,
@@ -69,6 +70,10 @@ export function SubscriptionTab({
   const [cancelInput, setCancelInput] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+
   const billingConfigured = state?.reason !== "POLAR_UNCONFIGURED" && state?.reason !== "MP_UNCONFIGURED";
   const isActive = Boolean(state?.isActive);
   const showInactive = !isActive || state?.reason === "NO_ACTIVE_SUBSCRIPTION";
@@ -99,6 +104,11 @@ export function SubscriptionTab({
       ? Math.min(100, Math.round((usedInvoices / includedInvoices) * 100))
       : 0;
 
+  // Amber threshold (design language): usage >= 80% of the plan limit.
+  const USAGE_THRESHOLD = 80;
+  const usageAtLimit = usagePercent >= USAGE_THRESHOLD;
+  const aiUsageAtLimit = aiCreditsPercent >= USAGE_THRESHOLD;
+
   const nextBillingDate = state?.subscription?.currentPeriodEnd
     ? new Date(state.subscription.currentPeriodEnd)
     : null;
@@ -115,6 +125,42 @@ export function SubscriptionTab({
           currency: "USD",
         }).format(plan.price)
       : null;
+
+  // Drop checkout-outcome params once the user acknowledges the banner so it
+  // does not reappear on refresh. Preserves any other params (e.g. view).
+  const clearPaymentParams = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("payment_verified");
+    params.delete("payment_error");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  };
+
+  // Acknowledge checkout-outcome params after the banner renders (not only on
+  // dismiss): strip them from the URL via history.replaceState so refresh and
+  // back-navigation do not re-show a stale banner. Also refetch the
+  // subscription state once so webhook/verify-driven changes appear without a
+  // manual "Actualizar estado" click.
+  useEffect(() => {
+    const hadOutcome =
+      searchParams.get("payment_verified") === "true" ||
+      searchParams.get("payment_error") === "true";
+
+    if (hadOutcome) {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("payment_verified");
+      params.delete("payment_error");
+      const query = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        query ? `${window.location.pathname}?${query}` : window.location.pathname
+      );
+      void onRefresh();
+    }
+    // Run once on mount: the checkout callback is a fresh page navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading && !state) {
     return <SubscriptionSkeleton />;
@@ -133,10 +179,14 @@ export function SubscriptionTab({
           <AlertTriangle className="mt-1 h-5 w-5 text-amber-500" />
           <div className="space-y-1">
             <CardTitle className="text-lg text-amber-900">
-              {ui.billing.polarConfigRequired}
+              {state?.reason === "MP_UNCONFIGURED"
+                ? ui.billing.mpConfigRequired
+                : ui.billing.polarConfigRequired}
             </CardTitle>
             <CardDescription className="text-sm text-amber-800">
-              {ui.billing.polarConfigDesc}
+              {state?.reason === "MP_UNCONFIGURED"
+                ? ui.billing.mpConfigDesc
+                : ui.billing.polarConfigDesc}
             </CardDescription>
           </div>
         </CardHeader>
@@ -161,19 +211,19 @@ export function SubscriptionTab({
   const overlayActive = isPlanChangePending || actionState !== "idle";
 
   const summarySection = showInactive ? (
-    <section className="rounded-3xl border border-dashed border-gray-300 bg-white p-10 text-center shadow-sm">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-        <AlertTriangle className="h-6 w-6 text-gray-500" />
+    <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <AlertTriangle className="h-6 w-6 text-slate-500" />
       </div>
-      <h3 className="mt-6 text-2xl font-semibold text-gray-900">{ui.billing.noActivePlan}</h3>
-      <p className="mt-2 text-sm text-gray-600">
+      <h3 className="mt-6 text-2xl font-semibold text-slate-900">{ui.billing.noActivePlan}</h3>
+      <p className="mt-2 text-sm text-slate-600">
         {ui.billing.noActivePlanBody}
       </p>
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button
           onClick={() => setPlansOpen(true)}
           disabled={!canInteract}
-          className="bg-gray-900 text-white hover:bg-gray-800"
+          className="bg-emerald-500 text-white hover:bg-emerald-600"
         >
           {ui.billing.browsePlans}
         </Button>
@@ -185,22 +235,36 @@ export function SubscriptionTab({
       </div>
     </section>
   ) : (
-    <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+    <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-600">
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
             <CalendarDays className="h-3.5 w-3.5" />
             {ui.billing.currentPlanEyebrow}
           </div>
-          <h3 className="text-3xl font-semibold text-gray-900">
+          <h3 className="text-3xl font-semibold text-slate-900">
             {plan?.name ?? ui.billing.customPlan}
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             {planPrice ? `${planPrice} • ${ui.billing.billedMonthly}` : `${ui.billing.billedVia} ${mercadopagoEnabled ? "MercadoPago" : "Polar"}`}
           </p>
         </div>
-        <Badge className={statusDisplay.className}>{statusDisplay.label}</Badge>
+        <StatusChip tone={statusDisplay.tone} icon={statusDisplay.icon}>
+          {statusDisplay.label}
+        </StatusChip>
       </div>
+
+      {/* Grace-period messaging: features stay readable, writes are blocked.
+          past_due with IsGracePeriod = the subscription hasn't been cancelled yet. */}
+      {isActive && state?.status === "past_due" && (
+        <Alert variant="default" className="mt-4 border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">{ui.billing.gracePeriodTitle}</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            {ui.billing.gracePeriodBody}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {nextBillingDate && (
@@ -230,26 +294,29 @@ export function SubscriptionTab({
               {ui.billing.scheduledToEnd}
             </AlertTitle>
             <AlertDescription className="text-sm text-amber-800">
-              {tpl(ui.billing.scheduledToEndBody, {
-                date: format(nextBillingDate, "MMM d, yyyy"),
-              })}
+              {tpl(
+                mercadopagoEnabled
+                  ? ui.billing.scheduledToEndBodyMp
+                  : ui.billing.scheduledToEndBody,
+                { date: format(nextBillingDate, "MMM d, yyyy") }
+              )}
             </AlertDescription>
           </Alert>
         ) : (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             {ui.billing.switchPlansHint}
           </p>
         )}
 
         {plan?.benefits?.length ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               {ui.billing.planBenefits}
             </p>
             <ul className="mt-3 space-y-2">
               {plan.benefits.map((benefit) => (
-                <li key={benefit} className="flex items-start gap-2 text-sm text-gray-600">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-gray-500" />
+                <li key={benefit} className="flex items-start gap-2 text-sm text-slate-600">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-slate-500" />
                   <span>{benefit}</span>
                 </li>
               ))}
@@ -288,7 +355,7 @@ export function SubscriptionTab({
             {ui.billing.refreshStatus}
           </Button>
           <Button variant="ghost" asChild>
-            <a href={contactHref} className="text-sm text-gray-600 hover:text-gray-900">
+            <a href={contactHref} className="text-sm text-slate-600 hover:text-slate-900">
               <LifeBuoy className="mr-2 h-4 w-4" />
               {ui.common.contactSupport}
             </a>
@@ -300,45 +367,53 @@ export function SubscriptionTab({
 
   const usageSection =
     !showInactive && includedInvoices > 0 ? (
-      <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <h4 className="text-lg font-semibold text-gray-900">{ui.billing.invoiceUsage}</h4>
-            <p className="text-sm text-gray-600">
+            <h4 className="text-lg font-semibold text-slate-900">{ui.billing.invoiceUsage}</h4>
+            <p className="text-sm text-slate-600">
               {nextBillingDate
                 ? tpl(ui.billing.usageResetsOn, { date: format(nextBillingDate, "MMM d, yyyy") })
                 : ui.billing.trackUsage}
             </p>
           </div>
-          <Badge className="bg-gray-100 text-gray-700">
-            {usagePercent}% of {includedInvoices.toLocaleString()}
-          </Badge>
+          <StatusChip tone={usageAtLimit ? "amber" : "gray"} icon={usageAtLimit ? AlertTriangle : undefined}>
+            {usageAtLimit
+              ? tpl(ui.settings.usageAtLimit, { percent: String(usagePercent) })
+              : tpl(ui.settings.usagePercent, { percent: String(usagePercent) })}
+          </StatusChip>
         </div>
         <div className="mt-6 space-y-3">
-          <Progress value={usagePercent} className="h-2" />
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+          <Progress
+            value={usagePercent}
+            className={usageAtLimit ? "h-2 [&>div]:bg-amber-500" : "h-2"}
+          />
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
             <span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-slate-900">
                 {usedInvoices.toLocaleString()}
               </span>{" "}
               {ui.billing.invoicesProcessed}
             </span>
-            <span className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="flex items-center gap-2 text-xs text-slate-500">
               <Clock className="h-4 w-4" />
               {remainingInvoicesText(includedInvoices, usedInvoices)}
             </span>
           </div>
+          {usageAtLimit ? (
+            <p className="text-xs font-medium text-amber-700">{ui.settings.usageNearLimitBody}</p>
+          ) : null}
         </div>
       </section>
     ) : null;
 
   const aiUsageSection =
     !showInactive && aiUsage && aiUsage.credits_max > 0 ? (
-      <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <h4 className="text-lg font-semibold text-gray-900">{ui.billing.aiCredits}</h4>
-            <p className="text-sm text-gray-600">
+            <h4 className="text-lg font-semibold text-slate-900">{ui.billing.aiCredits}</h4>
+            <p className="text-sm text-slate-600">
               {tpl(ui.billing.aiCreditsBody, {
                 resets: aiUsage.period_end
                   ? tpl(ui.billing.aiResetsOn, {
@@ -348,25 +423,33 @@ export function SubscriptionTab({
               })}
             </p>
           </div>
-          <Badge className="bg-gray-100 text-gray-700">
-            {aiUsage.credits_used.toLocaleString()} / {aiUsage.credits_max.toLocaleString()}
-          </Badge>
+          <StatusChip tone={aiUsageAtLimit ? "amber" : "gray"} icon={aiUsageAtLimit ? AlertTriangle : undefined}>
+            {aiUsageAtLimit
+              ? tpl(ui.settings.usageAtLimit, { percent: String(aiCreditsPercent) })
+              : `${aiUsage.credits_used.toLocaleString()} / ${aiUsage.credits_max.toLocaleString()}`}
+          </StatusChip>
         </div>
         <div className="mt-6 space-y-3">
-          <Progress value={aiCreditsPercent} className="h-2" />
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+          <Progress
+            value={aiCreditsPercent}
+            className={aiUsageAtLimit ? "h-2 [&>div]:bg-amber-500" : "h-2"}
+          />
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
             <span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-slate-900">
                 {aiUsage.credits_remaining.toLocaleString()}
               </span>{" "}
               {ui.billing.creditsRemaining}
             </span>
-            <span className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="flex items-center gap-2 text-xs text-slate-500">
               <Sparkles className="h-4 w-4" />
               {aiUsage.tokens_input.toLocaleString()} / {aiUsage.tokens_output.toLocaleString()}{" "}
               {ui.billing.inOutTokens}
             </span>
           </div>
+          {aiUsageAtLimit ? (
+            <p className="text-xs font-medium text-amber-700">{ui.settings.usageNearLimitBody}</p>
+          ) : null}
         </div>
       </section>
     ) : null;
@@ -376,7 +459,7 @@ export function SubscriptionTab({
       <div className="relative">
         {overlayActive && (
           <div className="absolute inset-0 z-20 rounded-3xl bg-white/70 backdrop-blur-sm">
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-sm font-medium text-gray-700">
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-sm font-medium text-slate-700">
               <Loader2 className="h-6 w-6 animate-spin" />
               {ui.billing.processingRequest}
             </div>
@@ -384,6 +467,45 @@ export function SubscriptionTab({
         )}
 
         <div className="space-y-8">
+          {searchParams.get("payment_verified") === "true" ? (
+            <Alert className="border border-emerald-200 bg-emerald-50">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <AlertTitle className="flex items-center gap-2">
+                {ui.billing.paymentVerifiedTitle}
+              </AlertTitle>
+              <AlertDescription className="text-emerald-700">
+                {ui.billing.paymentVerifiedBody}
+              </AlertDescription>
+              <div className="mt-3 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearPaymentParams}
+                  className="border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                >
+                  {ui.billing.understood}
+                </Button>
+              </div>
+            </Alert>
+          ) : null}
+
+          {searchParams.get("payment_error") === "true" ? (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>{ui.billing.paymentErrorTitle}</AlertTitle>
+              <AlertDescription>{ui.billing.paymentErrorBody}</AlertDescription>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="destructive" onClick={() => setPlansOpen(true)}>
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  {ui.billing.retryCheckout}
+                </Button>
+                <Button size="sm" variant="outline" onClick={clearPaymentParams}>
+                  {ui.billing.understood}
+                </Button>
+              </div>
+            </Alert>
+          ) : null}
+
           {error ? (
             <Alert variant="destructive">
               <AlertTitle>{ui.billing.unableLoadSubscription}</AlertTitle>
@@ -429,15 +551,17 @@ export function SubscriptionTab({
       >
         <DialogContent className="max-w-lg">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-xl font-semibold text-gray-900">
+            <DialogTitle className="text-xl font-semibold text-slate-900">
               {ui.billing.confirmCancellation}
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-600">
-              {tpl(ui.billing.cancelDialogBody, {
-                date: nextBillingDate
-                  ? format(nextBillingDate, "MMM d, yyyy")
-                  : ui.billing.endOfTerm,
-              })}
+            <DialogDescription className="text-sm text-slate-600">
+              {mercadopagoEnabled
+                ? ui.billing.cancelDialogBodyMp
+                : tpl(ui.billing.cancelDialogBody, {
+                    date: nextBillingDate
+                      ? format(nextBillingDate, "MMM d, yyyy")
+                      : ui.billing.endOfTerm,
+                  })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -453,7 +577,7 @@ export function SubscriptionTab({
                 {ui.billing.headsUp}
               </AlertTitle>
               <AlertDescription className="text-sm text-amber-800">
-                {ui.billing.headsUpBody}
+                {mercadopagoEnabled ? ui.billing.headsUpBodyMp : ui.billing.headsUpBody}
               </AlertDescription>
             </Alert>
           </div>
@@ -496,10 +620,13 @@ export function SubscriptionTab({
 
     startTransition(async () => {
       try {
-        const result =
-          cancel && mercadopagoEnabled
-            ? await cancelMPSubscription({ subscriptionId })
-            : await cancelSubscription({ cancelAtPeriodEnd: cancel });
+        // Provider-accurate branching: under MercadoPago both cancel and
+        // resume route through the MP action (Polar's cancelSubscription
+        // errors with "No active subscription to update." for MP orgs); Polar
+        // keeps its own cancel/resume path.
+        const result = mercadopagoEnabled
+          ? await cancelMPSubscription({ subscriptionId })
+          : await cancelSubscription({ cancelAtPeriodEnd: cancel });
 
         if (!result.success) {
           throw new Error(result.error);
@@ -531,11 +658,11 @@ export function SubscriptionTab({
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-left">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-left">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -547,10 +674,10 @@ function remainingInvoicesText(limit: number, used: number) {
 
 function SubscriptionSkeleton() {
   return (
-    <Card className="border-gray-200">
+    <Card className="border-slate-200">
       <CardHeader>
         <CardTitle className="text-xl">{ui.billing.subscriptionOverview}</CardTitle>
-        <CardDescription className="text-sm text-gray-600">
+        <CardDescription className="text-sm text-slate-600">
           {ui.billing.loadingPlanDetails}
         </CardDescription>
       </CardHeader>
@@ -571,14 +698,16 @@ function getStatusDisplay(
   if (!state?.isActive) {
     return {
       label: status ? titleCase(status) : ui.billing.statusInactive,
-      className: "bg-gray-200 text-gray-700",
+      tone: "gray" as const,
+      icon: CircleOff,
     };
   }
 
   if (cancelAtPeriodEnd) {
     return {
       label: ui.billing.statusCancelsSoon,
-      className: "bg-amber-100 text-amber-700",
+      tone: "amber" as const,
+      icon: AlertTriangle,
     };
   }
 
@@ -586,23 +715,27 @@ function getStatusDisplay(
     case "trialing":
       return {
         label: ui.billing.statusTrialing,
-        className: "bg-blue-100 text-blue-700",
+        tone: "blue" as const,
+        icon: Sparkles,
       };
     case "past_due":
       return {
         label: ui.billing.statusPastDue,
-        className: "bg-amber-100 text-amber-700",
+        tone: "amber" as const,
+        icon: AlertTriangle,
       };
     case "grace":
       return {
         label: ui.billing.statusGrace,
-        className: "bg-amber-100 text-amber-700",
+        tone: "amber" as const,
+        icon: Clock,
       };
     case "active":
     default:
       return {
         label: status ? titleCase(status) : ui.billing.statusActive,
-        className: "bg-emerald-100 text-emerald-700",
+        tone: "emerald" as const,
+        icon: CheckCircle2,
       };
   }
 }

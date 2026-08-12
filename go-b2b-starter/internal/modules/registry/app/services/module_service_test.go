@@ -28,6 +28,7 @@ func (f *fakeModuleRepo) GetByKey(ctx context.Context, key string) (*domain.Modu
 
 type fakeOrgModRepo struct {
 	orgMods []*domain.OrganizationModule
+	deleted []string
 }
 
 func (f *fakeOrgModRepo) ListByOrg(ctx context.Context, orgID int32) ([]*domain.OrganizationModule, error) {
@@ -44,7 +45,10 @@ func (f *fakeOrgModRepo) GetByKey(ctx context.Context, orgID int32, moduleKey st
 func (f *fakeOrgModRepo) UpsertConfig(ctx context.Context, orgID int32, moduleKey string, config map[string]any) (*domain.OrganizationModule, error) {
 	return &domain.OrganizationModule{OrganizationID: orgID, ModuleKey: moduleKey, Config: config}, nil
 }
-func (f *fakeOrgModRepo) Delete(ctx context.Context, orgID int32, moduleKey string) error { return nil }
+func (f *fakeOrgModRepo) Delete(ctx context.Context, orgID int32, moduleKey string) error {
+	f.deleted = append(f.deleted, moduleKey)
+	return nil
+}
 
 type fakeLogger struct{}
 
@@ -116,4 +120,23 @@ func TestSaveOrgModuleConfig_ValidatesSchema(t *testing.T) {
 
 	_, err = svc.SaveOrgModuleConfig(context.Background(), 1, "ghost", map[string]any{})
 	require.ErrorIs(t, err, domain.ErrModuleNotFound)
+}
+
+func TestSyncModulesFromMetadata_EmptyKeysAreNoOp(t *testing.T) {
+	modRepo := &fakeModuleRepo{modules: newFakeModuleSet()}
+	orgModRepo := &fakeOrgModRepo{orgMods: []*domain.OrganizationModule{
+		{OrganizationID: 7, ModuleKey: "tickets", Config: map[string]any{"sla_hours": float64(4)}},
+	}}
+	svc := NewModuleService(modRepo, orgModRepo, fakeLogger{})
+
+	// Absent/empty metadata key sets must not disable existing org modules.
+	err := svc.SyncModulesFromMetadata(context.Background(), 7, nil)
+	require.NoError(t, err)
+	err = svc.SyncModulesFromMetadata(context.Background(), 7, []string{})
+	require.NoError(t, err)
+
+	assert.Empty(t, orgModRepo.deleted, "no module may be disabled on empty metadata")
+	require.Len(t, orgModRepo.orgMods, 1)
+	assert.Equal(t, "tickets", orgModRepo.orgMods[0].ModuleKey)
+	assert.Equal(t, map[string]any{"sla_hours": float64(4)}, orgModRepo.orgMods[0].Config)
 }

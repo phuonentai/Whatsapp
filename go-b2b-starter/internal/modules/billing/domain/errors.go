@@ -15,6 +15,11 @@ var (
 	// ErrQuotaExceeded is returned when invoice quota has been exceeded
 	ErrQuotaExceeded = errors.New("invoice quota exceeded")
 
+	// ErrQuotaExhausted is returned when the invoice count is already 0 and a
+	// decrement was attempted (DecrementInvoiceCount's bounded WHERE clause
+	// matched no row)
+	ErrQuotaExhausted = errors.New("invoice quota exhausted")
+
 	// ErrInvalidWebhookPayload is returned when webhook payload cannot be parsed
 	ErrInvalidWebhookPayload = errors.New("invalid webhook payload")
 

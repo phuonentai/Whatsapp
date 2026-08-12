@@ -69,7 +69,7 @@ export function ComplianceSection() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <ShieldCheck className="h-6 w-6 text-gray-600" />
+            <ShieldCheck className="h-6 w-6 text-slate-600" />
             <div>
               <CardTitle>Habeas Data (Ley 1581)</CardTitle>
               <CardDescription>
@@ -98,7 +98,7 @@ export function ComplianceSection() {
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-500">
               El ID aparece en la URL de la conversación del CRM (contacto) o en la lista de contactos.
             </p>
           </div>
@@ -115,7 +115,7 @@ export function ComplianceSection() {
             <Button
               onClick={handleExport}
               disabled={isExporting || !contactId}
-              className="bg-gray-900 text-white hover:bg-gray-800"
+              className="bg-emerald-500 text-white hover:bg-emerald-600"
             >
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Exportar datos del contacto

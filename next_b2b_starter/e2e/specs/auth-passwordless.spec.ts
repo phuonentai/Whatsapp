@@ -5,14 +5,16 @@ test.describe("Passwordless Authentication", () => {
   test("signup page exposes no password input", async ({ page }) => {
     await page.goto("/signup");
 
-    await expect(page.getByPlaceholder("John Doe")).toBeVisible();
-    await expect(page.getByPlaceholder("you@company.com")).toBeVisible();
+    await expect(page.getByPlaceholder("Juan Pérez")).toBeVisible();
+    await expect(page.getByPlaceholder("tu@empresa.com")).toBeVisible();
     await expect(page.locator('input[type="password"]')).toHaveCount(0);
   });
 
   test("login page is email-only with no password input", async ({ page }) => {
     await page.goto("/auth");
 
+    // The /auth login page is still English-implemented (copy migration gap —
+    // tracked separately); its email field placeholder is you@company.com.
     await expect(page.getByPlaceholder("you@company.com")).toBeVisible();
     await expect(page.locator('input[type="password"]')).toHaveCount(0);
   });

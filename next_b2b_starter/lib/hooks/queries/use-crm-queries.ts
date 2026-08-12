@@ -1,11 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { crmRepository } from "@/lib/api/api/repositories/crm-repository";
 import { queryKeys } from "./query-keys";
 
-export function useContactsQuery(params?: { source?: string; lead_status?: string; limit?: number; offset?: number }) {
+export interface ContactsQueryParams {
+  source?: string;
+  lead_status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CompaniesQueryParams {
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Derive the API limit/offset pair from a page/pageSize request. Callers that
+ * omit pagination keep fetching the full list (dashboard counts, dialog
+ * pickers) — only paged views pass page/pageSize.
+ */
+function paginationParams(params?: { page?: number; pageSize?: number }) {
+  const { page, pageSize } = params ?? {};
+  if (page && pageSize) {
+    return { limit: pageSize, offset: (page - 1) * pageSize };
+  }
+  return {};
+}
+
+export function useContactsQuery(params?: ContactsQueryParams) {
+  const { page, pageSize, ...filters } = params ?? {};
+  const requestParams = page && pageSize
+    ? { ...filters, ...paginationParams(params) }
+    : filters;
   const query = useQuery({
-    queryKey: queryKeys.crm.contacts(params),
-    queryFn: () => crmRepository.listContacts(params),
+    // Page-scoped key: TanStack caches each offset window separately, so the
+    // previous page's data survives while the next one loads.
+    queryKey: queryKeys.crm.contacts(requestParams),
+    queryFn: () => crmRepository.listContacts(requestParams),
+    placeholderData: keepPreviousData,
   });
   return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }
@@ -18,10 +50,15 @@ export function useContactQuery(id: number) {
   });
 }
 
-export function useCompaniesQuery(params?: { limit?: number; offset?: number }) {
+export function useCompaniesQuery(params?: CompaniesQueryParams) {
+  const { page, pageSize, ...filters } = params ?? {};
+  const requestParams = page && pageSize
+    ? { ...filters, ...paginationParams(params) }
+    : filters;
   const query = useQuery({
-    queryKey: queryKeys.crm.companies(params),
-    queryFn: () => crmRepository.listCompanies(params),
+    queryKey: queryKeys.crm.companies(requestParams),
+    queryFn: () => crmRepository.listCompanies(requestParams),
+    placeholderData: keepPreviousData,
   });
   return { ...query, data: query.data?.items, total: query.data?.total ?? 0 };
 }

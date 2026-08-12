@@ -1,9 +1,7 @@
 ## Purpose
 
 Defines the WhatsApp agent pipeline: inbound-message trigger, LLM-powered metered analysis, and L1 human approval for copilot mode.
-
 ## Requirements
-
 ### Requirement: Inbound message triggers the agent pipeline
 
 The system SHALL start or advance a conversation flow whenever a `whatsapp.message.received` or `instagram.message.received` event is published, by subscribing to the same events consumed by the CRM message listeners. The pipeline SHALL resolve the contact and active conversation idempotently (independent of the CRM listener's event ordering) and SHALL NOT block the webhook HTTP response (the eventbus dispatches handlers asynchronously).
@@ -31,6 +29,13 @@ The system SHALL start or advance a conversation flow whenever a `whatsapp.messa
 
 - **WHEN** a message event has a non-text type or empty content
 - **THEN** the pipeline SHALL return without analysis or suggestions
+
+#### Scenario: Message consumed by an active inquiry run skips analysis
+
+- **WHEN** a `whatsapp.message.received` event belongs to an active supplier inquiry run recipient (a run in `sending` or `awaiting_responses` status with the recipient awaiting a reply)
+- **THEN** the agent pipeline SHALL skip analysis and suggestions for that message
+- **AND** SHALL NOT create a conversation flow or suggestion
+- **AND** SHALL NOT block or duplicate the procurement subscriber's processing
 
 ### Requirement: Agent analysis is LLM-powered and metered
 
@@ -171,3 +176,19 @@ The system SHALL expose contact data export and anonymization. Exports SHALL mas
 - **WHEN** an `org:manage` member calls `POST /api/agent/compliance/forget/:contactId`
 - **THEN** the contact's personal fields SHALL be scrubbed and consent set to `withdrawn`
 - **AND** a repeated call SHALL succeed without further changes
+
+### Requirement: Conversation context generation in the agent pipeline
+
+The agent pipeline SHALL provide conversation-context generation as a sibling to analysis: a domain `ConversationContextService` that reads org-scoped conversation history, applies consent gating and PII masking, runs a metered LLM generation, and persists to `agent.conversation_contexts`. Consent semantics SHALL mirror the existing agent consent state machine (`none`/`requested`/`granted`/`withdrawn`); contacts without granted consent (when required) receive structural-only context.
+
+#### Scenario: Context service gates on consent
+
+- **WHEN** a context generation is requested for a conversation whose contact has not granted consent and the org requires consent
+- **THEN** the service SHALL produce structural-only context with `consent_gated: true`
+- **AND** SHALL NOT invoke the analysis LLM
+
+#### Scenario: Context service masks PII
+
+- **WHEN** a context generation runs an LLM call
+- **THEN** the message bodies SHALL be masked per `whatsapp-compliance` before the call
+

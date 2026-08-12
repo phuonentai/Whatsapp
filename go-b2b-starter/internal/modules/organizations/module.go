@@ -45,11 +45,51 @@ func (m *Module) RegisterDependencies() error {
 		return err
 	}
 
+	// Session revocation (member deactivation): the same Stytch member
+	// repository implements the SessionRevoker domain contract. The shared
+	// *stytchcfg.Client singleton carries the circuit breaker.
+	if err := m.container.Provide(func(
+		client *stytchcfg.Client,
+		cfg *stytchcfg.Config,
+		logger loggerDomain.Logger,
+	) domain.SessionRevoker {
+		return repositories.NewStytchMemberRepository(client, *cfg, logger)
+	}); err != nil {
+		return err
+	}
+
 	if err := m.container.Provide(func(
 		client *stytchcfg.Client,
 		logger loggerDomain.Logger,
 	) domain.AuthRoleRepository {
 		return repositories.NewStytchRoleRepository(client, logger)
+	}); err != nil {
+		return err
+	}
+
+	// MFA policy updates: the same Stytch organization repository implements
+	// the MfaPolicyUpdater domain contract. The shared *stytchcfg.Client
+	// singleton carries the circuit breaker.
+	if err := m.container.Provide(func(
+		client *stytchcfg.Client,
+		logger loggerDomain.Logger,
+		localOrgRepo domain.OrganizationRepository,
+	) domain.MfaPolicyUpdater {
+		return repositories.NewStytchOrganizationRepository(client, logger, localOrgRepo)
+	}); err != nil {
+		return err
+	}
+
+	// Org auth policy (JIT / allowed auth methods / SSO JIT): the same Stytch
+	// organization repository implements the OrgAuthPolicyUpdater domain
+	// contract. The shared *stytchcfg.Client singleton carries the circuit
+	// breaker.
+	if err := m.container.Provide(func(
+		client *stytchcfg.Client,
+		logger loggerDomain.Logger,
+		localOrgRepo domain.OrganizationRepository,
+	) domain.OrgAuthPolicyUpdater {
+		return repositories.NewStytchOrganizationRepository(client, logger, localOrgRepo)
 	}); err != nil {
 		return err
 	}
@@ -60,8 +100,12 @@ func (m *Module) RegisterDependencies() error {
 		accountRepo domain.AccountRepository,
 		authOrgRepo domain.AuthOrganizationRepository,
 		authMemberRepo domain.AuthMemberRepository,
+		sessionRevoker domain.SessionRevoker,
+		mfaPolicyUpdater domain.MfaPolicyUpdater,
+		authPolicyUpdater domain.OrgAuthPolicyUpdater,
+		logger loggerDomain.Logger,
 	) services.OrganizationService {
-		return services.NewOrganizationService(orgRepo, accountRepo, authOrgRepo, authMemberRepo)
+		return services.NewOrganizationService(orgRepo, accountRepo, authOrgRepo, authMemberRepo, sessionRevoker, mfaPolicyUpdater, authPolicyUpdater, logger)
 	}); err != nil {
 		return err
 	}
@@ -73,6 +117,7 @@ func (m *Module) RegisterDependencies() error {
 		authRoleRepo domain.AuthRoleRepository,
 		localOrgRepo domain.OrganizationRepository,
 		localAccountRepo domain.AccountRepository,
+		trialSeeder domain.TrialSeeder,
 		logger loggerDomain.Logger,
 	) services.MemberService {
 		return services.NewMemberService(
@@ -81,6 +126,7 @@ func (m *Module) RegisterDependencies() error {
 			authRoleRepo,
 			localOrgRepo,
 			localAccountRepo,
+			trialSeeder,
 			logger,
 		)
 	}); err != nil {

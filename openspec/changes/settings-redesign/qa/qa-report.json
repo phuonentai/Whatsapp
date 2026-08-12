@@ -1,0 +1,53 @@
+{
+  "change": "settings-redesign",
+  "stage": "apply-verification (visual/a11y gate, task 3.3)",
+  "generated_at": "2026-08-12",
+  "stack": {
+    "frontend": "next dev :3001 (Next.js 16, mock-auth cookie X-Test-Org-ID=test-org-pro)",
+    "backend": "go bin/api :8080 (AUTH_MOCK_ENABLED=true, local postgres saas_db_test @ migrations 39)",
+    "browser": "chromium headless"
+  },
+  "artifacts": {
+    "count": 33,
+    "viewports": ["390x844", "768x1024", "1440x900"],
+    "views": [
+      "overview", "profile", "subscription", "modules", "compliance",
+      "audit", "whatsapp", "templates", "instagram", "siigo", "siigo-admin"
+    ]
+  },
+  "design_language_checks": [
+    { "check": "semantic status chips pair tone + text (never color-only)", "result": "pass", "evidence": "whatsapp Conectado chip, modules plan-source chips, subscription usage chips all render icon+text; 0 empty chips on modules/profile/whatsapp" },
+    { "check": "overview icon tiles use tinted per-module backgrounds", "result": "pass", "evidence": "rounded-full -50 tinted tiles present on overview" },
+    { "check": "slate-200 surfaces / slate text hierarchy", "result": "pass", "evidence": "border-slate-200 containers; gray-* fully removed from app/dashboard/settings/components/* (0 matches)" },
+    { "check": "subscription usage bars: amber threshold >=80%", "result": "pass", "evidence": "unit tests: 9/10=90% → 'Uso alto: 90% del límite' amber chip + body; 85/100 AI credits → amber; 40% → neutral 'Uso: 40% del límite' (subscription-tab.test.tsx, 3 new tests)" },
+    { "check": "modules plan-source badge ('Incluido en plan X')", "result": "pass", "evidence": "DOM + unit test assert 'Incluido en plan Pro'" },
+    { "check": "no color-only states / chips-with-text a11y", "result": "pass", "evidence": "StatusChip component renders icon + text; toggle labels retained next to chips" }
+  ],
+  "console_and_network": {
+    "result": "pass",
+    "note": "No unexpected console errors. Expected noise whitelisted: instagram config 404 (module not mounted in main API server — pre-existing backend wiring gap), Stytch bootstrap 404 (test public token env noise), favicon."
+  },
+  "known_environment_limitations": [
+    {
+      "area": "templates (Message templates)",
+      "issue": "StatusChip markup renders, but template row fields (name/status) map empty: backend /api/v1/whatsapp/templates returns Go field names (ID/Name/Status) while the frontend model expects snake_case — pre-existing backend serialization mismatch (working-tree WIP, uncommitted handler.go). React 'unique key' warning follows from undefined ids.",
+      "scope": "pre-existing backend issue, outside settings-redesign (frontend-only, non-goal: no contract changes)"
+    },
+    {
+      "area": "instagram (Instagram config)",
+      "issue": "Instagram connected/paused chips not exercisable: internal/modules/instagram routes are not mounted in internal/api/provider.go (pre-existing backend wiring gap); mock org returns empty 'Connect Instagram' state. Chip code path is structurally identical to the verified whatsapp chips (same StatusChip component).",
+      "scope": "pre-existing backend wiring gap, outside settings-redesign"
+    },
+    {
+      "area": "subscription (usage bars live)",
+      "issue": "Live org has no active subscription (Polar/MercadoPago not wired in test env) → neutral noActivePlan state renders (correct empty-state per delta spec). Amber >=80% path verified by unit tests instead.",
+      "scope": "environment data state"
+    }
+  ],
+  "verification_gates": {
+    "pnpm lint": "pass (0 errors, 4 pre-existing warnings in unrelated files)",
+    "pnpm build": "pass (Compiled successfully)",
+    "npx tsc --noEmit": "pass",
+    "vitest settings": "pass (8 files, 40 tests; incl. 3 new amber-threshold + updated class assertions)"
+  }
+}

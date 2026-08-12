@@ -132,9 +132,9 @@ export function DocumentUpload({
   return (
     <div className="space-y-4">
       {success && (
-        <Alert className="border-emerald-200 bg-emerald-50 mb-4">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <AlertDescription className="text-emerald-700">
+        <Alert className="border-secondary bg-secondary mb-4">
+          <Check className="h-4 w-4 text-secondary-foreground" />
+          <AlertDescription className="text-secondary-foreground">
             Document uploaded successfully!
           </AlertDescription>
         </Alert>

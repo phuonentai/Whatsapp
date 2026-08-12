@@ -50,10 +50,30 @@ func (m *Module) RegisterDependencies() error {
 		return err
 	}
 
+	// Expose the agent service as the CRM module's ManualSendGovernance seam
+	// (dependency inversion: the CRM module depends on the interface, defined
+	// in its own app/services package, so no import cycle exists).
+	if err := m.container.Provide(func(agentService services.AgentService) crmServices.ManualSendGovernance {
+		return agentService
+	}); err != nil {
+		return err
+	}
+
 	if err := m.container.Provide(func(
 		repo domain.AgentRepository,
 	) services.ComplianceService {
 		return services.NewComplianceService(repo)
+	}); err != nil {
+		return err
+	}
+
+	if err := m.container.Provide(func(
+		repo domain.AgentRepository,
+		llmClient llmdomain.LLMClient,
+		billing billingServices.BillingService,
+		log logger.Logger,
+	) domain.ConversationContextService {
+		return services.NewConversationContextService(repo, llmClient, billing, log)
 	}); err != nil {
 		return err
 	}

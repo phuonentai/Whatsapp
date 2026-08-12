@@ -2,7 +2,10 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/moasq/go-b2b-starter/internal/db/helpers"
 	sqlc "github.com/moasq/go-b2b-starter/internal/db/postgres/sqlc/gen"
@@ -41,14 +44,18 @@ func (r *documentRepository) Create(ctx context.Context, doc *domain.Document) (
 	return r.mapToDomain(&result), nil
 }
 
-func (r *documentRepository) GetByID(ctx context.Context, orgID, docID int32) (*domain.Document, error) {
+func (r *documentRepository) GetByID(ctx context.Context, orgID, docID int32, includeAdminOnly bool) (*domain.Document, error) {
 	params := sqlc.GetDocumentByIDParams{
-		ID:             docID,
-		OrganizationID: orgID,
+		ID:               docID,
+		OrganizationID:   orgID,
+		IncludeAdminOnly: includeAdminOnly,
 	}
 
 	result, err := r.store.GetDocumentByID(ctx, params)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrDocumentNotFound
+		}
 		return nil, fmt.Errorf("failed to get document: %w", err)
 	}
 
@@ -69,11 +76,12 @@ func (r *documentRepository) GetByFileAssetID(ctx context.Context, orgID, fileAs
 	return r.mapToDomain(&result), nil
 }
 
-func (r *documentRepository) List(ctx context.Context, orgID int32, limit, offset int32) ([]*domain.Document, error) {
+func (r *documentRepository) List(ctx context.Context, orgID int32, limit, offset int32, includeAdminOnly bool) ([]*domain.Document, error) {
 	params := sqlc.ListDocumentsByOrganizationParams{
-		OrganizationID: orgID,
-		Limit:          limit,
-		Offset:         offset,
+		OrganizationID:   orgID,
+		Limit:            limit,
+		Offset:           offset,
+		IncludeAdminOnly: includeAdminOnly,
 	}
 
 	results, err := r.store.ListDocumentsByOrganization(ctx, params)
@@ -89,12 +97,13 @@ func (r *documentRepository) List(ctx context.Context, orgID int32, limit, offse
 	return docs, nil
 }
 
-func (r *documentRepository) ListByStatus(ctx context.Context, orgID int32, status domain.DocumentStatus, limit, offset int32) ([]*domain.Document, error) {
+func (r *documentRepository) ListByStatus(ctx context.Context, orgID int32, status domain.DocumentStatus, limit, offset int32, includeAdminOnly bool) ([]*domain.Document, error) {
 	params := sqlc.ListDocumentsByStatusParams{
-		OrganizationID: orgID,
-		Status:         string(status),
-		Limit:          limit,
-		Offset:         offset,
+		OrganizationID:   orgID,
+		Status:           string(status),
+		Limit:            limit,
+		Offset:           offset,
+		IncludeAdminOnly: includeAdminOnly,
 	}
 
 	results, err := r.store.ListDocumentsByStatus(ctx, params)
@@ -146,6 +155,7 @@ func (r *documentRepository) Update(ctx context.Context, doc *domain.Document) (
 		OrganizationID: doc.OrganizationID,
 		Title:          doc.Title,
 		Metadata:       helpers.ToJSONB(doc.Metadata),
+		Visibility:     string(doc.Visibility),
 	}
 
 	result, err := r.store.UpdateDocument(ctx, params)
@@ -169,8 +179,13 @@ func (r *documentRepository) Delete(ctx context.Context, orgID, docID int32) err
 	return nil
 }
 
-func (r *documentRepository) Count(ctx context.Context, orgID int32) (int64, error) {
-	count, err := r.store.CountDocumentsByOrganization(ctx, orgID)
+func (r *documentRepository) Count(ctx context.Context, orgID int32, includeAdminOnly bool) (int64, error) {
+	params := sqlc.CountDocumentsByOrganizationParams{
+		OrganizationID:   orgID,
+		IncludeAdminOnly: includeAdminOnly,
+	}
+
+	count, err := r.store.CountDocumentsByOrganization(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count documents: %w", err)
 	}
@@ -178,10 +193,11 @@ func (r *documentRepository) Count(ctx context.Context, orgID int32) (int64, err
 	return count, nil
 }
 
-func (r *documentRepository) CountByStatus(ctx context.Context, orgID int32, status domain.DocumentStatus) (int64, error) {
+func (r *documentRepository) CountByStatus(ctx context.Context, orgID int32, status domain.DocumentStatus, includeAdminOnly bool) (int64, error) {
 	params := sqlc.CountDocumentsByStatusParams{
-		OrganizationID: orgID,
-		Status:         string(status),
+		OrganizationID:   orgID,
+		Status:           string(status),
+		IncludeAdminOnly: includeAdminOnly,
 	}
 
 	count, err := r.store.CountDocumentsByStatus(ctx, params)
@@ -190,6 +206,26 @@ func (r *documentRepository) CountByStatus(ctx context.Context, orgID int32, sta
 	}
 
 	return count, nil
+}
+
+func (r *documentRepository) ListIndexedForCompliance(ctx context.Context, orgID int32) ([]domain.ComplianceDocument, error) {
+	results, err := r.store.ListIndexedDocuments(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list indexed documents: %w", err)
+	}
+
+	docs := make([]domain.ComplianceDocument, len(results))
+	for i, result := range results {
+		docs[i] = domain.ComplianceDocument{
+			ID:         result.ID,
+			Title:      result.Title,
+			Status:     domain.DocumentStatus(result.Status),
+			Visibility: domain.DocumentVisibility(result.Visibility),
+			CreatedAt:  result.CreatedAt.Time,
+		}
+	}
+
+	return docs, nil
 }
 
 // mapToDomain converts SQLC document type to domain type.
@@ -205,6 +241,7 @@ func (r *documentRepository) mapToDomain(doc *sqlc.DocumentsDocument) *domain.Do
 		FileSize:       doc.FileSize,
 		ExtractedText:  helpers.FromPgText(doc.ExtractedText),
 		Status:         domain.DocumentStatus(doc.Status),
+		Visibility:     domain.DocumentVisibility(doc.Visibility),
 		Metadata:       helpers.FromJSONB(doc.Metadata),
 		CreatedAt:      doc.CreatedAt.Time,
 		UpdatedAt:      doc.UpdatedAt.Time,

@@ -2,6 +2,7 @@
 
 import { usePlaybooksQuery } from "@/lib/hooks/queries/use-playbooks-query";
 import type { PlaybookGuionDto } from "@/lib/api/api/dto/playbook.dto";
+import { tpl, ui } from "@/lib/copy/ui";
 
 interface QuickRepliesProps {
   conversationId: number;
@@ -34,9 +35,12 @@ export function QuickReplies({
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-2">
-      {sequenceActive ? (
-        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-          Paso {sequenceStep} de {sequenceTotal}
+      {sequenceActive && sequenceStep !== null && sequenceTotal > 0 ? (
+        <span
+          role="status"
+          className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700"
+        >
+          {tpl(ui.inbox.sequenceStepChip, { k: sequenceStep, n: sequenceTotal })}
         </span>
       ) : null}
       {guiones.map((guion) =>
